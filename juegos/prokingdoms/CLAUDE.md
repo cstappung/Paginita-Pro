@@ -535,7 +535,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - No `D.PROTO` bump: the server only uses `W.ubicarLugares` for the Calzada's `ocupa`. Until `firebase deploy --only
   functions`, the deployed server still treats the old footprints as occupied (a Calzada tile there is refused).
 
-## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, `js/cintas.js`, `PK.Cintas`)
+## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, menu/packets `pk-67`, `js/cintas.js`, `PK.Cintas`)
 
 - **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
   `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
@@ -561,7 +561,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   tracing (`plegarAlColocar`). Belts may not go on roads or the Calzada (use a pass). «Quitar varios» removes pieces.
 - **Old saves:** `st.logi.belts` become level III pieces with their items (`Ci.init`), `st.logi.avisoCintas` toasts once.
 - The server never sees belts; `Lb.fuera` counts what rides on them (`Ci.enCinta`). The autopilot does not build them.
-- Levels I–V (`D.CINTA.maxFase` 5 since C3): IV from Era V (300/min), V from Era VI (480/min).
+- Levels I–V (`D.CINTA.maxFase` 5 since C3): IV from Era V (300 items/min = 1,200 units with packets), V from Era VI (480 items/min = 1,920 units).
 - **C2 nodes** (`Ci.NODO`): `u` unidor (takes from every lane that enters, turn by turn: `turno`/`listo`/`hayLugarDesde`),
   `v` divisor and `s` clasificador (one input, outputs ahead and both sides, round-robin `c.rr` among outs with room).
   Lanes carry `outs` (`{c|b, d}`) and `ent` (`{c, d}`) instead of a single `sig`; every walker (tramo, alimenta,
@@ -592,6 +592,27 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
   The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
   options) feeds the sorter panel's short list.
+- **Packets (pk-67, owner's request: 4× capacity):** an item is `[res, q, cant]`, up to `D.CINTA.pila` (4) units;
+  no `cant` means 1 (old saves). Same items on screen, so the phone cost does not change. `sacar` takes up to a packet,
+  `entregar(b, r, cant)` returns how many fit and the rest waits at the lane's tip (`it0[2]`), `pz.flujo`/`pz.pm`,
+  `Ci.enCinta`, `devolverItems` and the offline budget count units. Show rates with `Ci.porMin(n)`, never
+  `rate * 60`.
+- **Several belts per building:** `bordeHacia` prefers a free border tile and only falls back to one with a piece
+  (it used to take the nearest even if a belt already left from there, so a second belt collided with the first).
+- **Belt menu (pk-67):** `#cintabar` (ui.js `barraCintas`, refreshed with the panel) shows while
+  `PK.Render.modoCintas()` (a belt tool in `Ci.HERR`, or a selected piece). Menu button «Cintas» (Reino group, id
+  `cintas`), key K, and Logística's «Cintas…» open it (`PK.Input.abrirCintas`). Tap-a-piece tools
+  (`Ci.HERR_PIEZA`, handled by `I.usarEnPieza`): `cnodo` (with `L.cintaNodo` u/v/s), `csubir` (whole tramo to
+  `L.cintaNivel`), `cgirar`, `cquitar`, `cmolde` (picks the network, then the `copiar` tool). The level starts at
+  your era's best until you pick one (`L.cintaNivelElegido`). On phones the labels hide and it wraps in two rows; the
+  minimap hides while it is open.
+- **Transparent mode (pk-67, owner's request):** while `modoCintas()`, items in the sorted list draw with
+  `TRANSP[it.k]` alpha (buildings 0.28), then a veil and the whole network (and the `puente` items) are drawn again on
+  top. Anything new that should fade must use a `k` in `TRANSP`.
+- **Ports (pk-67):** `Sp.beltBoca(d, entrada, n)` — a hopper where a lane delivers into a building, an arched hatch
+  with a chute where a lane takes from one. `Ci.bocas` lists them per `armarDib` as `k: 'puente'` items; when the
+  building is behind the belt (d W/N) the port sorts just after the building so it sits on its visible wall.
+
 
 ### War plan, G4: decisions during the siege (`pk-61`)
 

@@ -33,7 +33,7 @@
     for (const i of st.logi.roads) W.road[i] = 1;
     PK.Cintas.init(st); // pk-58: convierte las cintas de antes y marca W.belt
     W.roadVer++;
-    L.tool = null; L.beltFrom = null; L.cintaNivel = 1; caminosRevisados = false;
+    L.tool = null; L.beltFrom = null; L.cintaNivel = 1; L.cintaNivelElegido = false; caminosRevisados = false;
   };
   L.save = function (st) {
     const roads = [];

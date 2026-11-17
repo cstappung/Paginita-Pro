@@ -2792,6 +2792,55 @@
     return (BELTC[key] = { c, ox: 16, oy: alto, mask: conMascara(c) });
   };
 
+  // pk-67 (pedido del dueño): las bocas donde una cinta toca un edificio. Entrega: una tolva con la boca abierta arriba
+  // (y de frente, si se ve ese lado). Saca: una compuerta con arco y una rampa que baja a la cinta. d: hacia dónde está
+  // el edificio desde la casilla de la cinta (0 E, 1 S, 2 O, 3 N). Del color del nivel de la pieza.
+  S.beltBoca = function (d, entrada, n) {
+    n = n || 3;
+    const key = 'b' + d + (entrada ? 1 : 0) + n;
+    if (BELTC[key]) return BELTC[key];
+    const H = 18, c = document.createElement('canvas'); c.width = 32; c.height = 16 + H;
+    const ctx = c.getContext('2d'), C = BELT_COL[n];
+    const DV = [[1, 0], [0, 1], [-1, 0], [0, -1]][d], LAT = [-DV[1], DV[0]];
+    const P = (a, s, h) => isoP(0.5 + DV[0] * a + LAT[0] * s, 0.5 + DV[1] * a + LAT[1] * s, h, H);
+    const rgb = (k, f) => 'rgb(' + Math.round(Math.min(255, k[0] * f)) + ',' + Math.round(Math.min(255, k[1] * f)) + ',' + Math.round(Math.min(255, k[2] * f)) + ')';
+    const poly = (pts, col) => { ctx.fillStyle = col; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.fill(); };
+    const cuerpo = n === 1 ? [118, 82, 50] : sc(C.riel, 0.62), canto = C.riel;
+    // una caja en coordenadas de la boca (a: de la cinta hacia el edificio, s: a lo ancho), con sus caras visibles
+    const caja = (a0, a1, s0, s1, h0, h1, col) => {
+      const pts = [[a0, s0], [a1, s0], [a1, s1], [a0, s1]].map(([a, s2]) => { const p = P(a, s2, 0); return { a, s: s2, u: p[0], y: p[1] }; });
+      const U0 = 0.5 + Math.min(DV[0] * a0 + LAT[0] * s0, DV[0] * a1 + LAT[0] * s1), U1 = 0.5 + Math.max(DV[0] * a0 + LAT[0] * s0, DV[0] * a1 + LAT[0] * s1);
+      const V0 = 0.5 + Math.min(DV[1] * a0 + LAT[1] * s0, DV[1] * a1 + LAT[1] * s1), V1 = 0.5 + Math.max(DV[1] * a0 + LAT[1] * s0, DV[1] * a1 + LAT[1] * s1);
+      const Q = (u, v, h) => isoP(u, v, h, H);
+      poly([Q(U1, V0, h0), Q(U1, V1, h0), Q(U1, V1, h1), Q(U1, V0, h1)], rgb(col, 0.66));
+      poly([Q(U0, V1, h0), Q(U1, V1, h0), Q(U1, V1, h1), Q(U0, V1, h1)], rgb(col, 0.86));
+      poly([Q(U0, V0, h1), Q(U1, V0, h1), Q(U1, V1, h1), Q(U0, V1, h1)], rgb(col, 1.08));
+      return pts;
+    };
+    const deFrente = d >= 2; // el lado que mira a la cinta se ve solo si el edificio queda atrás (O o N)
+    const cara = (a, s0, s1, h0, h1, col) => poly([P(a, s0, h0), P(a, s1, h0), P(a, s1, h1), P(a, s0, h1)], col);
+    if (entrada) {
+      caja(0.3, 0.5, -0.3, 0.3, 0, 9, cuerpo);
+      if (deFrente) { cara(0.3, -0.17, 0.17, 1, 7, '#120c08'); cara(0.3, -0.17, 0.17, 6, 7, rgb(cuerpo, 0.4)); }
+      caja(0.25, 0.5, -0.37, 0.37, 9, 12, canto);
+      poly([P(0.3, -0.27, 12), P(0.45, -0.27, 12), P(0.45, 0.27, 12), P(0.3, 0.27, 12)], '#120c08'); // la boca de la tolva
+      poly([P(0.3, -0.27, 12), P(0.45, -0.27, 12), P(0.45, -0.2, 12), P(0.3, -0.2, 12)], rgb(cuerpo, 0.45));
+      const l = P(0.25, 0, 10.5); ctx.fillStyle = '#7aff8a'; ctx.fillRect(Math.round(l[0]) - 1, Math.round(l[1]), 2, 1); // luz verde: entra
+    } else {
+      const rampa = () => {
+        poly([P(0.33, -0.18, 5), P(0.33, 0.18, 5), P(0.1, 0.18, 0.5), P(0.1, -0.18, 0.5)], rgb(canto, 0.9));
+        for (const t of [0.35, 0.7]) { const a = 0.33 - 0.23 * t, h = 5 - 4.5 * t; const p0 = P(a, -0.17, h), p1 = P(a, 0.17, h); ctx.strokeStyle = rgb(canto, 0.55); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
+      };
+      if (!deFrente) rampa();
+      caja(0.33, 0.5, -0.3, 0.3, 0, 13, cuerpo);
+      if (deFrente) { cara(0.33, -0.18, 0.18, 0, 7, '#120c08'); cara(0.33, -0.12, 0.12, 7, 9, '#120c08'); cara(0.33, -0.2, 0.2, 10, 11, canto); }
+      caja(0.31, 0.5, -0.34, 0.34, 13, 15, canto);
+      const l = P(0.31, 0, 14); ctx.fillStyle = '#ffc040'; ctx.fillRect(Math.round(l[0]) - 1, Math.round(l[1]), 2, 1); // luz ámbar: sale
+      if (deFrente) rampa();
+    }
+    return (BELTC[key] = { c, ox: 16, oy: H });
+  };
+
   S.TERRAIN_MM = [[86, 124, 48], [52, 78, 32], [124, 100, 64], [194, 174, 120], [36, 76, 116]];
   S.NODE_MM = { tree: [30, 58, 26], berry: [150, 60, 90], deer: [170, 120, 70], stone: [170, 168, 160], gold: [240, 200, 70], ore: [180, 90, 60], marble: [240, 240, 232], gems: [90, 170, 230] };
 
