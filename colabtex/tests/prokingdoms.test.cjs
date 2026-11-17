@@ -1304,9 +1304,17 @@ test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, c
     Ci.cambio();
     for (let i = 0; i < 100; i++) Ci.update(0.1);
     assert.equal(Ci.carrilesEn(W.idx(23, 50))[0].src, mina, 'boca de salida del campamento: todo lo que junta');
-    assert.match(Ci.carrilesEn(W.idx(26, 50))[0].motivo || '', /^Atascada: llega (piedra|oro) y Herrería no lo usa/);
-    assert.ok(Ci.carrilesEn(W.idx(26, 50))[0].atasco);
+    // pk-70: lo que nadie de adelante recibe ya no sale (antes salía y trababa la cinta)
+    assert.match(Ci.carrilesEn(W.idx(23, 50))[0].motivo || '', /^No sale nada: adelante nadie recibe (piedra|oro)/);
+    assert.ok(!Ci.carrilesEn(W.idx(26, 50))[0].atasco, 'no se traba');
+    assert.equal([23, 24, 25, 26].reduce((n, x) => n + t[W.idx(x, 50)].i.length, 0), 0, 'la cinta queda vacía');
     assert.ok(!forja2.inb.stone && !forja2.inb.gold, 'no entra lo que no usa');
+    // y si se trabó con carga vieja (de antes), avisa en rojo
+    t[W.idx(26, 50)].i.push(['stone', 0.9, 4]);
+    for (let i = 0; i < 10; i++) Ci.update(0.1);
+    assert.match(Ci.carrilesEn(W.idx(26, 50))[0].motivo || '', /^Atascada: llega piedra y Herrería no lo usa/);
+    assert.ok(Ci.carrilesEn(W.idx(26, 50))[0].atasco);
+    t[W.idx(26, 50)].i = [];
     // cruce: una cinta vertical cruza la horizontal en x 28 sin mezclarse
     t[W.idx(28, 41)].p = 'k'; t[W.idx(28, 41)].j = [];
     pz(28, 39, 1, 3); pz(28, 40, 1, 3); pz(28, 42, 1, 3); pz(28, 43, 1, 3);
@@ -1613,4 +1621,41 @@ test('pk-69: el clasificador manda por «lo que sobre» lo que no entra en la sa
     assert.equal(fa.inb.planks, 20, 'sin conexión: la derecha se completa');
     assert.ok(fb.inb.planks >= 150 * PILA, 'sin conexión: el resto va adelante (' + fb.inb.planks + ')');
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});
+
+test('pk-70: de bodega a bodega la cinta entrega aunque el pueblo esté lleno o sobre el tope, y no saca lo que nadie recibe', () => {
+  const Ci = PK.Cintas, L = PK.Logi, Lb = PK.Libro, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, capDe0 = G.capDe, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  G.stat = () => {}; G.cap = () => 500; G.capDe = () => 1000;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  const a = mk(1, 'warehouse', 20, 40, { inv: { wood: 400, stone: 400, gold: 400, iron: 0 } }), b = mk(2, 'warehouse', 30, 40, { inv: {} });
+  G.buildings = [a, b]; G.bById = new Map(G.buildings.map(o => [o.id, o]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  // el pueblo, muy por encima del tope (un premio): 800 de cada uno con tope 500
+  G.state = Object.assign({}, st0 || {}, { era: 6, res: { wood: 800, stone: 800, gold: 800, food: 800 }, flags: {}, auto: { reserve: 0 }, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t;
+  try {
+    for (let x = 23; x <= 29; x++) t[W.idx(x, 41)] = { p: 'c', d: 0, n: 3, i: [] };
+    Ci.init(G.state);
+    const boca = Ci.carrilesEn(W.idx(23, 41))[0];
+    assert.equal(boca.src, a); assert.equal(Ci.carrilesEn(W.idx(29, 41))[0].dst, b);
+    boca.pz.f = ['wood', 'stone', 'gold', 'food', 'planks'];
+    Ci.cambio();
+    const total0 = ['wood', 'stone', 'gold'].reduce((n, r) => n + G.state.res[r], 0);
+    for (let i = 0; i < 600; i++) Ci.update(0.1);
+    const llego = ['wood', 'stone', 'gold'].map(r => b.inv[r] || 0);
+    assert.ok(llego.every(n => n >= 40), 'llegan los tres a la otra bodega (' + llego + ')');
+    const enCinta = ['wood', 'stone', 'gold'].reduce((n, r) => n + Ci.enCinta(r), 0);
+    assert.equal(['wood', 'stone', 'gold'].reduce((n, r) => n + G.state.res[r], 0) + enCinta, total0, 'no se crea ni se pierde nada');
+    assert.ok(!Object.values(t).some(pz => pz.i.some(it => it[0] === 'food')), 'la comida no sale: esta bodega no tiene');
+    assert.ok(Object.values(t).every(pz => pz.i.every(it => it[3] === 1)), 'los paquetes llevan la marca de que salieron de una bodega');
+    // sin conexión, igual
+    for (const k in t) t[k].i = [];
+    b.inv = {};
+    Ci.offline(60);
+    assert.ok((b.inv.wood || 0) >= 100, 'sin conexión también llega (' + b.inv.wood + ')');
+    // Lb.poner sin margen no pasa el tope; con margen, sí (lo que vuelve)
+    assert.equal(Lb.poner(b, 'wood', 4), 0);
+    assert.equal(Lb.poner(b, 'wood', 4, 4), 4);
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });

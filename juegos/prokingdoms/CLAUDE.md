@@ -600,6 +600,14 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `entregar(b, r, cant)` returns how many fit and the rest waits at the lane's tip (`it0[2]`), `pz.flujo`/`pz.pm`,
   `Ci.enCinta`, `devolverItems` and the offline budget count units. Show rates with `Ci.porMin(n)`, never
   `rate * 60`.
+- **Store to store (pk-70, owner's report «saca 3 y nunca llega»):** a packet taken from a store carries `it[3] = 1`;
+  delivering it to a store passes that much over the town cap (`Lb.poner(b, r, n, extra)`), because it already
+  counted there. Before, with the town full or over the cap (rewards enter over it) the belt filled with 3 packets
+  and stopped forever. Offline the same through `deBod`.
+- **A port emits only what someone downstream receives** (`aceptaAbajo`, memo per `armado`; a sorter passes its
+  filter and everything through `'*'`). Otherwise the source lane shows «No sale nada: adelante nadie recibe …»; a
+  belt still jams (red) only with old cargo. The store-port picker shows how much this building holds of each
+  resource and warns about picks it does not hold or nobody receives.
 - **Several belts per building:** `bordeHacia` prefers a free border tile and only falls back to one with a piece
   (it used to take the nearest even if a belt already left from there, so a second belt collided with the first).
 - **Belt menu (pk-67):** `#cintabar` (ui.js `barraCintas`, refreshed with the panel) shows while
