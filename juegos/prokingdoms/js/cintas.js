@@ -265,7 +265,7 @@
   // cuánto puede dar de eso (una bodega, sin bajar de la reserva)
   function hayDe(b, r) {
     if (PK.Libro.esCampo(b)) return PK.Libro.inv(b)[r] || 0;
-    return Math.min(PK.Libro.inv(b)[r] || 0, (S().res[r] || 0) - reserva(r));
+    return (S().res[r] || 0) - reserva(r); // pk-71: de todo el pueblo (ver disponible)
   }
   // qué puede salir por esa boca: lo que hace el taller, lo que junta el campamento, lo elegido en la bodega
   function opcionesFuente(c) {
@@ -278,8 +278,13 @@
   function disponible(b, r) {
     if (L().isShop(b)) return ((b.outb && b.outb[r]) || 0) >= 1;
     if (PK.Libro.esCampo(b)) return (PK.Libro.inv(b)[r] || 0) >= 1;
-    return (PK.Libro.inv(b)[r] || 0) >= 1 && (S().res[r] || 0) - 1 >= reserva(r);
+    // pk-71 (reporte del dueño, «saca solo un par de lo que elegí»): una boca de bodega saca del pueblo entero. Antes
+    // pedía que ese edificio lo tuviera en sus estantes, y los aldeanos dejan cada cosa en la bodega más cercana: el
+    // Centro Urbano solía tener dos de los seis recursos elegidos. Lb.sacar baja primero los de este edificio y la
+    // conciliación saca el resto de las demás bodegas (como al pagar).
+    return (S().res[r] || 0) - 1 >= reserva(r);
   }
+  Ci.puedeSacar = (b, r) => disponible(b, r);
   // la reserva de los talleres (como las carretas): una bodega no se vacía por debajo de lo que guarda el Capataz
   function reserva(r) {
     const st = S(), rv = st.auto ? st.auto.reserve || 0 : 0;
@@ -418,7 +423,7 @@
       if (!opc.length) continue;
       let presu = NIV(c.pz.n).rate * PILA() * k0 * dt;
       const quedan = {};
-      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r)));
+      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, (st.res[r] || 0) - reserva(r));
       for (let pasada = 0; pasada < 3 && presu > 0.01; pasada++) {
         const vivos = opc.filter(r => quedan[r] > 0.01);
         if (!vivos.length) break;
