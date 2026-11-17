@@ -56,10 +56,17 @@
     const [hx, hy] = tc ? [tc.cx, tc.cy] : D.PLAYER_HOME, propios = g.buildings.filter(b => b.owner === 'p');
     let caminos = 0;
     for (let k = 0; k < 160 && caminos < 6; k++) {
-      const a = Math.random() * Math.PI * 2, r = k < 100 ? 15 + Math.random() * 8 : 10 + Math.random() * 6;
-      const x = Math.floor(hx + Math.cos(a) * r), y = Math.floor(hy + Math.sin(a) * r);
-      if (!W.explored(x, y) || !W.passable(x, y)) continue;
-      if (k < 100 && W.ownerAt(x, y) === 'p') continue; // mejor desde afuera de tus tierras
+      // pk-61 (reporte de un jugador): siempre desde afuera de tus tierras. Antes buscaban a 15–23 casillas del Centro
+      // Urbano y, si tu tierra llegaba más lejos, a los 100 intentos aceptaban un lugar adentro: con el reino crecido
+      // aparecían en medio del pueblo. Ahora se camina en esa dirección hasta el borde y se acampa unas casillas más allá.
+      const a = Math.random() * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+      let borde = 0;
+      for (let r = 6; r < 90; r++) { const bx = Math.floor(hx + ca * r), by = Math.floor(hy + sa * r); if (!W.inb(bx, by)) break; if (W.ownerAt(bx, by) !== 'p') { borde = r; break; } }
+      if (!borde) continue;
+      const r = Math.max(15, borde + 2 + Math.random() * 6);
+      const x = Math.floor(hx + ca * r), y = Math.floor(hy + sa * r);
+      if (!W.inb(x, y) || !W.explored(x, y) || !W.passable(x, y)) continue;
+      if (W.ownerAt(x, y) === 'p') continue;
       if (propios.some(b => U.dist(b.cx, b.cy, x, y) < 7)) continue;
       if (PK.Def.isInside(x, y)) continue;
       const dest = almacenes().sort((p, q) => U.dist(p.cx, p.cy, x, y) - U.dist(q.cx, q.cy, x, y))[0];
@@ -88,7 +95,7 @@
     st.inc.n++;
     const def = PK.Social.defense();
     if (olas > 1) toast('¡Asedio ' + Inc.banda.lado + '! Llegan ' + olas + ' oleadas de bandidos, la primera de ' + cuantos + ' (fuerza aprox. ' + U.fmt(fuerza) + '), en ' + U.fmtTime(aviso) + '. Los aldeanos se refugiarán en el Centro Urbano. Tu defensa: ' + U.fmt(def) + '.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
-    else toast('¡Bandidos ' + Inc.banda.lado + '! Una banda de ' + cuantos + ' (fuerza aprox. ' + U.fmt(fuerza) + ') acampa a la vista y atacará en ' + U.fmtTime(aviso) + '. Tu defensa: ' + U.fmt(def) + '.', 'bad', { label: 'Ver', fn: () => Inc.ver() });
+    else toast('¡Bandidos ' + Inc.banda.lado + '! Una banda de ' + cuantos + ' (fuerza aprox. ' + U.fmt(fuerza) + ') acampa a la vista y atacará en ' + U.fmtTime(aviso) + '. Tu defensa: ' + U.fmt(def) + '.', 'bad', hayTropas() ? { label: 'Atacar su campamento', fn: () => Inc.cargar() } : { label: 'Ver', fn: () => Inc.ver() });
     Inc.banda.explicar = n === 0; // la primera vez, cómo se defiende (en otro aviso: uno solo no cabía en el celular)
     sfx('cuerno');
     g.stat('raids', 1);
@@ -136,6 +143,8 @@
       st.inc.t -= dt;
       if (st.inc.t <= 0) st.inc.t = empezar() ? U.rand(ENTRE[0], ENTRE[1]) : 60;
     } else actualizar(dt);
+    if (!Inc.banda && !Inc.defensores.length && PK.Life && PK.Life.wolves.length && (Inc.lobosT = (Inc.lobosT || 0) - dt) <= 0) { Inc.lobosT = 5; Inc.salirLobos(); }
+    if (Inc.banda && Inc.defensores.length && Inc.defensores[0].lobos) Inc.defensores = []; // llegaron bandidos: vuelven a formar
     actualizarDefensores(dt);
     disparos(dt);
   };
@@ -157,6 +166,8 @@
     for (const b of bd.bandidos) b.anim += dt;
     const dest = g.bById.get(bd.dest);
     if (bd.fase === 'aviso') {
+      // pk-61: «Atacar su campamento»: cuando tus tropas llegan, levantan el campamento y pelean ahí, lejos del pueblo
+      if (bd.cargar && bd.t < bd.aviso && Inc.defensores.some(d => U.dist(d.x, d.y, bd.ox, bd.oy) < 4)) { bd.t = bd.aviso; toast('¡Tus tropas cayeron sobre el campamento de los bandidos!', 'good'); }
       if (bd.explicar && bd.t >= 7) {
         bd.explicar = false;
         toast('Los bandidos no respetan treguas. Tu Centro Urbano y tus Torres les disparan, y las tropas del Cuartel salen a cortarles el paso. Si llegan, roban parte de tus bodegas.', 'info');
@@ -169,7 +180,7 @@
         toast(bd.olas > 1 ? '¡Oleada ' + bd.ola + ' de ' + bd.olas + ': marchan sobre tu pueblo!' : '¡Los bandidos ' + bd.lado + ' marchan sobre tu pueblo!', 'bad', { label: 'Ver', fn: () => Inc.ver() });
         sfx('cuerno');
         if (bd.olas > 1) refugio();
-        salir();
+        if (!Inc.defensores.length || Inc.defensores[0].lobos) salir(); // pk-61: si ya fueron a su campamento, siguen
       }
       return;
     }
@@ -313,6 +324,30 @@
     for (const k in army) if (army[k] > 0 && k !== 'catapult') out[k] = army[k];
     return out;
   }
+  const hayTropas = () => !!(PK.Troops && PK.Troops.total(enCasa()));
+  // pk-61 (sugerencia de un jugador): mandar las tropas antes de que marchen, a su campamento
+  Inc.cargar = function () {
+    const bd = Inc.banda;
+    if (!bd || bd.fase !== 'aviso') { toast('Ya vienen: tus tropas salen solas a cortarles el paso.', 'info'); return; }
+    if (!hayTropas()) { toast('No tienes tropas en casa: entrénalas en el Cuartel.', 'warn'); return; }
+    bd.cargar = true;
+    salir();
+    Inc.ver();
+  };
+  // pk-61: las tropas en casa también salen a cazar lobos (antes solo les tiraban las torres y el Centro Urbano)
+  Inc.salirLobos = function () {
+    const g = G(), units = enCasa(), lobos = PK.Life ? PK.Life.wolves.filter(w => !w.flee) : [];
+    if (Inc.banda || Inc.defensores.length || !lobos.length || !hayTropas()) return false;
+    const bars = g.buildings.filter(b => b.owner === 'p' && b.done && b.type === 'barracks'), w0 = lobos[0];
+    const casa = bars.sort((a, b) => U.dist(a.cx, a.cy, w0.x, w0.y) - U.dist(b.cx, b.cy, w0.x, w0.y))[0];
+    if (!casa || U.dist(casa.cx, casa.cy, w0.x, w0.y) > 30) return false;
+    const p = W.freeAround(casa.x, casa.y, casa.x + casa.w - 1, casa.y + casa.h - 1, Math.floor(w0.x), Math.floor(w0.y));
+    const tipos = PK.Troops.pickTypes(units, Math.min(6, PK.Troops.total(units)));
+    Inc.poderLobos = PK.Social.power(units);
+    Inc.defensores = tipos.map((tipo, i) => ({ id: i, tipo, lobos: true, x: p[0] + 0.5 + (i % 3) * 0.3 - 0.3, y: p[1] + 0.5 + Math.floor(i / 3) * 0.3, cx: p[0] + 0.5, cy: p[1] + 0.5, path: [], rt: i * 0.15, cd: 0, anim: Math.random(), flip: false, back: false, cuerpo: tipo !== 'archer', modo: 'walk' }));
+    toast('Tus tropas salen del Cuartel a espantar a los lobos.', 'info');
+    return true;
+  };
   function salir() {
     const bd = Inc.banda, g = G(), units = enCasa();
     if (!PK.Troops || !PK.Troops.total(units)) return;
@@ -350,8 +385,10 @@
   function actualizarDefensores(dt) {
     const bd = Inc.banda, list = Inc.defensores;
     if (!list.length) return;
-    const activos = bd && bd.fase !== 'aviso' && bd.pool > 0, objetivos = activos ? vivos().filter(b => !b.fuera && b.espera <= 0) : [];
-    const dps = bd && bd.poder ? (bd.poder * 0.25) / list.length : 0;
+    const lobos = list[0].lobos && !bd;
+    const activos = bd && (bd.fase !== 'aviso' || bd.cargar) && bd.pool > 0, objetivos = lobos ? PK.Life.wolves.filter(w => !w.flee && w.hp > 0) : activos ? vivos().filter(b => !b.fuera && !(b.espera > 0)) : [];
+    const dps = lobos ? ((Inc.poderLobos || 0) * 0.25) / list.length : bd && bd.poder ? (bd.poder * 0.25) / list.length : 0;
+    const pegar = lobos ? (w, n) => PK.Life.herirLobo(w, n) : herir;
     if (bd && bd.pool > 0 && bd.dano >= bd.pool) {
       bd.pool = 0;
       toast('Tus tropas no pudieron con los bandidos y se repliegan al Cuartel.', 'bad');
@@ -379,11 +416,11 @@
       if (bdist <= alcance) {
         d.path = []; d.modo = 'work';
         mirar(d, tgt.x, tgt.y);
-        if (d.cuerpo) herir(tgt, dps * dt);
+        if (d.cuerpo) pegar(tgt, dps * dt);
         else if (d.cd <= 0) { // los arqueros disparan de lejos
           d.cd = 1.1;
           const dmg = dps * 1.1;
-          PK.Life.arrows.push({ x0: d.x, y0: d.y, z0: 14, w: tgt, t: 0, dur: Math.max(0.15, bdist / 12), dmg, fn: a => herir(a.w, a.dmg) });
+          PK.Life.arrows.push({ x0: d.x, y0: d.y, z0: 14, w: tgt, t: 0, dur: Math.max(0.15, bdist / 12), dmg, fn: a => pegar(a.w, a.dmg) });
           sfx('arrow');
         }
         continue;

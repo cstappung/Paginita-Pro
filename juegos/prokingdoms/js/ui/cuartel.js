@@ -296,10 +296,10 @@
       pane.append(el('div', { class: 'raid-row dungeon' + (locked ? ' locked' : '') },
         el('img', { class: 'dg-ico', src: Sp.poi(p.kind, false).c.toDataURL() }),
         el('div', { class: 'dg-info' }, el('b', null, d.name), el('div', { class: 'small' }, enemyText(d.enemy) + ' · da ' + D.RES[d.loot].name.toLowerCase()),
-          el('div', { class: 'small muted' }, 'Pisos ' + site.best + '/' + d.floors + ' · viaje ' + U.fmtTime(PK.Exp.travel(p)) + (rest > 0 ? ' · se repone en ' + U.fmtTime(rest / 1000) : ''))),
+          el('div', { class: 'small muted' }, 'Pisos ' + site.best + '/' + d.floors + ' · viaje ' + U.fmtTime(PK.Exp.travel(p)) + (rest > 0 ? ' · se repone en ' + U.fmtTime(rest / 1000) : '') + (p.sub ? ' · bajo tierra (su entrada quedó tapada por un reino)' : ''))),
         locked ? el('span', { class: 'muted small' }, 'Era ' + U.roman(d.era)) : going ? el('span', { class: 'muted small' }, 'Expedición en curso') :
           bloques ? el('span', { class: 'row' }, bloques.slice(-2).map(bloqueBtn)) : el('span', { class: 'row' }, site.best ? floorBtn(site.best) : null, site.best < d.floors ? floorBtn(next) : null),
-        UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + 1, p.y + 1); }, { small: true })));
+        UI.btn('Ver', () => { UI.closeModal(); PK.Render.centerOn(p.x + p.w / 2, p.y + p.h / 2); }, { small: true })));
     }
   }
 

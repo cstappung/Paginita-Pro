@@ -392,7 +392,7 @@
   // ¿Está llena la bodega de eso? Los aldeanos esperan en vez de gastar el recurso del mapa.
   G.isFull = res => G.cap(res) !== Infinity && (S.res[res] || 0) >= G.cap(res) - 0.5;
   // pk-43: lleno para quien descarga en ese edificio: un campamento mira su propio tope; el pueblo, sus bodegas
-  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) ? PK.Libro.campoLleno(b) : G.isFull(res); };
+  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) && !(PK.Logi.campoAislado && PK.Logi.campoAislado(b)) ? PK.Libro.campoLleno(b) : G.isFull(res); }; // pk-61: el aislado mira el pueblo
   G.noteFull = function (res) {
     // un solo aviso cada 2 minutos que junta todo lo que se llenó (antes uno por recurso, y se apilaban)
     if (PK.UI && !G.offline) {
@@ -814,12 +814,13 @@
   G.poiTier = p => D.poiTier(U.dist(p.x + p.w / 2, p.y + p.h / 2, D.PLAYER_HOME[0], D.PLAYER_HOME[1]));
   G.explorePct = () => W.fogCount / (W.W * W.H);
 
+  G.discoverPoi = discoverPoi;
   G.revealAt = function (x, y, r, ok) {
     const idx = W.reveal(x, y, r, ok);
     if (!idx.length) return;
     G.stat('explored', idx.length);
     for (const i of idx) {
-      const pid = W.poiAt[i];
+      const pid = W.poiAt[i] >= 0 ? W.poiAt[i] : W.subAt.size ? W.subAt.get(i) : undefined; // pk-62: o una mazmorra bajo tierra
       if (pid >= 0) discoverPoi(W.pois[pid]);
     }
     for (const bot of D.BOTS) {
@@ -832,12 +833,13 @@
     }
   };
 
-  function discoverPoi(p) {
+  function discoverPoi(p, callado) {
     const st = S.pois[p.id] || (S.pois[p.id] = {});
     if (st.f) return;
     st.f = 1;
     const tier = G.poiTier(p), name = D.POI[p.kind].name;
     G.stat('pois_found', 1);
+    if (callado && D.POI[p.kind].dungeon) { G.stat('dungeons_found', 1); return; } // pk-62: el despeje junta los avisos
     if (p.kind === 'chest') {
       const r = D.chestReward(tier);
       G.give(r); st.d = 1; G.stat('chests', 1);
@@ -1024,10 +1026,23 @@
   // metaJunta: las metas de la próxima era ya están y solo falta pagarla (recién ahí los talleres guardan insumos;
   // antes, las mejoras que piden las metas necesitan tablones y sillares).
   let metaC = null, metaT = -1, metaJunta = false;
+  // pk-61: lo que cuestan los edificios que pide la próxima era y todavía no tienes (ni en obra). Sin esto la meta
+  // juntaba solo el costo de la era: con el mármol justo para ella, nadie juntaba los 60 de la Universidad y el piloto
+  // se quedaba para siempre en la Era IV con «Falta: una Universidad, una Acería».
+  G.metaObras = function () {
+    const c = {};
+    if (S.eraProg) return c;
+    for (const r of D.eraReq(S.era + 1)) {
+      if (!r.any || r.n !== 1 || r.any.some(t => G.countAll(t) > 0)) continue;
+      const t = r.any.find(x => D.BUILD[x] && G.isUnlocked(x));
+      if (t) { const k = G.buildCost(t); for (const x in k) c[x] = (c[x] || 0) + k[x]; }
+    }
+    return c;
+  };
   G.metaNecesita = function () {
     if (metaC && Math.abs(G.time - metaT) < 1) return metaC;
     const c = {}, suma = x => { for (const r in x) c[r] = (c[r] || 0) + x[r]; };
-    if (!S.eraProg) suma(D.eraCost(S.era + 1));
+    if (!S.eraProg) { suma(D.eraCost(S.era + 1)); suma(G.metaObras()); }
     for (const id of S.upq || []) { const b = G.bById.get(id); if (b) suma(G.upCost(b)); }
     metaJunta = !S.eraProg && G.eraChecks(S.era + 1).every(x => x.ok);
     metaT = G.time;
@@ -1062,7 +1077,11 @@
     // 5.000 sillares cuando pedía 840 y nunca llegó a las 7.000 de piedra).
     if (S.auto && S.auto.plan === 'meta') {
       const nec = G.metaNecesita();
-      if ((S.res[out] || 0) >= Math.max((nec[out] || 0) * 1.25, 0.2 * G.cap(out)) && (metaJunta || nec[out])) for (const k in rc.in) if (nec[k] && (S.res[k] || 0) < nec[k]) return { res: k, have: S.res[k], keep: nec[k], meta: true };
+      // pk-61: si la meta no pide lo que hace, basta con 100 de eso (o el 20% de la bodega, lo que sea menos): con
+      // bodegas grandes la Herrería y la Acería nunca llegaban al 20% y se comían cada lingote que pedía la Era V
+      // (el piloto se quedó horas con 1 lingote y hierro de sobra)
+      const basta = nec[out] ? Math.max(nec[out] * 1.25, 0.2 * G.cap(out)) : Math.min(100, 0.2 * G.cap(out));
+      if ((S.res[out] || 0) >= basta && (metaJunta || nec[out])) for (const k in rc.in) if (nec[k] && (S.res[k] || 0) < nec[k]) return { res: k, have: S.res[k], keep: nec[k], meta: true };
     }
     if (S.upq && S.upq.length) {
       const nc = G.colaNecesita();
@@ -1766,12 +1785,15 @@
             u.x = p[0] + 0.5; u.y = p[1] + 0.5; u.path = [];
           }
           if (D.NODES[n.kind].marea && !D.mareaBaja(G.tSim)) continue; // el arrecife está bajo el agua
-          const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res, base);
+          // pk-61: como en vivo, el campamento al que no llega ningún carromato manda todo a pie al pueblo
+          const aislado = u.owner === 'p' && PK.Logi && PK.Logi.campoAislado && PK.Logi.campoAislado(base);
+          const viaje = aislado ? G.findDrop('p', t.res, n.x + 0.5, n.y + 0.5) || base : base;
+          const eff = tripRate(u, G.gatherRate(u.owner, t.res, u, n.kind), n.x + 0.5, n.y + 0.5, t.res, viaje);
           // los reinos simulados recolectan a menor ritmo sin ti, para que las zonas comunes no se vacíen
           // con la bodega llena, tus aldeanos no gastan el recurso del mapa (antes lo vaciaban y se perdía)
           // pk-43: si trabaja para un campamento, junta en el campamento (con su tope); si no, en el pueblo
           const alm = u.owner === 'p' && PK.Libro ? PK.Libro.almacenDe(base) : base; // pk-46: en una colonia, su Muelle
-          const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(alm);
+          const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(alm) && !aislado;
           const room = u.owner !== 'p' ? Infinity : campo ? Math.max(0, PK.Libro.capCampo(alm) - PK.Libro.totalCampo(alm)) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
           const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
           if (take <= 0) continue;

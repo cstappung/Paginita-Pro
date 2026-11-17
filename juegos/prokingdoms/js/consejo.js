@@ -110,10 +110,19 @@
       // reclutar hasta la guarnición: la mejor tropa disponible, sin vaciar las bodegas (paga solo si tiene el triple)
       const total = enCasa() + fuera + st.war.q.length;
       if (total < cs.guarnicion) {
-        const tipo = Object.keys(D.ARMY).filter(k => !Soc.trainWhy(k) && g.canAfford(D.ARMY[k].cost, 3)).sort((a, b) => D.ARMY[b].power - D.ARMY[a].power)[0];
+        // pk-61 (sugerencia de un jugador): un ejército repartido. Antes era siempre la tropa de más poder, y desde la
+        // Era V eso es la catapulta (60): «solo contrata catapultas por montones». Ahora cada tipo disponible tiene su
+        // parte (la catapulta, un décimo; el miliciano solo si no hay otra) y se recluta el que más le falta.
+        const disp = Object.keys(D.ARMY).filter(k => !Soc.trainWhy(k) && g.canAfford(D.ARMY[k].cost, 3));
+        const usar = disp.length > 1 ? disp.filter(k => k !== 'militia') : disp;
+        const cupo = k => (k === 'catapult' ? 0.1 : 1), tiene = {};
+        for (const k in army) tiene[k] = (tiene[k] || 0) + (army[k] || 0);
+        for (const r of st.exp.runs) for (const k in r.units) tiene[k] = (tiene[k] || 0) + r.units[k];
+        for (const k of st.war.q) tiene[k] = (tiene[k] || 0) + 1;
+        const tipo = usar.sort((a, b) => ((tiene[a] || 0) + 1) / cupo(a) - ((tiene[b] || 0) + 1) / cupo(b) || D.ARMY[b].power - D.ARMY[a].power)[0];
         if (tipo) {
           let n = 0;
-          while (n < 5 && enCasa() + fuera + st.war.q.length < cs.guarnicion && !Soc.trainWhy(tipo) && g.canAfford(D.ARMY[tipo].cost, 3)) n += Soc.trainArmy(tipo, 1);
+          while (n < 3 && enCasa() + fuera + st.war.q.length < cs.guarnicion && !Soc.trainWhy(tipo) && g.canAfford(D.ARMY[tipo].cost, 3)) n += Soc.trainArmy(tipo, 1);
           if (n) anota('mariscal', 'Reclutó ' + n + ' ' + D.ARMY[tipo].name.toLowerCase() + (n === 1 ? '' : 's') + '.');
         }
       }
