@@ -227,6 +227,8 @@
     if (tipos >= 6) out.push({ txt: 'Variedad de edificios (' + tipos + ' tipos)', v: Math.min(8, Math.floor((tipos - 3) / 3)) });
     if (juglar()) out.push({ txt: 'Un Juglar gobierna', v: 5 });
     const sant = PK.Terr && PK.Terr.comarcasMias ? Math.min(D.COMARCA_SANTUARIOS, PK.Terr.comarcasMias('santuario')) : 0; // G5
+    const fa = PK.Fort && st.fort ? PK.Fort.animo() : 0; // G6
+    if (fa) out.push({ txt: 'Feria de tus fortalezas', v: fa });
     if (sant) out.push({ txt: sant === 1 ? 'Un Santuario en tu tierra' : sant + ' Santuarios en tu tierra', v: sant * D.COMARCAS.santuario.animo });
     if (V.bono('animo')) out.push({ txt: 'Jardines Eternos', v: Math.round(V.bono('animo')) });
     for (const e of st.animo.ev) if (e.hasta > now) out.push({ txt: e.txt, v: e.v });

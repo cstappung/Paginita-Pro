@@ -33,7 +33,12 @@
     hizo el rasgo «Cruce»; el Cerro no da alcance extra a las torres en vivo; las máquinas se dibujan como un carro
     (no tienen modelo propio en `vehiculos.js`) y el Fuerte no es todavía la pieza de la etapa 2 en el dibujo; la
     torre de asedio quita 5 puntos de bajas al asedio entero; no se corrió el piloto antes y después.
-  - Sigue G6 (fortalezas y amenazas visibles).
+  - **G6:** hecha en `pk-63`, solo cliente. Fortalezas (hasta 8, según el mapa) que se sitian con el mismo asedio,
+    dan tributo diario y un bono a elección, y hay que defender cada 3 a 5 días; la hueste de un tanteo se ve marchar
+    y se le puede pagar tributo. Diferencias con el texto: las fortalezas no son lugares de `W.pois` (módulo aparte,
+    sin tocar el despeje ni su prueba) y usan el dibujo del Fuerte; no cuentan los héroes; no hay «pedir ayuda» ni
+    tanteos decididos por el servidor en línea; no se hizo el capítulo de la Crónica «La Marca del Norte».
+  - Sigue G7 (la guerra del mundo: Ciudadela y gremios, servidor).
 
 ---
 

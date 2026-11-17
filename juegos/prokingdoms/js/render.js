@@ -604,6 +604,7 @@
     // soldados: guarnición del Cuartel, columnas en marcha y peleas (troops.js)
     if (PK.Troops) PK.Troops.collect(list, dt, vis);
     if (PK.Incursiones) PK.Incursiones.collect(list, dt, vis); // bandidos y tropas que salen a pelear
+    if (PK.Fort && !g.enMar()) PK.Fort.collect(list, vis); // G6: las fortalezas
     if (PK.Frente) PK.Frente.collect(list, dt, vis); // pk-55: los dos bandos de cada asedio (frente.js)
 
     // capa plana: granjas y marcas de selección
@@ -1228,6 +1229,7 @@
     }
     if (PK.Incursiones) PK.Incursiones.minimapa(ctx, toMM);
     if (PK.Saqueos) PK.Saqueos.minimapa(ctx, toMM); // C6
+    if (PK.Fort) PK.Fort.minimapa(ctx, toMM); // G6
     if (PK.Frente) PK.Frente.minimapa(ctx, toMM); // pk-55: parcelas bajo asedio
     if (PK.Mundo) PK.Mundo.minimapa(ctx, toMM); // S2
     if (PK.Mar) PK.Mar.minimapa(ctx, toMM); // Fase 9: el Galeón

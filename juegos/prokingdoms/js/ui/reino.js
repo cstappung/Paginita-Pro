@@ -69,6 +69,36 @@
     if (a.peligro && !confirm(a.txt + ': ' + a.title + '\n\n¿Seguro?')) return;
     T.accion(f.id, a);
   };
+  // G6: la ventana de una fortaleza
+  UI.openFort = function (id) {
+    UI.modal('fort', 'Fortaleza', body => {
+      const F = PK.Fort, T = PK.Terr, o = F.lista()[id], e = F.de(id), st = PK.Game.state, fo = F.ensure(), C = D.FORT;
+      const add = (...a) => body.append(...a.filter(Boolean));
+      add(el('p', null, el('b', null, o.nombre), ' · nivel ' + e.lvl + ' · ' + (e.mia ? 'es tuya' : 'en manos de ' + D.ENEMY[o.enemigo].name.toLowerCase())));
+      const fr = T.frentes().find(f => f.fort && f.fort.id === id);
+      if (fr) { add(UI.frenteEl(fr)); return; }
+      if (e.mia) {
+        add(el('p', { class: 'small' }, 'Tributo: ' + U.fmt(C.tributo(st.era, e.lvl)) + ' de oro por día. Cada ' + C.contra[0] + ' a ' + C.contra[1] + ' días una hueste viene a recuperarla y la defiendes con sus muros y tu ejército en casa (' + U.fmt(F.defensa(id).total) + ' de defensa ahora). Si la pierdes, vuelve un nivel más fuerte.'),
+          fo.asalto && fo.asalto.id === id ? el('div', { class: 'alert' }, 'Una hueste viene en camino: llega en ' + U.fmtTime(Math.max(0, (fo.asalto.at - Date.now()) / 1000)) + ' con una fuerza de aprox. ' + U.fmt(fo.asalto.power) + '.') : el('p', { class: 'small muted' }, 'Próximo intento de recuperarla: en ' + U.fmtTime(Math.max(0, (e.prox - Date.now()) / 1000)) + '.'),
+          el('h3', null, e.bono ? 'Bono elegido' : 'Elige su bono'),
+          el('div', { class: 'row' }, Object.keys(C.bonos).map(b => UI.btn(C.bonos[b].nombre, () => { F.elegirBono(id, b); UI.rerender(); }, { small: true, cls: e.bono === b ? 'gold' : '', title: C.bonos[b].txt }))),
+          e.bono ? el('p', { class: 'small' }, C.bonos[e.bono].txt + ' Puedes cambiarlo cuando quieras.') : el('p', { class: 'small warn-t' }, 'Todavía no elegiste: la fortaleza no da bono hasta que elijas.'));
+      } else {
+        const why = F.puedeSitiar(id), w = st.war, fz = F.fuerza(id);
+        add(el('p', { class: 'small' }, D.ENEMY[o.enemigo].desc),
+          el('p', { class: 'small' }, 'Fuerza de la guarnición: aprox. ' + U.fmt(fz) + '. Tu ejército en casa vale ' + U.fmt(F.fuerzaContra(id, w.army)) + ' contra ' + D.ENEMY[o.enemigo].name.toLowerCase() + '.'),
+          el('div', { class: 'row' }, el('b', null, 'Botín si la tomas: '), UI.costEl(C.botin(st.era, e.lvl), 1, true)),
+          el('p', { class: 'small' }, 'Es un asedio de tres etapas (la empalizada, la torre del homenaje y el estandarte), como una conquista, pero contra monstruos: cuentan los bonos de tus tropas contra ese enemigo. No cuesta recursos, solo las tropas que caigan. Tomada, te da un tributo diario y un bono a elección.'));
+        if (fo.sitio) add(el('p', { class: 'small muted' }, fo.sitio.phase === 'go' ? 'Tus tropas marchan a ' + F.lista()[fo.sitio.id].nombre + ': llegan en ' + U.fmtTime(Math.max(0, (fo.sitio.arrive - Date.now()) / 1000)) + '.' : 'Tus tropas vuelven del sitio.'));
+        if (why) { add(el('p', { class: 'small warn-t' }, why)); }
+        else {
+          const pk = armyPicker(w, 'ft-');
+          add(el('div', { class: 'row' }, pk.box), el('div', { class: 'row' }, UI.btn('Sitiar', () => { if (F.sitiar(id, pk.read())) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' })));
+        }
+      }
+      add(el('div', { class: 'row' }, UI.btn('Ver en el mapa', () => { UI.closeModal(); if (T.mode) T.toggle(false); PK.Render.centerOn(o.cx, o.cy); }, { small: true })));
+    });
+  };
   UI.openTerritory = function () {
     UI.modal('terr', 'Territorio', body => {
       const T = PK.Terr, st = S(), tr = st.terr, now = Date.now();
@@ -116,8 +146,15 @@
         body.append(el('h3', null, 'Amenazas'));
         for (const th of tr.threats) {
           const f = th.plan ? T.frente('t' + th.k) : null;
-          body.append(f ? UI.frenteEl(f) : el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + ').'));
+          body.append(f ? UI.frenteEl(f) : el('div', { class: 'alert' }, T.realmOf(th.slot).realm + ' prepara un ataque a tu frontera (fuerza aprox. ' + th.power + '). ',
+            UI.btn('Pagar tributo', () => T.pagarTributo(th), { small: true, title: 'Su hueste se vuelve sin pelear' }), ' ', UI.costEl({ gold: T.tributoDe(th) })));
         }
+      }
+      // G6: las fortalezas que ya viste
+      const forts = PK.Fort ? PK.Fort.lista().filter(o => T.explored(o.k)) : [];
+      if (forts.length) {
+        body.append(el('h3', null, 'Fortalezas'));
+        for (const o of forts) body.append(el('div', { class: 'raid-row' }, el('b', null, o.nombre), el('span', { class: 'small muted' }, ' ' + PK.Fort.titulo(o).split(' · ').slice(1).join(' · ')), UI.btn('Abrir', () => UI.openFort(o.id), { small: true })));
       }
       const realms = D.BOTS.filter(b => st.flags['seen_' + b.slot]);
       if (realms.length) {

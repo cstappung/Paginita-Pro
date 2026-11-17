@@ -695,6 +695,23 @@
   D.COMARCA_BOTIN = 1.5;     // conquistar una comarca da más botín
   D.COMARCA_SANTUARIOS = 2;
 
+  // ---------- Fortalezas (plan de guerra, G6, pk-63; js/fortalezas.js) ----------
+  D.FORT = {
+    n: 8, separa: 5, era: 3, maxLvl: 8,
+    enemigos: ['bandit', 'undead', 'giant'],
+    nombres: ['Fortaleza del Paso', 'Torre Negra', 'Bastión de Ymir', 'Fuerte del Cuervo', 'Cripta Amurallada', 'Peña del Gigante', 'Guarida de Hierro', 'Atalaya Maldita'],
+    fuerza: lvl => Math.round(700 * Math.pow(1.5, lvl - 1)),
+    botin: (era, lvl) => { const k = Math.pow(1.6, era - 1) * (1 + 0.25 * (lvl - 1)), r = v => Math.round((v * k) / 10) * 10; return { gold: r(500), stone: r(350), wood: r(350), gems: 4 + era + lvl }; },
+    tributo: (era, lvl) => Math.round(60 * era * (1 + 0.3 * (lvl - 1))),
+    contra: [3, 5], // días reales entre un intento de recuperarla y el siguiente
+    bonos: {
+      granjas: { nombre: 'Tierras de labranza', txt: 'Todas tus granjas rinden un 5 % más.', granja: 0.05 },
+      talas: { nombre: 'Cotos de tala', txt: 'Toda tu madera rinde un 5 % más.', res: { wood: 0.05 } },
+      minas: { nombre: 'Derechos de mina', txt: 'Piedra, oro y minerales rinden un 5 % más.', res: { stone: 0.05, gold: 0.05, ore: 0.05, marble: 0.05, gems: 0.05 } },
+      feria: { nombre: 'Feria de la fortaleza', txt: '+2 de ánimo para tu pueblo.', animo: 2 },
+    },
+  };
+
   // ---------- El asedio por etapas (plan de guerra, G1, pk-55) ----------
   // La campaña ya no es una tirada al llegar: es un asedio de tres etapas que dura minutos. Cada etapa es un grupo de
   // las partes de la defensa (D.parcelDefenseParts), así que la suma sigue siendo la defensa de siempre.

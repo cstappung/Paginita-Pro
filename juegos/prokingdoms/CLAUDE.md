@@ -594,3 +594,20 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - Not measured: the pace with the autopilot before/after (the plan asks comarcas to move it under 5 %).
 - `tools/cheat-test.js`: its one failing check («la cuenta honesta…») is the Calzada Real part of the test (24 of
   the honest account's tiles are refused as invalid), from before the war plan.
+
+### War plan, G6: fortresses and visible threats (`pk-63`, client only)
+
+- **Fortresses** (`js/fortalezas.js`, `PK.Fort`, `D.FORT`): up to 8 neutral forts, each at the centre of a parcel,
+  computed from the terrain, the realms' homes and `W.ORIG` with their own rng (`D.SEED + 7127`). They are **not**
+  `W.pois` (the plan said so): the POI list feeds the clearing code and its fixture test, and this avoids both.
+  Nothing may be built next to one (`G.placeWhy` → `'fortaleza'`).
+- Sieging one is the same three-stage siege (`D.asedioPlan`, parts from `F.partes`), with the PvE force
+  (`Exp.powerVs` against its enemy type), no resource cost. `F.frentes()` is concatenated in `T.frentes()` with
+  `fort` set, slot `-1` for the garrison (grey in `frente.js`); `T.acciones` returns nothing for them.
+- Taken: a daily tribute (3 days at most when coming back), a bonus you choose (`D.FORT.bonos`: goes through the
+  `extra` of `Vida.recoleccion` or the ánimo), and every 3–5 real days a host comes to retake it; you defend with
+  half its strength plus your army at home. Lost: it goes back one level stronger. State in `st.fort`.
+- **Probes**: the neighbour's host is drawn marching its last 3 minutes (`Sq.dibujar` in `saqueos.js`) and can be
+  paid off before it arrives (`T.pagarTributo`, 60 % of its power in gold).
+- Not done from the plan's G6: «pedir ayuda» against a probe, probes decided by the server when online (online,
+  simulated realms still never attack your border), heroes in fortress sieges, and the Crónica chapter.

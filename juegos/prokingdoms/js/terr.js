@@ -237,6 +237,7 @@
     for (const c of st.terr.camps) if (c.phase === 'asedio' && c.plan) out.push({ id: 'c' + c.k, k: c.k, de: me(), a: c.slot, lado: c.lado || 0, ini: c.ini, plan: c.plan, units: c.units, mio: 'atk', fuerza: c.power });
     // G3: los asedios entre jugadores que cuenta el servidor. Los míos van en su campaña (c.plan, arriba).
     if (online()) for (const a of PK.Net.asedios || []) if (a.de !== me()) out.push({ id: 'r' + a.id, k: a.k, de: a.de, a: a.a, lado: a.lado || 0, ini: a.ini, plan: a.plan, units: a.units, mio: a.a === me() ? 'def' : 'ver', fuerza: a.plan.atk, deN: a.deN, aN: a.aN });
+    if (PK.Fort) for (const f of PK.Fort.frentes()) out.push(f); // G6: sitios de fortalezas y sus defensas
     for (const th of st.terr.threats) if (th.plan) out.push({ id: 't' + th.k, k: th.k, de: th.slot, a: me(), lado: th.lado || 0, ini: th.ini, plan: th.plan, units: null, mio: 'def', fuerza: th.power });
     return out;
   };
@@ -245,6 +246,7 @@
   // El estado de un frente ahora mismo (D.asedioEn con el reloj).
   T.estado = f => D.asedioEn(f.plan, (Date.now() - f.ini) / 1000);
   T.nombreFrente = function (f) {
+    if (f.fort) return { otro: f.fort.nombre, titulo: f.mio === 'atk' ? 'Sitio de ' : 'Asedian ' };
     if (f.mio === 'ver') return { otro: f.aN || (T.realmInfo(f.a) || {}).realm || 'otro reino', titulo: (f.deN || 'Un reino') + ' asedia a ' };
     const otro = T.realmInfo(f.mio === 'atk' ? f.a : f.de);
     return { otro: otro ? otro.realm : 'otro reino', titulo: f.mio === 'atk' ? 'Asedio a ' : 'Te asedia ' };
@@ -274,7 +276,7 @@
   const amenazaDe = f => S().terr.threats.find(th => th.plan && 't' + th.k === f.id) || null; // con plan: puede haber otra amenaza en camino a la misma parcela
   T.acciones = function (f) {
     const e = T.estado(f), out = [];
-    if (e.fin || !f.plan || f.plan.v < 2 || f.mio === 'ver') return out;
+    if (e.fin || !f.plan || f.plan.v < 2 || f.mio === 'ver' || f.fort) return out; // en una fortaleza no hay decisiones (todavía)
     const o = f.mio === 'atk' ? campDe(f) : f.id[0] === 't' ? amenazaDe(f) : (T.hechas[f.id] || (T.hechas[f.id] = {}));
     if (!o || (o.nAcc || 0) >= D.ASEDIO.maxAcc) return out;
     if (f.mio === 'atk') {
@@ -288,6 +290,17 @@
     return out;
   };
   const sumaTropas = (x, y) => { const o = Object.assign({}, x); for (const u in y) o[u] = (o[u] || 0) + y[u]; return o; };
+  // G6: pagarle a la hueste de un reino vecino para que se vuelva, antes de que llegue
+  T.tributoDe = th => Math.round(th.power * 0.6);
+  T.pagarTributo = function (th) {
+    const st = S(), i = st.terr.threats.indexOf(th);
+    if (i < 0 || th.plan) { toast('Ya no se puede: el asedio empezó.', 'warn'); return false; }
+    if (!G().pay({ gold: T.tributoDe(th) })) { toast('No te alcanza el oro para el tributo.', 'warn'); return false; }
+    st.terr.threats.splice(i, 1);
+    const tx = 'Pagaste tributo a ' + T.realmOf(th.slot).realm + ': su hueste se vuelve.';
+    PK.Social.log(tx, 'info'); toast(tx, 'info'); PK.UI.rerender();
+    return true;
+  };
   T.hechas = {}; // lo que ya hice como defensor contra un jugador (no se guarda: el servidor lleva la cuenta de verdad)
   const seg = f => (Date.now() - f.ini) / 1000;
   T.tiempoRefuerzo = c => Math.max(45, (c.travel || 120) * 0.5);

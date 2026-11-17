@@ -1375,6 +1375,7 @@
     if (h.k === 'node') { const z = W.zoneOf(h.o); text = D.NODES[h.o.kind].name + ' · ' + (h.o.dead ? 'agotado' : U.fmt(h.o.amount)) + (z ? ' · ' + z.name : ''); }
     else if (h.k === 'building') text = h.o.def.name + (h.o.def.noUp ? '' : ' · Nv ' + h.o.lvl) + (h.o.upg ? ' (mejorando)' : '') + (h.o.owner !== 'p' ? ' · ' + D.BOTS.find(b => b.id === h.o.owner).name : '');
     else if (h.k === 'poi') { const st = G().poiState(h.o); text = (h.o.kind === 'legend' ? D.LEYENDAS[h.o.ley].name + (st && st.d ? ' · investigado' : ' · lugar legendario') : D.POI[h.o.kind].name + (st && st.d ? ' · ya aprovechado' : '')); }
+    else if (h.k === 'fort') text = PK.Fort.titulo(h.o);
     else if (h.k === 'cap') { const c = D.CAPITULOS[h.o.n - 1]; text = c.lugar.name + ' · Capítulo ' + U.roman(h.o.n) + ' de la Crónica'; }
     else if (h.k === 'troop') text = h.o.march ? 'Tus tropas marchan hacia ' + (h.o.march.back ? 'casa' : h.o.march.name) : 'Tus soldados · ' + UI.hint('clic', 'toca') + ' para abrir el Cuartel';
     else if (h.k === 'unit') text = h.o.owner === 'p' ? (h.o.kind === 'scout' ? 'Explorador · ' : 'Aldeano · ') + taskText(h.o) : 'Aldeano de ' + D.BOTS.find(b => b.id === h.o.owner).name;

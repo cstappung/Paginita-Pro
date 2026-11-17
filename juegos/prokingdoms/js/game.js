@@ -249,6 +249,7 @@
     const c = D.COMARCAS[W.rasgoDe(k)];
     return !c ? 0 : granja ? c.granja || 0 : (c.res && c.res[res]) || 0;
   };
+  const fortB = (res, granja) => (PK.Fort && S && S.fort ? PK.Fort.bono(res, granja) : 0); // G6: las fortalezas tomadas, en todo el reino
   G.comarca = comarca;
   G.bono = vb;
   const conMod = cost => { const m = lm('cost') * (1 + vb('cost')); if (m === 1) return cost; const o = {}; for (const r in cost) o[r] = Math.ceil(cost[r] * m); return o; };
@@ -284,7 +285,7 @@
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
     if (owner !== 'p') return base;
     const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
-    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk, u ? comarca(u.x, u.y, res) : 0);
+    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk, (u ? comarca(u.x, u.y, res) : 0) + fortB(res));
   };
   // Muelle de pesca (V9): rinde según el agua que lo rodea; la Cosecha eficiente no le suma, Pesca con redes sí.
   G.MUELLE_RATE = 0.3;
@@ -303,7 +304,7 @@
     if (owner !== 'p') return D.FARM_RATE;
     if (b && b.def.farmRes) return G.SALINAS_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * dropMult(u) * G.globalMult();
     if (b && b.type === 'muelle') return mareaPesca() * G.MUELLE_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * (1 + vb('muelle')) * (1 + G.cerca(b)) * dropMult(u) * G.globalMult() * (1 + ley('food')) * vr('food');
-    return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm', b ? comarca(b.cx, b.cy, 'food', true) : 0);
+    return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm', (b ? comarca(b.cx, b.cy, 'food', true) : 0) + fortB('food', true));
   };
   // Bonos por cercanía (V5, D.CERCANIA en datos-vida.js): un edificio rinde más con un vecino de cierto tipo. Se
   // recalcula cuando cambia algo del mapa (G.blockVer sube al construir, terminar, mover o demoler).
@@ -1306,6 +1307,7 @@
     }
     if ((type === 'muelle' || def.agua) && !G.tocaAgua(x, y, def)) return 'sinAgua';
     if (G.encierra(type, x, y, ignorar)) return 'encierra';
+    if (PK.Fort && PK.Fort.cerca(x, y, def.w, def.h)) return 'fortaleza'; // G6
     // pk-55: una parcela bajo asedio está en disputa: no se construye ahí hasta que termine
     if (PK.Terr && PK.Terr.enDisputa && S && S.terr && (PK.Terr.enDisputa(W.parcel(x, y)) || PK.Terr.enDisputa(W.parcel(x + def.w - 1, y + def.h - 1)))) return 'disputa';
     return null;
@@ -1401,6 +1403,7 @@
     fuera: 'Eso queda fuera del mapa.',
     encierra: 'Así encerrarías a tu pueblo: deja al menos una casilla de paso.',
     sinAgua: 'El muelle va pegado al agua: ponlo en la orilla de un lago o río.',
+    fortaleza: 'Ahí hay una fortaleza: no se construye pegado a sus muros.',
     disputa: 'Esa parcela está bajo asedio: no se puede construir ahí hasta que termine la batalla.',
   };
   G.place = function (type, x, y, builders) {
@@ -1680,6 +1683,7 @@
     PK.Logi.update(dt);
     const tierra = !G.enMar(); // en el archipiélago (Fase 9) no corren los sistemas de la tierra
     if (tierra) PK.Terr.update(dt, false);
+    if (tierra && PK.Fort) PK.Fort.update(dt, false);
     PK.Exp.update(dt, false);
     if (PK.Heroes) PK.Heroes.update(dt);
     if (PK.Aventura) PK.Aventura.tick(dt);
@@ -1810,6 +1814,7 @@
       PK.Logi.offline(dt);
       const tierra = !G.enMar(); // como en vivo: en el archipiélago no corren los sistemas de la tierra
       if (tierra) PK.Terr.update(dt, true);
+      if (tierra && PK.Fort) PK.Fort.update(dt, true);
       PK.Exp.update(dt, true);
       if (PK.Heroes) PK.Heroes.update(dt);
       if (PK.Aventura) PK.Aventura.tick(dt);

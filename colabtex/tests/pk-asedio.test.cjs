@@ -237,3 +237,26 @@ test('G5: el ariete solo rinde con murallas y la torre de asedio ahorra tropas',
   assert.ok(con.torre && con.bajas < sin.bajas, 'con torre de asedio caen menos');
   assert.equal(D.PROTO, 11, 'tipos nuevos de edificio y de tropa: sube el protocolo');
 });
+
+// ---------- G6: fortalezas ----------
+test('G6: las fortalezas salen del mapa y de la semilla, lejos de los reinos y sin pisar lugares', () => {
+  const w2 = {}, c2 = vm.createContext({ window: w2, console, URLSearchParams, location: { search: '' }, performance: { now: () => 0 } });
+  for (const f of ['util.js', 'data.js', 'world.js', 'fortalezas.js']) vm.runInContext(JS(f), c2, { filename: f });
+  const W = w2.PK.World, D2 = w2.PK.D, F = w2.PK.Fort;
+  if (W.generate && !W.terrCommon) W.generate(D2.SEED);
+  const L = F.lista(), P = W.PW;
+  assert.ok(L.length >= 5 && L.length <= D2.FORT.n, 'hay fortalezas (' + L.length + ')');
+  for (const o of L) {
+    assert.ok(!W.terrCommon[o.k], 'no en zona común');
+    assert.ok(!D2.REALM_SLOTS.some((s, i) => { const h = W.homeParcel(i); return Math.max(Math.abs(o.k % P - h % P), Math.abs(Math.floor(o.k / P) - Math.floor(h / P))) <= D2.TERR.core + 2; }), 'lejos de todo reino');
+    assert.equal(W.parcel(o.x + 1, o.y + 1), o.k, 'en su parcela');
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) assert.ok(W.terrain[W.idx(o.x + i, o.y + j)] !== 4, 'en tierra firme');
+    assert.ok(D2.ENEMY[o.enemigo] && D2.FORT.nombres.includes(o.nombre));
+  }
+  for (const a of L) for (const b of L) if (a !== b) assert.ok(Math.hypot(a.k % P - b.k % P, Math.floor(a.k / P) - Math.floor(b.k / P)) >= D2.FORT.separa, 'separadas');
+  assert.ok(F.en(L[0].x + 1, L[0].y + 1) === L[0] && !F.en(0, 0));
+  const p = F.partes(1575);
+  assert.equal(p.era + p.towers + p.troops, p.total, 'las tres etapas suman la fuerza');
+  assert.ok(D.asedioPlan({ atk: 3000, parts: p, semilla: 4 }).etapas.length === 3);
+  assert.ok(D2.FORT.fuerza(2) > D2.FORT.fuerza(1) && D2.FORT.tributo(4, 2) > D2.FORT.tributo(4, 1));
+});
