@@ -1063,8 +1063,10 @@
   // Los reinos de la segunda era (levels.js: `torres`) venden solo su lista, cada vez más corta.
   // En la tercera era (`heroes: 'todos'`) se elige UNO de los diez héroes (canPlace: uno por partida);
   // en la cuarta (`heroes: 'cuarta'`), uno de sus cinco héroes nuevos (`era4`).
-  PD.towersFor = li => {
-    const L = PD.LEVELS && PD.LEVELS[li];
+  // `ve`: la versión del motor de la partida (prueba.js), porque la lista de un reino puede
+  // cambiar con ella (levels.js `v6`); sin ella, la de ahora.
+  PD.towersFor = (li, ve) => {
+    const L = PD.LEVELS && PD.LEVELS[li] && (PD.nivel ? PD.nivel(li, ve || PD.MOTOR_VE) : PD.LEVELS[li]);
     const heroe = id => L && L.heroes === 'todos' ? !T[id].era4 : L && L.heroes === 'cuarta' ? !!T[id].era4 : T[id].realm === li;
     if (L && L.torres) return PD.TOWER_ORDER.filter(id => T[id].hero ? heroe(id) : L.torres.indexOf(id) >= 0);
     return PD.TOWER_ORDER.filter(id => T[id].hero ? T[id].realm === li : (T[id].realm || 0) <= li);
@@ -1072,7 +1074,7 @@
   // el héroe propio del reino (null en los reinos donde se elige)
   PD.heroOf = li => (PD.LEVELS && PD.LEVELS[li] && PD.LEVELS[li].heroes) ? null : PD.TOWER_ORDER.find(id => T[id].hero && T[id].realm === li) || null;
   // los héroes que se pueden poner en un reino (uno solo, o los diez o los cinco para elegir)
-  PD.heroesOf = li => PD.towersFor(li).filter(id => T[id].hero);
+  PD.heroesOf = (li, ve) => PD.towersFor(li, ve).filter(id => T[id].hero);
   for (const id in T) T[id].id = id;
   PD.TOWERS = T;
 })();

@@ -105,7 +105,12 @@
   // con 1/5 los tres ganan (lo mismo con 1/8).
   // `esbirros`: cuánto más espaciadas invocan (con x20 de vida viven mucho más: a su ritmo de
   // antes llenaban el camino de esbirros y eso, no el jefe, era lo que se escapaba).
-  const JEFE = { vida: 20, vel: 1 / 5, esbirros: 10 };
+  // Versión 6 (Nov 2026, pedido del dueño: «no son lo suficientemente lentos»): la mitad de
+  // rápidos que en la 5 (1/10 de su velocidad de base), con la misma vida. Como tardan el doble
+  // en cruzar, invocan el doble de espaciado: los mismos esbirros por tramo de camino que antes.
+  const JEFE = { vida: 20, vel: 1 / 5, esbirros: 10, vel6: 1 / 10, esbirros6: 20 };
+  const jefeVel = ve => (ve >= 6 ? JEFE.vel6 : ve >= 5 ? JEFE.vel : 1);
+  const jefeEsbirros = ve => (ve >= 6 ? JEFE.esbirros6 : ve >= 5 ? JEFE.esbirros : 1);
   PD.JEFE = JEFE;   // el bot lo cambia para medir (--jefe vida,vel)
   // Leyes de la tercera era (levels.js `ley`, PD.LEYES): la regla que decide cómo se gana cada
   // reino. Purga: lo que no remata fuego, explosivo o arcano queda en huesos y se levanta.
@@ -728,7 +733,7 @@
         burrowed: false, burrowT: d.burrow ? d.burrow.every * (0.5 + this.rnd() * 0.5) : 0,
         phased: false, phaseT: d.phase ? d.phase.every * (0.3 + this.rnd() * 0.7) : 0,
         healT: d.heal ? d.heal.every : 0, sabT: d.sabotage ? d.sabotage.every * 0.7 : 0,
-        spawnT: d.spawn ? d.spawn.every * (d.boss && this.ve >= 5 ? JEFE.esbirros : 1) : 0, tpT: d.teleport ? d.teleport.every : 0,
+        spawnT: d.spawn ? d.spawn.every * (d.boss ? jefeEsbirros(this.ve) : 1) : 0, tpT: d.teleport ? d.teleport.every : 0,
         revived: false, enraged: false, blinked: false, haste: 1, auraSlow: 0, invulnT: 0,
         corr: 0, corrT: 0, corrAmp: 0, wetT: 0, wetElec: 1.5, wetAmp: 0, liftT: 0, goldT: 0, goldMult: 1,
         hexT: 0, hexAmp: 0, hexExec: 0, hexSpread: 0, hexDps: 0, hexArmor: 0, hexReveal: false, hexSrc: null,
@@ -1247,7 +1252,7 @@
         if (d.spawn) {
           e.spawnT -= dt;
           if (e.spawnT <= 0) {
-            e.spawnT = d.spawn.every * (d.boss && this.ve >= 5 ? JEFE.esbirros : 1);
+            e.spawnT = d.spawn.every * (d.boss ? jefeEsbirros(this.ve) : 1);
             const hpM = PD.hpMult(this.L, cur);
             for (let i = 0; i < d.spawn.n; i++) this.spawn(d.spawn.type, e.path, e.dist - 20 - i * 14, hpM);
           }
@@ -1267,7 +1272,7 @@
         if (this.era4 && this.cuartaEra(e, d, dt, mudo, cur, hurry)) continue;
         // movimiento
         let sp = 0;
-        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1) * (d.boss && this.ve >= 5 ? JEFE.vel : 1);
+        const vel = d.speed * sm * (e.fast || 1) * (this.era3 ? this.velTercera(e, hurry) : 1) * (d.boss ? jefeVel(this.ve) : 1);
         const cc5 = this.ve >= 5 && CC.nuevo, jefe5 = d.boss && this.ve >= 5;
         if (hurry && !cc5) { sp = vel; if (e.engaged) this.release(e); }   // ronda eterna: los rezagados avanzan sin frenos
         else {
@@ -3493,6 +3498,6 @@
   }
 
   // la versión del motor de las partidas nuevas (prueba.js: VERSION)
-  PD.MOTOR_VE = 5;
+  PD.MOTOR_VE = 6;
   PD.Game = Game;
 })();

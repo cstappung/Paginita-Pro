@@ -356,6 +356,12 @@
       ],
       obstacles: [{ x: 420, y: 165, r: 40, kind: 'estante' }, { x: 330, y: 335, r: 38, kind: 'globoTerra' }, { x: 760, y: 340, r: 34, kind: 'estante' }, { x: 300, y: 525, r: 34, kind: 'estante' }, { x: 960, y: 300, r: 28, kind: 'globoTerra' }],
       torres: ['espinas', 'escarcha', 'vigia', 'dragon', 'prisma', 'totem', 'huerto', 'balista', 'obelisco', 'segador', 'grimorio'],
+      // v6: sin Segador (corto alcance y físico contra Origami), Cañón Gélido (élites y jefes no se
+      // frenan) ni Obelisco (el bot nunca lo subió); con Arco Voltaico (rompe los escudos de Runas y
+      // de los capítulos del Códice), Alquimista (el veneno corta la Marea Vital, el ácido quita
+      // blindaje) y Colmena (drones contra libros y almas que vuelan). Con el bot, rondas 61–80:
+      // ~23k vidas perdidas → ~10k.
+      v6: { torres: ['espinas', 'vigia', 'voltaico', 'dragon', 'prisma', 'colmena', 'totem', 'huerto', 'acido', 'balista', 'grimorio'] },
       heroes: 'cuarta', eventos: ['apagon', 'niebla', 'esporas', 'bendicion'], eventosTarde: ['runas', 'vital', 'elite', 'furia'], poder: 'olvido',
       boss: 'codice',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['libro', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['origami', 8, 1.3],
@@ -375,6 +381,11 @@
       ],
       obstacles: [{ x: 420, y: 280, r: 50, kind: 'planeta' }, { x: 790, y: 330, r: 44, kind: 'planeta' }, { x: 75, y: 400, r: 30, kind: 'asteroide' }, { x: 560, y: 110, r: 30, kind: 'asteroide' }, { x: 965, y: 280, r: 26, kind: 'asteroide' }],
       torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'totem', 'balista', 'sierra', 'geiser', 'pararrayos', 'satelite'],
+      // v6: sin Géiser (no toca voladores, y aquí vuelan platillos, jinetes, galeones y la mitad de
+      // las flotas; el bot nunca lo usó) y con Colmena (drones contra lo que vuela; con Láser Arcano
+      // ignoran el blindaje de los dirigibles). Las Sierras se quedan: sin ellas al bot se le
+      // escapaban los tanques (49k vidas perdidas en las rondas 61–100 → 80k).
+      v6: { torres: ['espinas', 'vigia', 'voltaico', 'mortero', 'prisma', 'colmena', 'totem', 'balista', 'sierra', 'pararrayos', 'satelite'] },
       heroes: 'cuarta', eventos: ['meteoros', 'tormenta', 'viento', 'frenesi'], eventosTarde: ['portales', 'titanes', 'runas', 'terremoto'], poder: 'agujero',
       boss: 'vortex',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['alado', 3, 1], ['robusto', 4, 1], ['marciano', 5, 1.3], ['escudero', 7, 1], ['ovni', 8, 1.3],
@@ -398,6 +409,11 @@
       ],
       obstacles: [{ x: 520, y: 210, r: 48, kind: 'relojSol' }, { x: 110, y: 300, r: 34, kind: 'arenaReloj' }, { x: 650, y: 490, r: 30, kind: 'arenaReloj' }, { x: 410, y: 600, r: 26, kind: 'engranajeT' }, { x: 960, y: 625, r: 24, kind: 'engranajeT' }],
       torres: ['espinas', 'escarcha', 'vigia', 'prisma', 'totem', 'faro', 'balista', 'obelisco', 'campanario', 'crono'],
+      // v6: sin Faro (las mejoras y el Tótem ya ven camuflados) ni Cañón Gélido (Guardianes, élites y
+      // jefes no se frenan; la Cronotorre queda de control); con Arco Voltaico (daño que salta,
+      // para los tres caminos) y Alquimista (blindaje del Guardián y de los Colosos). Con el bot,
+      // rondas 61–100: ~84k vidas perdidas → ~34k.
+      v6: { torres: ['espinas', 'vigia', 'voltaico', 'prisma', 'totem', 'acido', 'balista', 'obelisco', 'campanario', 'crono'] },
       heroes: 'cuarta', eventos: ['lunaSangre', 'muertos', 'oro', 'meteoros'], eventosTarde: ['titanes', 'elite', 'runas', 'vital', 'furia', 'portales', 'terremoto'], poder: 'pausa',
       boss: 'aion',
       pool: [['brote', 1, 1], ['veloz', 2, 1], ['robusto', 3, 1], ['cuerda', 4, 1.3], ['alado', 5, 1], ['escudero', 7, 1], ['ecoTiempo', 8, 1.3],
@@ -531,15 +547,19 @@
   // Los números de un reino según la versión del motor (prueba.js: VERSIONES): una partida de la 4
   // se juega y se rehace con los de entonces (L); las de la 5, con `L.v5` encima. Así un reino se
   // puede rebalancear sin romper las partidas a medias ni las pruebas ya guardadas.
+  // Desde la 6 también `L.v6` (encima de `v5`, si lo hay): p. ej. las torres de los reinos
+  // 18–20, cambiadas sin tocar las partidas ni las pruebas de la 5.
   PD.nivel = function (li, ve) {
     const L = PD.LEVELS[li];
-    if (!(ve >= 5) || !L.v5) return L;
-    if (!L._v5) {
+    const capas = [ve >= 5 && L.v5, ve >= 6 && L.v6].filter(Boolean);
+    if (!capas.length) return L;
+    const clave = ve >= 6 && L.v6 ? '_v6' : '_v5';
+    if (!L[clave]) {
       const o = {};
-      for (const k in L) if (k !== '_rounds' && k !== '_v5' && k !== 'v5') o[k] = L[k];
-      L._v5 = Object.assign(o, L.v5);
+      for (const k in L) if (k !== '_rounds' && k !== '_v5' && k !== '_v6' && k !== 'v5' && k !== 'v6') o[k] = L[k];
+      L[clave] = Object.assign(o, ...capas);
     }
-    return L._v5;
+    return L[clave];
   };
   PD.buildRounds = function (li, L) {
     L = L || PD.LEVELS[li];
