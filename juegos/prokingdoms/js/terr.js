@@ -347,7 +347,7 @@
         else { if (T.estado(f).impetu < T.estado(f).resistencia) G().stat('retirada_a_tiempo', 1); hecho('Tus tropas se retiran del asedio.'); } // G8
       };
       if (c.remote) PK.Net.asedio(c.rid, a.tipo, { tactica: a.tactica }).then(listo).catch(e => toast(e.message, 'warn'));
-      else { const n = D.asedioReplan(c.plan, seg(f), a); if (!n) { toast('Ya no se puede.', 'warn'); return false; } c.plan = n; listo(); }
+      else { aplicarRefuerzo(c, Date.now(), true); const n = D.asedioReplan(c.plan, seg(f), a); if (!n) { toast('Ya no se puede.', 'warn'); return false; } c.plan = n; listo(); }
       return true;
     }
     // defensor
@@ -535,6 +535,14 @@
     }
   }
 
+  // G4: los refuerzos entran al plan desde que llegaron. pk-77: con la misma condición que el servidor (llegaron antes del
+  // final), no «ahora antes del final»: al recargar o ponerse al día sin conexión pasaba la ventana y volvían a casa,
+  // otro final que con la pestaña abierta. También antes de cada decisión (T.accion), como el servidor.
+  function aplicarRefuerzo(c, now, offline) {
+    if (!(c.plan && c.ref && !c.ref.ok && now >= c.ref.llega && c.ref.llega < c.ini + c.plan.total * 1000)) return;
+    const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT || c.power)), m: D.asedioOficio(sumaTropas(c.units, c.ref.units), (c.plan.parts.walls || 0) > 0), torre: (c.ref.units.torreAsedio || 0) + (c.units.torreAsedio || 0) > 0 });
+    if (n) { c.plan = n; c.powerT = (c.powerT || c.power) + c.ref.power; for (const u in c.ref.units) c.units[u] = (c.units[u] || 0) + c.ref.units[u]; c.ref.ok = true; if (!offline) toast('¡Llegaron los refuerzos al asedio!', 'good'); }
+  }
   let tickT = 0;
   T.update = function (dt, offline) {
     const st = S();
@@ -545,10 +553,7 @@
     const now = Date.now();
     for (const c of st.terr.camps.slice()) {
       if (c.phase === 'go' && !c.remote && now >= c.arrive) empezarAsedio(c, offline);
-      if (c.phase === 'asedio' && !c.remote && c.ref && !c.ref.ok && now >= c.ref.llega && now < c.ini + c.plan.total * 1000) { // G4: llegaron los refuerzos
-        const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT || c.power)), m: D.asedioOficio(sumaTropas(c.units, c.ref.units), (c.plan.parts.walls || 0) > 0), torre: (c.ref.units.torreAsedio || 0) + (c.units.torreAsedio || 0) > 0 });
-        if (n) { c.plan = n; c.powerT = (c.powerT || c.power) + c.ref.power; for (const u in c.ref.units) c.units[u] = (c.units[u] || 0) + c.ref.units[u]; c.ref.ok = true; if (!offline) toast('¡Llegaron los refuerzos al asedio!', 'good'); }
-      }
+      if (c.phase === 'asedio' && !c.remote) aplicarRefuerzo(c, now, offline); // G4: llegaron los refuerzos
       if (c.phase === 'asedio' && !c.remote && now >= c.ini + c.plan.total * 1000) { const p = c.plan; finishCampaign(c, p.gano && W.terr[c.k] === c.slot + 1, p.ratio, { atk: p.atk, def: p.def, parts: p.parts }, p); }
       if (c.phase === 'back' && now >= c.back) {
         for (const u in c.units) st.war.army[u] += c.units[u];

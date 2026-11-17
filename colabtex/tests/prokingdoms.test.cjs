@@ -1739,3 +1739,109 @@ test('pk-75: una boca solo manda paquetes llenos, y el taller junto a una bodega
     assert.ok(!Ci.sacaDe(forja), 'sin cinta que se lleve su producción');
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+test('pk-77: un traslado entre bodegas descarga aunque el pueblo esté sobre el tope, no descarga en una bodega llena y no da vueltas si su destino desaparece', () => {
+  const L = PK.Logi, Lb = PK.Libro, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.cap, capDe0 = G.capDe, stat0 = G.stat;
+  const mk = (id, type, x) => { const def = D.BUILD[type]; return { id, type, owner: 'p', done: true, lvl: 1, def, x, y: 10, w: def.w, h: def.h, cx: x + def.w / 2, cy: 10 + def.h / 2, inv: {}, workers: [] }; };
+  const tc = mk(1, 'tc', 10), wh = mk(2, 'warehouse', 40), gr = mk(3, 'granary', 70);
+  const CAP = { tc: { wood: 1000, food: 1000 }, warehouse: { wood: 1000 }, granary: { food: 1000 } };
+  G.capDe = (b, r) => (CAP[b.type] || {})[r] || 0;
+  G.cap = r => G.buildings.filter(b => b.done).reduce((n, b) => n + G.capDe(b, r), 0);
+  G.stat = () => {};
+  const rend0 = PK.Render; PK.Render = rend0 || {};
+  G.buildings = [tc, wh, gr]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+  G.state = Object.assign({}, st0 || {}, { res: { wood: 2500, food: 500 }, flags: {}, logi: { rutas: [], belts: [], nextRuta: 2, red: { v: 1, t: {} } } });
+  const r = { id: 1, de: tc.id, a: 'bodega', lista: ['wood', 'food'] };
+  G.state.logi.rutas.push(r);
+  const junto = b => ({ x: b.x - 0.5, y: b.y + 0.5 });
+  const cargada = (b, n) => { G.state.res.wood -= n; return Object.assign({ id: 50, kind: 'cart', owner: 'p', ruta: 1, carry: n, carryRes: 'wood', wait: 0, rA: wh.id, path: [] }, junto(b)); };
+  try {
+    tc.inv = { wood: 2400, food: 500 }; wh.inv = {}; // el pueblo sobre el tope (un premio): 2500 con tope 2000
+    const u = cargada(wh, 100); G.units = [u];
+    L.cart(u, 0.1);
+    assert.equal(u.carry, 0, 'descarga en el Almacén vacío (' + u.estado + ')');
+    assert.equal(wh.inv.wood, 100); assert.equal(G.state.res.wood, 2500, 'el total del pueblo no cambia');
+    // un Almacén lleno: espera con la carga en vez de «descargar» y que la conciliación lo devuelva al origen
+    tc.inv.wood = 900; wh.inv.wood = 1000; G.state.res.wood = 1900;
+    const u2 = cargada(wh, 100); u2.id = 51; G.units = [u2];
+    L.cart(u2, 0.1);
+    assert.equal(u2.carry, 100, 'no descarga en una bodega llena (' + u2.estado + ')');
+    assert.equal(wh.inv.wood, 1000);
+    // el Almacén desaparece con la carreta cargada: ninguna otra bodega guarda madera, la carga vuelve al pueblo
+    G.buildings = [tc, gr]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+    const u3 = cargada(gr, 100); u3.id = 52; G.units = [u3];
+    for (let i = 0; i < 10 && u3.carry > 0; i++) { u3.wait = 0; L.cart(u3, 0.1); Object.assign(u3, junto(G.bById.get(u3.rA) || gr)); }
+    assert.equal(u3.carry, 0, 'no da vueltas con la madera (' + u3.estado + ')');
+    assert.equal(G.state.res.wood, 1800, 'la madera vuelve al pueblo (la de la segunda carreta sigue arriba de ella)');
+  } finally { G.state = st0; G.buildings = bs0; G.units = us0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; PK.Render = rend0; }
+});
+
+test('pk-77: cintas — el unidor no se traba con un divisor, el clasificador manda por «lo que sobre» lo que su rama no recibe, sin restos de paquete y sin conexión por origen', () => {
+  const Ci = PK.Cintas, L = PK.Logi, Lb = PK.Libro, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, capDe0 = G.capDe, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice(), buf0 = L.bufCap;
+  G.stat = () => {};
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const mundo = (bs, res) => {
+    G.buildings = bs; G.bById = new Map(bs.map(o => [o.id, o]));
+    W.bAt.fill(-1); W.belt.fill(-1);
+    for (const b of bs) for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id;
+    G.state = Object.assign({}, st0 || {}, { era: 6, res, flags: {}, auto: { reserve: 0 }, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+    return G.state.logi.red.t;
+  };
+  try {
+    // 1) bodega (piedra y madera) → divisor V: adelante una cantería llena de piedra, abajo un unidor que también recibe
+    //    madera de otra cinta y entrega a un aserradero. La piedra en la punta de V no puede ir al unidor: no lo traba.
+    G.cap = () => 1e9; G.capDe = () => 1e9; L.bufCap = () => 100;
+    let a = mk(1, 'warehouse', 20, 47, { inv: { wood: 5000, stone: 5000 } }), mas = mk(2, 'masonry', 29, 47, { inb: { stone: 100 }, outb: {} }), saw = mk(3, 'sawmill', 25, 51, { inb: {}, outb: {} });
+    let t = mundo([a, mas, saw], { wood: 5000, stone: 5000 });
+    for (let x = 23; x <= 28; x++) t[W.idx(x, 48)] = { p: x === 26 ? 'v' : 'c', d: 0, n: 5, i: [] };
+    t[W.idx(26, 49)] = { p: 'u', d: 1, n: 5, i: [] }; t[W.idx(26, 50)] = { p: 'c', d: 1, n: 5, i: [] };
+    for (let x = 23; x <= 25; x++) t[W.idx(x, 49)] = { p: 'c', d: 0, n: 5, i: [] };
+    Ci.init(G.state);
+    Ci.carrilesEn(W.idx(23, 48))[0].pz.f = ['stone', 'wood']; Ci.carrilesEn(W.idx(23, 49))[0].pz.f = ['wood']; Ci.cambio();
+    let got = 0, tarde = 0;
+    for (let i = 0; i < 400; i++) { const n = saw.inb.wood || 0; got += n; if (i >= 300) tarde += n; saw.inb.wood = 0; Ci.update(0.1); Lb.conciliar(); }
+    assert.ok(tarde > 100, 'el aserradero sigue recibiendo madera (' + got + ', en los últimos 10 s ' + tarde + ')');
+    // 2) clasificador: «madera» al norte (a una forja, que no la usa), «lo que sobre» adelante al aserradero
+    G.cap = () => 1e9; G.capDe = () => 1e9; L.bufCap = () => 1e6;
+    a = mk(1, 'warehouse', 20, 50, { inv: { wood: 1000 } }); saw = mk(2, 'sawmill', 30, 50, { inb: {}, outb: {} });
+    const forja = mk(3, 'forge', 26, 46, { inb: {}, outb: {} });
+    t = mundo([a, saw, forja], { wood: 1000 });
+    for (let x = 23; x <= 29; x++) t[W.idx(x, 51)] = { p: x === 26 ? 's' : 'c', d: 0, n: 5, i: [] };
+    t[W.idx(26, 51)].f2 = { 0: '*', 3: 'wood' };
+    for (let y = 50; y >= 48; y--) t[W.idx(26, y)] = { p: 'c', d: 3, n: 5, i: [] };
+    Ci.init(G.state);
+    Ci.carrilesEn(W.idx(23, 51))[0].pz.f = ['wood']; Ci.cambio();
+    for (let i = 0; i < 300; i++) { Ci.update(0.1); Lb.conciliar(); }
+    assert.ok((saw.inb.wood || 0) > 500, 'la madera sigue por «lo que sobre» (' + saw.inb.wood + ')');
+    // 3) S.res por debajo del estante (antes de conciliar): no sale un paquete de 15,5 que después se traba
+    G.cap = () => 1e9; G.capDe = () => 1e9; L.bufCap = () => 100;
+    a = mk(1, 'warehouse', 20, 50, { inv: { wood: 40 } }); saw = mk(2, 'sawmill', 30, 50, { inb: { wood: 85 }, outb: {} });
+    t = mundo([a, saw], { wood: 40 });
+    for (let x = 23; x <= 29; x++) t[W.idx(x, 51)] = { p: 'c', d: 0, n: 5, i: [] };
+    Ci.init(G.state);
+    Ci.carrilesEn(W.idx(23, 51))[0].pz.f = ['wood']; Ci.cambio();
+    G.state.res.wood = 15.5;
+    Ci.update(0.1);
+    assert.equal(t[W.idx(23, 51)].i.length, 0, 'no sale un paquete a medias');
+    G.state.res.wood = 24.5; Lb.conciliar();
+    for (let i = 0; i < 200; i++) { Ci.update(0.1); if (i >= 50) saw.inb.wood = 0; }
+    assert.equal(t[W.idx(29, 51)].i.length, 0, 'la punta no queda trabada');
+    // el resto de un paquete menor que 1 entra igual
+    t[W.idx(29, 51)].i = [['wood', 1, 0.5, 1]]; saw.inb.wood = 0;
+    Ci.update(0.1);
+    assert.equal(t[W.idx(29, 51)].i.length, 0); assert.equal(saw.inb.wood, 0.5);
+    // 4) sin conexión: lo del campamento no usa el margen de lo que sale de bodegas, y cada boca pierde lo que entregó
+    G.cap = () => 1000; G.capDe = (b, r) => (b.type === 'warehouse' ? 1000 : 0); L.bufCap = () => 1e6;
+    const camp = mk(1, 'lumber', 20, 40, { inv: { wood: 300 } }), b = mk(2, 'warehouse', 30, 40, { inv: { wood: 1000 } });
+    a = mk(3, 'warehouse', 20, 50, { inv: {} }); saw = mk(4, 'sawmill', 30, 50, { inb: {}, outb: {} });
+    t = mundo([camp, b, a, saw], { wood: 1000 });
+    for (let x = camp.x + camp.w; x <= 29; x++) t[W.idx(x, 41)] = { p: 'c', d: 0, n: 5, i: [] };
+    for (let x = 23; x <= 29; x++) t[W.idx(x, 51)] = { p: 'c', d: 0, n: 5, i: [] };
+    Ci.init(G.state);
+    a.inv.wood = 200; G.state.res.wood = 1200; b.inv.wood = 1000;
+    Ci.carrilesEn(W.idx(23, 51))[0].pz.f = ['wood']; Ci.cambio();
+    Ci.offline(10);
+    assert.equal(camp.inv.wood, 300, 'el campamento no entrega: el pueblo está sobre el tope');
+    assert.equal(G.state.res.wood + (saw.inb.wood || 0), 1200, 'lo que sale de la bodega A llega al aserradero, nada más');
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});

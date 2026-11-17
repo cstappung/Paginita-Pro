@@ -109,7 +109,9 @@ test('G3: lo que el servidor cuenta de un asedio no trae el final hasta la últi
       assert.ok(v.semilla === 99 && v.semilla !== p.semilla, 'la semilla del dibujo no es la del plan');
       const e = D.asedioEn(v, t);
       assert.ok(e.impetu >= 0 && e.impetu <= 1 && e.bajasA >= 0 && e.bajasA <= 1 && !Number.isNaN(e.control), 'se puede dibujar');
-      if (v.etapas.length < p.etapas.length) {
+      // pk-77: el final viaja cuando empieza el estandarte o al terminar (no cuando empezaron todas las etapas del plan:
+      // un ataque que se quiebra antes tiene un plan más corto y lo delataba desde el principio)
+      if (!(t >= p.total || p.etapas.some(x => x.id === 'estandarte' && t >= x.t0))) {
         parciales++;
         assert.ok(v.parcial && v.gano === undefined && v.ratio === undefined && v.atk === v.def, 'sin ganador ni fuerza real');
         assert.ok(!v.etapas.some(x => x.rota) && !e.fin, 'ninguna etapa a la vista dice cómo termina');
@@ -303,4 +305,23 @@ test('pk-67: el traslado entre bodegas existe en la logística, el armador y el 
   assert.ok(/L\.esTraslado\(r\) \? queTraslado\(/.test(lg), 'sin conexión también');
   assert.ok(/L\.crearRuta = function \(de, a, res, tipo, lista\)/.test(lg) && /trasladoMalo\(r\)/.test(lg));
   assert.ok(/UI\.materialesTraslado = /.test(ui) && /¿Qué materiales pasa\?/.test(ui));
+});
+
+test('pk-77: un plan cortado por retirada o rendición no se rearma, y la vista no trae el final de un ataque que se quiebra', () => {
+  const p = D.asedioPlan({ atk: PARTES.total * 0.7, parts: PARTES, semilla: 5, units: { militia: 10 } });
+  const ret = D.asedioReplan(p, 0.4, { tipo: 'retirada' }), ren = D.asedioReplan(p, 0.4, { tipo: 'rendir' });
+  assert.equal(ret.fin, 'retirada'); assert.equal(ren.fin, 'rendir');
+  assert.equal(D.asedioReplan(ret, 0.7, { tipo: 'salida' }), null, 'una salida no rearma un asedio del que el atacante se retiró');
+  assert.equal(D.asedioReplan(ren, 0.7, { tipo: 'tactica', tactica: 'cerco' }), null, 'una táctica no deshace una rendición');
+  assert.equal(D.asedioReplan(ret, 0.2, { tipo: 'refuerzo', atk: 1e6, m: [1, 1, 1] }), null, 'unos refuerzos tardíos no deshacen la retirada');
+  // un ataque que se quiebra en la frontera: su plan tiene una sola etapa, y no se sabe hasta el final
+  for (let s = 1; s <= 40; s++) {
+    const pl = D.asedioPlan({ atk: PARTES.total * 0.2, parts: PARTES, semilla: s });
+    if (pl.etapas.some(e => e.id === 'estandarte')) continue;
+    const v = D.asedioVista(pl, 0, 77);
+    assert.ok(v.parcial && v.gano === undefined && v.atk === v.def, 'sin el final en el segundo 0');
+    assert.ok(!v.etapas.some(e => e.rota), 'ni la marca de que se quiebra');
+    const f = D.asedioVista(pl, pl.total, 77);
+    assert.ok(!f.parcial && f.gano === false, 'al terminar, sí');
+  }
 });

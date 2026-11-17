@@ -47,7 +47,7 @@ ok(B.inbox.some(i => i.type === 'siege_start'), 'el defensor recibe el aviso de 
 ok(!A.inbox.some(i => i.type === 'conquest_result'), 'el atacante todavía no recibe el resultado');
 const v1 = sync(C, -1), a1 = v1.asedios[0];
 ok(a1 && a1.k === kB && a1.de === A.slot && a1.a === B.slot && a1.plan.etapas.length === 1, 'un tercero lo ve, con una sola etapa', JSON.stringify(a1 && a1.plan.etapas.map(e => e.id)));
-ok(camp.plan.etapas.length < 2 || (a1.plan.parcial && a1.plan.gano === undefined && a1.plan.atk === a1.plan.def && a1.plan.semilla !== camp.plan.semilla), 'sin el final: ni quién gana, ni la fuerza real, ni la semilla del plan');
+ok((a1.plan.parcial && a1.plan.gano === undefined && a1.plan.atk === a1.plan.def && a1.plan.semilla !== camp.plan.semilla), 'sin el final: ni quién gana, ni la fuerza real, ni la semilla del plan');
 ok(sync(C, v1.asv).asedios === undefined, 'si no cambió, la lista no viaja');
 ok(!sync(B, -1).incoming.length, 'el aviso de «en camino» ya no sale');
 // reinicio a mitad de asedio: el plan está guardado en la campaña
@@ -161,6 +161,30 @@ for (const x of store.all('camps')) store.del('camps', x.id);
 c = llegar(900);
 ok(c.plan.parts.towers > 100, 'y también a casi 2 parcelas de distancia', c.plan.parts.towers);
 B.buildings = [];
+
+// ---------- pk-77: una decisión que falla no cobra, y unos refuerzos no deshacen una retirada ----------
+{
+  for (const x of store.all('camps')) store.del('camps', x.id);
+  let c3;
+  for (let i = 0; i < 40; i++) { for (const x of store.all('camps')) store.del('camps', x.id); c3 = llegar(3000); if (c3.plan.etapas.length === 3) break; }
+  corre += c3.ini + (c3.plan.etapas[2].t0 + 2) * 1000 - Date.now();
+  const army0 = B.snap.army, err = falla(() => sim.asedio(B, { id: c3.id, accion: 'salida' }));
+  c3 = store.get('camps', c3.id);
+  ok(err && !c3.salida && B.snap.army === army0, 'una salida fuera de etapa no cobra ni queda gastada', err);
+  for (const x of store.all('camps')) store.del('camps', x.id);
+  let c4 = llegar(900);
+  const rr = sim.asedio(A, { id: c4.id, accion: 'refuerzo', units: { militia: 100, spear: 100 }, power: 3000 });
+  c4 = store.get('camps', c4.id);
+  if (rr.llega + 3000 < c4.ini + c4.plan.total * 1000) {
+    corre += rr.llega - Date.now() + 3000; // los refuerzos ya llegaron, pero todavía no pasó un tick
+    sim.asedio(A, { id: c4.id, accion: 'retirada' });
+    sim.tickCamps();
+    corre += 3600e3; sim.tickCamps();
+    const res = A.inbox.find(i => i.type === 'conquest_result');
+    ok(res && !res.won && res.plan.fin === 'retirada' && w.terr[kB] === B.slot + 1, 'unos refuerzos que llegaron antes de la retirada no la deshacen', res && res.plan.fin);
+  }
+  for (const x of store.all('camps')) store.del('camps', x.id);
+}
 
 // ---------- G7: diario, rankings y la Ciudadela ----------
 ok((w.diario || []).length > 0 && w.diario[0].plan && w.diario[0].plan.res === undefined && w.diario.length <= 20, 'el diario guarda las batallas con el plan para «Ver» y sin las tiradas', (w.diario || []).length);

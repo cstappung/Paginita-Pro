@@ -214,7 +214,8 @@
     if (!recibe(b, r)) return 'no';
     const tienda = L().isShop(b), extra = deBodega && !tienda ? cant : 0;
     let m = Math.min(cant, Math.floor(Math.max(0, lugarEn(b, r)) + extra));
-    if (m < 1) return 0;
+    if (cant < 1 && Math.max(0, lugarEn(b, r)) + extra >= cant) m = cant; // pk-77: el resto de un paquete que no llega a 1 entra (si no, esperaba para siempre)
+    if (m <= 0) return 0;
     if (tienda) { if (!b.inb) b.inb = {}; b.inb[r] = (b.inb[r] || 0) + m; }
     else m = PK.Libro.poner(b, r, m, extra);
     if (m > 0) G().stat('belted', m);
@@ -240,6 +241,7 @@
       const j = ((pz.rr || 0) + i) % lista.length, r = lista[j];
       if (!acepta.has(r) || !disponible(b, r)) continue; // pk-70: solo lo que alguien de adelante recibe
       if (hayDe(b, r) < PILA()) continue;
+      if (!PK.Libro.esCampo(b) && (S().res[r] || 0) < PILA()) continue; // pk-77: Lb.sacar da hasta el total del pueblo (antes de conciliar puede ser menos que el estante)
       const n = PK.Libro.esCampo(b) ? PK.Libro.sacarCampo(b, r, PILA()) : PK.Libro.sacar(b, r, PILA());
       if (n < 1) continue;
       pz.rr = j + 1;
@@ -314,7 +316,14 @@
   function hayLugar(c) { const it = itemsDe(c); return (c.lib || 0) <= 0 && (!it.length || it[it.length - 1][1] >= JUNTOS - tolera(c)); }
   const detras = it => (it.length ? Math.min(0, it[it.length - 1][1] - JUNTOS) : 0);
   // el unidor toma por turnos: si al que le toca tiene algo listo, los demás esperan
-  function listo(l, dest) { const it = itemsDe(l); return it.length > 0 && it[0][1] >= l.len - 1e-6 && l.outs.some(o => o.c === dest); }
+  // pk-77: y solo si lo de su punta puede ir a ese unidor. Un divisor salta la rama que no lo recibe (pk-72) y un
+  // clasificador la que su filtro cierra: con su turno «listo» para siempre, la otra entrada del unidor quedaba parada.
+  function listo(l, dest) {
+    const it = itemsDe(l);
+    if (!(it.length > 0 && it[0][1] >= l.len - 1e-6)) return false;
+    const r = it[0][0];
+    return l.outs.some(o => o.c === dest && (l.pz.p !== 's' || Ci.filtro(l.pz, o.d) === r || Ci.filtro(l.pz, o.d) === '*') && (l.outs.length === 1 || aceptaAbajo(dest).has(r)));
+  }
   function hayLugarDesde(dest, src) {
     if (!hayLugar(dest)) return false;
     if (dest.pz.p === 'u' && dest.ent.length > 1) {
@@ -356,7 +365,9 @@
         if (o.c) {
           // pk-72 (reporte del dueño): un divisor solo manda a una rama donde alguien lo recibe. Antes repartía por turnos
           // sin mirar: la piedra entraba a la rama del aserradero, quedaba en su punta y trababa todo lo de atrás
-          if (n > 1 && !aceptaAbajo(o.c).has(r)) { noUsa = noUsa || o.c; continue; }
+          // pk-77: en el clasificador también con una sola salida propia (su grupo tiene una): la madera filtrada a una
+          // rama sin aserradero volvía al pueblo en la punta en vez de seguir por «lo que sobre», y sin conexión iba por ahí
+          if ((n > 1 || c.pz.p === 's') && !aceptaAbajo(o.c).has(r)) { noUsa = noUsa || o.c; continue; }
           if (!hayLugarDesde(o.c, c)) continue;
           const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
           dest.push(it0[3] ? [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant, 1] : [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
@@ -433,7 +444,11 @@
       for (const o of c.outs) for (const r of (o.b ? recursosDe(o.b) : accDe(o.c))) if (pasaFiltro(c, o, r)) s.add(r);
       return s;
     };
-    const flujo = new Map(), ofertas = [];
+    // pk-77: el flujo va por clave: el recurso, y «recurso|b» para lo que salió de una bodega del pueblo. Antes iba
+    // solo por recurso: el margen sobre el tope de lo que sale de bodegas (pk-70) dejaba pasar también la madera de un
+    // campamento, y lo entregado se descontaba a todas las bocas de ese recurso por igual (una que no entregó nada
+    // perdía stock y otra que entregó, menos).
+    const flujo = new Map(), ofertas = [], resDe = key => key.split('|')[0];
     const sumar = (c, r, n) => { let f = flujo.get(c); if (!f) flujo.set(c, (f = {})); f[r] = (f[r] || 0) + n; };
     for (const c of carriles) {
       if (!c.src) continue;
@@ -446,11 +461,12 @@
         const vivos = opc.filter(r => quedan[r] > 0.01);
         if (!vivos.length) break;
         const parte = presu / vivos.length;
-        for (const r of vivos) { const m = Math.min(parte, quedan[r]); quedan[r] -= m; presu -= m; sumar(c, r, m); ofertas.push({ c, b, r, n: m }); }
+        const deB = !L().isShop(b) && !PK.Libro.esCampo(b);
+        for (const r of vivos) { const m = Math.min(parte, quedan[r]), key = deB ? r + '|b' : r; quedan[r] -= m; presu -= m; sumar(c, key, m); ofertas.push({ c, b, r, key, n: m }); }
       }
     }
     const entregas = [], pend = new Map();
-    const repartir = (outs, r, n) => { for (const o of outs) { const m = n / outs.length; if (o.b) { entregas.push({ b: o.b, r, n: m }); pend.set(o.b.id + r, (pend.get(o.b.id + r) || 0) + m); } else sumar(o.c, r, m); } };
+    const repartir = (outs, key, n) => { const r = resDe(key); for (const o of outs) { const m = n / outs.length; if (o.b) { entregas.push({ b: o.b, r, key, n: m }); pend.set(o.b.id + r, (pend.get(o.b.id + r) || 0) + m); } else sumar(o.c, key, m); } };
     // cuánto más puede tomar una salida en este paso: una cinta, lo que le falta para su tope; un edificio, su lugar
     // (y lo que acepta lo que tiene adelante, hasta un edificio: una cinta que termina en un taller lleno no toma nada)
     const capOut = (o, r, vistos) => {
@@ -468,32 +484,32 @@
       const c = orden[i], f = flujo.get(c);
       if (!f) continue;
       const cap = NIV(c.pz.n).rate * PILA() * k0 * dt, tot = Object.values(f).reduce((a, b) => a + b, 0), esc = tot > cap ? cap / tot : 1;
-      for (const r in f) {
-        const n = f[r] * esc, ok = o => (o.b ? recibe(o.b, r) : accDe(o.c).has(r));
+      for (const key in f) {
+        const r = resDe(key), n = f[key] * esc, ok = o => (o.b ? recibe(o.b, r) : accDe(o.c).has(r));
         if (n <= 0) continue;
         if (c.pz.p === 's') { // pk-69: primero su salida, hasta lo que da; el resto por «lo que sobre»
           const propias = c.outs.filter(o => Ci.filtro(c.pz, o.d) === r && ok(o)), sobra = c.outs.filter(o => Ci.filtro(c.pz, o.d) === '*' && ok(o));
           let resto = n;
-          if (propias.length) { const vs = new Set([c]), va = Math.min(resto, propias.reduce((a, o) => a + capOut(o, r, vs), 0)); repartir(propias, r, va); resto -= va; }
-          if (resto > 1e-9 && sobra.length) repartir(sobra, r, resto);
+          if (propias.length) { const vs = new Set([c]), va = Math.min(resto, propias.reduce((a, o) => a + capOut(o, r, vs), 0)); repartir(propias, key, va); resto -= va; }
+          if (resto > 1e-9 && sobra.length) repartir(sobra, key, resto);
           continue;
         }
         const elig = c.outs.filter(o => pasaFiltro(c, o, r) && ok(o));
-        if (elig.length) repartir(elig, r, n);
+        if (elig.length) repartir(elig, key, n);
       }
     }
     const dado = {}, deBod = {}; // pk-70: lo que sale de bodegas vuelve a otra bodega aunque el pueblo esté lleno
-    for (const o of ofertas) if (!L().isShop(o.b) && !PK.Libro.esCampo(o.b)) deBod[o.r] = (deBod[o.r] || 0) + o.n;
+    for (const o of ofertas) if (o.key !== o.r) deBod[o.key] = (deBod[o.key] || 0) + o.n;
     for (const e of entregas) {
-      const tienda = L().isShop(e.b), extra = tienda ? 0 : Math.max(0, deBod[e.r] || 0);
+      const tienda = L().isShop(e.b), extra = tienda ? 0 : Math.max(0, deBod[e.key] || 0);
       let m = Math.floor(Math.min(e.n, Math.max(0, lugarEn(e.b, e.r)) + extra));
       if (m < 1) continue;
       if (tienda) { if (!e.b.inb) e.b.inb = {}; e.b.inb[e.r] = (e.b.inb[e.r] || 0) + m; }
-      else { m = PK.Libro.poner(e.b, e.r, m, extra); deBod[e.r] = Math.max(0, (deBod[e.r] || 0) - m); }
-      if (m > 0) { dado[e.r] = (dado[e.r] || 0) + m; G().stat('belted', m); }
+      else { m = PK.Libro.poner(e.b, e.r, m, extra); if (e.key !== e.r) deBod[e.key] = Math.max(0, (deBod[e.key] || 0) - m); }
+      if (m > 0) { dado[e.key] = (dado[e.key] || 0) + m; G().stat('belted', m); }
     }
-    for (const r in dado) {
-      const os = ofertas.filter(o => o.r === r), tot = os.reduce((a, o) => a + o.n, 0), fr = tot > 0 ? Math.min(1, dado[r] / tot) : 0;
+    for (const key in dado) {
+      const r = resDe(key), os = ofertas.filter(o => o.key === key), tot = os.reduce((a, o) => a + o.n, 0), fr = tot > 0 ? Math.min(1, dado[key] / tot) : 0;
       for (const o of os) {
         const m = o.n * fr;
         if (L().isShop(o.b)) o.b.outb[r] -= m; else if (PK.Libro.esCampo(o.b)) PK.Libro.sacarCampo(o.b, r, m); else PK.Libro.sacar(o.b, r, m);

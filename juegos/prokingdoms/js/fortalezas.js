@@ -150,7 +150,7 @@
     epilogo({ id: 'f' + s.id, k: o.k, de: D.MY_SLOT, a: -1, lado: s.lado || 0, ini: s.ini, plan, units: antes, mio: 'atk', fort: o }, plan.gano);
     if (plan.gano) {
       const lvl = F.de(s.id).lvl, loot = D.FORT.botin(st.era, lvl);
-      guarda(s.id, { mia: true, bono: null, desde: fin, prox: fin + U.rand(D.FORT.contra[0], D.FORT.contra[1]) * DIA, trib: fin });
+      guarda(s.id, { mia: true, bono: null, semana: false, desde: fin, prox: fin + U.rand(D.FORT.contra[0], D.FORT.contra[1]) * DIA, trib: fin });
       G().give(loot);
       G().stat('fortalezas', 1); G().stat('asedios_ganados', 1);
       if (PK.Vida) PK.Vida.evento('asedio', { won: true, bajas: plan.bajas });
