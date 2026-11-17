@@ -40,8 +40,21 @@
   Lb.capCampo = b => (b.type === 'colonia' && D.coloniaCap ? D.coloniaCap(b.lvl) : D.campoCap(b.lvl));
   Lb.totalCampo = b => { let n = 0; const o = inv(b); for (const r in o) n += o[r]; return n; };
   Lb.campoLleno = b => Lb.totalCampo(b) >= Lb.capCampo(b) - 0.5;
+  // pk-60: cuánto de `r` cabe todavía. Un recurso que tu reino ya no puede recibir (su bodega está en el tope, por
+  // ejemplo el oro después de unos premios) no sale del campamento, porque los carromatos solo cargan lo que cabe en
+  // destino. Antes ese recurso llenaba el campamento entero y dejaba sin lugar a los demás (un campamento minero con
+  // 600 de oro y nada de piedra). Ahora ocupa media capacidad como mucho, y lo que ya se había pasado de la mitad no
+  // les quita lugar a los otros (así se destraban solos los campamentos que quedaron llenos).
+  Lb.lugarCampo = function (b, r) {
+    const cap = Lb.capCampo(b), o = inv(b), g = G(), st = S();
+    const tope = x => isFinite(g.cap(x)) && g.cap(x) - (st.res[x] || 0) < 1;
+    if (tope(r)) return Math.max(0, Math.min(cap - Lb.totalCampo(b), cap / 2 - (o[r] || 0)));
+    let tot = 0;
+    for (const x in o) tot += x !== r && tope(x) ? Math.min(o[x], cap / 2) : o[x];
+    return Math.max(0, cap - tot);
+  };
   Lb.ponerCampo = function (b, r, n) {
-    const k = Math.max(0, Math.min(n, Lb.capCampo(b) - Lb.totalCampo(b)));
+    const k = Math.max(0, Math.min(n, Lb.lugarCampo(b, r)));
     if (k > 0) inv(b)[r] = (inv(b)[r] || 0) + k;
     return k;
   };

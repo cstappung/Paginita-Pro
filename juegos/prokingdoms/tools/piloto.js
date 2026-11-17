@@ -313,7 +313,6 @@
   function mercado() {
     const g = G(), st = S();
     if (!g.countB('market')) return;
-    for (const r of ['wood', 'stone']) if (st.res[r] < 150 && st.res.gold > 1500 && PK.Social.buyPrice(r, 300) < st.res.gold - 1000) PK.Social.buy(r, 300);
     // pk-61: lo que pide la meta (la era y sus edificios) y nadie puede juntar (no hay mármol a mano), se compra
     const nec = g.metaNecesita();
     for (const r of ['marble', 'ore', 'gems']) {
@@ -322,10 +321,50 @@
     }
     // lo que está lleno y la próxima era no pide (o ya tiene de sobra), se vende: lo que sugiere el Asesor
     const costo = st.eraProg ? {} : D.eraCost(st.era + 1);
+    // pk-55: también compra lo que le falta para la era cuando le sobra oro. Con el oro pasado del tope (premios), los
+    // carromatos que traen oro esperan sin descargar, el campamento minero se llena y la piedra deja de entrar: el
+    // piloto quedaba en la Era III con 32.000 de oro y 267 de piedra, sin comprar porque «tenía más de 150».
+    for (const r of ['wood', 'stone']) if (st.res[r] < Math.max(150, (costo[r] || 0) * 1.05) && st.res.gold > 1500 && PK.Social.buyPrice(r, 300) < st.res.gold - 1000) PK.Social.buy(r, 300);
     for (const r of ['food', 'wood', 'stone', 'marble', 'planks', 'blocks', 'books']) {
       if (!D.RES[r] || st.res[r] < g.cap(r) * 0.95 || st.res[r] - 1000 < (costo[r] || 0) * 1.1) continue;
       if (PK.Social.sell(r, 1000)) { P.ventas = (P.ventas || 0) + 1; break; }
     }
+  }
+  // pk-55 (plan de guerra, G1): la frontera. Los reinos nacen separados por 2 a 4 parcelas libres, así que primero
+  // reclama las que lo acercan al vecino más cercano (solo si le sobra cuatro veces el costo: no debe mover el ritmo
+  // de las eras) y, cuando lo toca, lanza una campaña contra su parcela más débil si llega con 1,25 veces la defensa.
+  // Así el time-lapse ejercita los asedios y el vigía de invariantes los cubre.
+  function frontera() {
+    const T = PK.Terr, st = S(), g = G();
+    if (st.era < D.TERR.minEra || !g.countB('barracks') || st.terr.camps.length || g.time - (P._terrT || -1e9) < 600) return;
+    let mejor = null;
+    for (const b of D.BOTS) { if (b.human) continue; const c = T.caminoA(b.slot); if (c && (!mejor || c.n < mejor.c.n)) mejor = { b, c }; }
+    if (!mejor) return;
+    P._terrT = g.time;
+    if (mejor.c.n > 0) {
+      const k = mejor.c.camino[0], costo = T.claimCost();
+      if (!T.canClaim(k) && Object.keys(costo).every(r => st.res[r] >= costo[r] * 4)) { T.claim(k); P.parcelas = (P.parcelas || 0) + 1; anota('Reclamó una parcela hacia ' + mejor.b.realm + ' (faltan ' + (mejor.c.n - 1) + ').'); }
+      return;
+    }
+    const fuerza = PK.Social.power(st.war.army);
+    let obj = null;
+    for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === mejor.b.slot + 1 && !T.canAttack(k)) { const d = T.defenseOf(k, mejor.b.slot); if (!obj || d < obj.d) obj = { k, d }; }
+    if (!obj || fuerza < obj.d * 1.25 || !g.canAfford(T.campaignCost(obj.k))) return;
+    if (T.attack(obj.k, Object.assign({}, st.war.army))) { P.campanas = (P.campanas || 0) + 1; anota('Campaña contra ' + mejor.b.realm + ': fuerza ' + Math.round(fuerza) + ' contra aprox. ' + Math.round(obj.d) + '.'); }
+  }
+  // G8 (pk-65): sitia una fortaleza cuando la gana de sobra (1,4 veces su guarnición con el 70 % del ejército) y elige
+  // el bono de las que tiene. Como un jugador que mira la ventana de la fortaleza.
+  function fortaleza() {
+    const F = PK.Fort, st = S(), g = G();
+    if (!F) return;
+    st.flags.guiaGuerra = st.flags.guiaGuerra || 3; // Tobías no interrumpe al piloto
+    for (const o of F.mias()) if (!F.de(o.id).bono) F.elegirBono(o.id, 'minas');
+    if (st.fort && st.fort.sitio || g.time - (P._fortT || -1e9) < 600) return;
+    P._fortT = g.time;
+    const units = {};
+    for (const k in st.war.army) if (st.war.army[k] > 0) units[k] = Math.floor(st.war.army[k] * 0.7);
+    const o = F.lista().filter(x => !F.puedeSitiar(x.id)).map(x => ({ x, m: F.fuerzaContra(x.id, units) / F.fuerza(x.id) })).filter(c => c.m >= 1.4).sort((a, b) => b.m - a.m)[0];
+    if (o && F.sitiar(o.x.id, units)) { P.sitios = (P.sitios || 0) + 1; anota('Sitio a ' + o.x.nombre + ' (' + o.m.toFixed(1) + ' veces su guarnición).'); }
   }
   function medir() {
     const g = G(), st = S();
@@ -363,10 +402,13 @@
       investigar();
       heroes();
       guerra();
+      frontera();
+      fortaleza();
       if (st.ret.welcome) g.openWelcome(true);
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  const F0 = () => (PK.Fort ? PK.Fort.mias().length : 0);
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

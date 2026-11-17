@@ -111,6 +111,15 @@
     }
   }
   Sq.dibujar = function (ctx, R) {
+    // G6: la hueste de un reino vecino que viene a tantear tu frontera se ve marchar sus últimos 3 minutos
+    const st = PK.Game.state, T = PK.Terr;
+    if (st && st.terr && T) for (const th of st.terr.threats) {
+      if (th.plan) continue;
+      const falta = (th.at - Date.now()) / 1000;
+      if (falta > 180 || falta < 0) continue;
+      const [x, y] = T.center(th.k);
+      columna(ctx, R, th.slot, 1 - falta / 180, { cx: x, cy: y }, ['spear', 'militia', 'archer']);
+    }
     const q = Sq.info, b = tc();
     if (!q || !b) return;
     const tot = Math.max(1, q.arrive - q.at), f = U.clamp((ahora() - q.at) / tot, 0, 1);

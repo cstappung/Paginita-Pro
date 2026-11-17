@@ -17,6 +17,27 @@
     Mn.off = (r.now || Date.now()) - Date.now();
     Mn.caravanas = r.caravanas || [];
     Mn.titulo = r.titulo || null;
+    // G7 (pk-64): la Ciudadela y el diario de guerra del mundo (solo llegan cuando cambian)
+    if (r.ciud) Mn.ciud = r.ciud;
+    if (r.cv !== undefined) Mn.cv = r.cv;
+    if (r.diario) Mn.diario = r.diario;
+    if (r.dv2 !== undefined) Mn.dv2 = r.dv2;
+  };
+  Mn.cv = -1; Mn.dv2 = -1; Mn.ciud = null; Mn.diario = [];
+  Mn.ciudMia = () => !!(online() && Mn.ciud && Mn.ciud.gid && S().guild && S().guild.id === Mn.ciud.gid);
+  Mn.sitiarCiudadela = async function (units) {
+    const st = S(), power = PK.Social.power(units);
+    if (!power) { toast('Elige tropas para la campaña.', 'warn'); return false; }
+    for (const k in units) if (units[k] > st.war.army[k]) { toast('No tienes tantas tropas.', 'warn'); return false; }
+    try {
+      const r = await PK.Net.api('POST', '/api/ciudadela', { units, power });
+      for (const k in units) st.war.army[k] = Math.max(0, st.war.army[k] - Math.round(units[k] * (r.bajas || 0)));
+      Mn.ciud = r.ciud; Mn.cv = r.cv; Mn.hoy = D.semana(Date.now()) + ':' + new Date().toISOString().slice(0, 10);
+      G().stat('ciudadela', 1);
+      toast('Tu campaña sumó ' + U.fmt(r.imp) + ' de ímpetu al asedio de ' + D.CIUDADELA.nombre + ' (perdiste un ' + Math.round((r.bajas || 0) * 100) + '% de esas tropas).', 'good');
+      if (PK.Sfx) PK.Sfx.play('cuerno');
+      return true;
+    } catch (e) { toast((e && e.message) || 'No se pudo hablar con el servidor.', 'warn'); return false; }
   };
   // lo que el ranking lee de la foto (el servidor lo acota: no sube más rápido de lo posible)
   Mn.rkFoto = function () {
@@ -24,7 +45,7 @@
     let wonder = 0, floor = 0;
     for (const b of g.buildings) if (b.owner === 'p' && b.done && (b.type === 'wonder' || (D.MARAVILLAS || []).includes(b.type))) wonder = Math.max(wonder, b.lvl);
     for (const k in st.stats) if (k.startsWith('floor_')) floor = Math.max(floor, st.stats[k] || 0);
-    return { wonder, floor, def: Math.floor(st.stats.defenses_won || 0) };
+    return { wonder, floor, def: Math.floor(st.stats.defenses_won || 0), fort: Math.floor(st.stats.fortalezas || 0) };
   };
 
   // ---------- Buzón ----------

@@ -535,6 +535,14 @@
     const fi = g.fiestaInfo();
     if (fi && fi.left) out.push({ k: 'fiesta', icon: Sp.icon('coin'), name: '🎉 Fiesta (+25%)', left: fi.left, pct: 1 - fi.left / g.FIESTA.dur, go: () => { const tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc'); if (tc) UI.selectBuilding(tc); } });
     out.sort((a, b) => a.left - b.left);
+    // pk-55: las campañas de conquista (antes no salían en la tira) y, arriba de todo, los asedios en curso
+    for (const c of (st.terr && st.terr.camps) || []) {
+      if (c.phase === 'asedio') continue;
+      const go = c.phase === 'go', left = ((go ? c.arrive : c.back) - now) / 1000, info = PK.Terr.realmInfo(c.slot);
+      out.push({ k: 't' + c.k + c.phase, icon: Sp.icon('war'), name: (go ? '⚔ Campaña contra ' : '↩ Vuelve de ') + (info ? info.realm : 'la frontera'), left, pct: 1 - left / Math.max(1, c.travel || 120), go: () => { const [x, y] = PK.Terr.center(c.k); PK.Render.centerOn(x, y); } });
+    }
+    out.sort((a, b) => a.left - b.left);
+    for (const fr of PK.Frente ? PK.Frente.filas() : []) out.unshift({ k: fr.k, raid: true, fr, icon: Sp.icon('war'), name: fr.titulo + fr.otro, left: fr.e.quedaTotal, pct: fr.e.control, go: () => PK.Terr.verFrente(fr.f.id) });
     const inc = PK.Incursiones && PK.Incursiones.fila();
     if (inc) out.unshift(Object.assign(inc, { raid: true, icon: Sp.icon('war'), go: () => PK.Incursiones.ver() }));
     const sq = PK.Saqueos && PK.Saqueos.fila(); // C6: partida de saqueo de un reino del servidor
@@ -553,9 +561,16 @@
         const time = el('span', { class: 'qs-t' }), fill = el('i', { class: 'qs-fill' });
         const row = el('div', { class: 'qs-item' + (it.idle ? ' idle' : '') + (it.raid ? ' raid' : ''), title: it.name, onclick: () => it.go() },
           el('img', { src: it.icon }), el('span', { class: 'qs-n' }, it.name), time, it.idle ? null : el('b', { class: 'qs-bar' }, fill));
+        let fr = null;
+        if (it.fr) { // un asedio: las tres etapas y las dos barras (ímpetu del atacante, resistencia del defensor)
+          const pips = D.ASEDIO.etapas.map(() => el('i', { class: 'fr-pip' })), a = el('i'), d = el('i');
+          row.classList.add('frente');
+          row.append(el('span', { class: 'qs-fr' }, el('span', { class: 'fr-pips' }, pips), el('b', { class: 'fr-bar a', title: 'Ímpetu del atacante' }, a), el('b', { class: 'fr-bar d', title: 'Resistencia del defensor' }, d)));
+          fr = { pips, a, d };
+        }
         if (it.b && G().canNudge(it.b)) row.append(UI.btn('Empujón', () => { G().nudge(it.b); UI.refreshPanel(true); }, { small: true, cls: 'gold', title: 'Le queda menos de un minuto: termínala gratis' }));
         qsEl.append(row);
-        return { time, fill };
+        return { time, fill, fr };
       });
       if (items.length > QS_MAX) qsEl.append(el('div', { class: 'qs-more', onclick: () => UI.openWorks() }, '+' + (items.length - QS_MAX) + ' más'));
     }
@@ -563,6 +578,11 @@
       if (it.idle) return;
       qsRows[i].time.textContent = it.left === null ? '' : U.fmtTime(it.left); // la marcha de los bandidos no tiene reloj
       qsRows[i].fill.style.width = U.clamp(it.pct * 100, 0, 100) + '%';
+      if (it.fr && qsRows[i].fr) {
+        const e = it.fr.e, q = qsRows[i].fr;
+        q.pips.forEach((p, n) => { p.className = 'fr-pip' + (n < e.etapa ? ' hecha' : n === e.etapa ? ' ahora' : ''); });
+        q.a.style.width = Math.round(e.impetu * 100) + '%'; q.d.style.width = Math.round(e.resistencia * 100) + '%';
+      }
     });
     qsEl.style.display = items.length ? '' : 'none';
   }
@@ -1362,6 +1382,8 @@
     if (h.k === 'node') { const z = W.zoneOf(h.o); text = D.NODES[h.o.kind].name + ' · ' + (h.o.dead ? 'agotado' : U.fmt(h.o.amount)) + (z ? ' · ' + z.name : ''); }
     else if (h.k === 'building') text = h.o.def.name + (h.o.def.noUp ? '' : ' · Nv ' + h.o.lvl) + (h.o.upg ? ' (mejorando)' : '') + (h.o.owner !== 'p' ? ' · ' + D.BOTS.find(b => b.id === h.o.owner).name : '');
     else if (h.k === 'poi') { const st = G().poiState(h.o); text = (h.o.kind === 'legend' ? D.LEYENDAS[h.o.ley].name + (st && st.d ? ' · investigado' : ' · lugar legendario') : D.POI[h.o.kind].name + (st && st.d ? ' · ya aprovechado' : '')); }
+    else if (h.k === 'fort') text = PK.Fort.titulo(h.o);
+    else if (h.k === 'ciud') text = PK.Fort.tituloCiudadela();
     else if (h.k === 'cap') { const c = D.CAPITULOS[h.o.n - 1]; text = c.lugar.name + ' · Capítulo ' + U.roman(h.o.n) + ' de la Crónica'; }
     else if (h.k === 'troop') text = h.o.march ? 'Tus tropas marchan hacia ' + (h.o.march.back ? 'casa' : h.o.march.name) : 'Tus soldados · ' + UI.hint('clic', 'toca') + ' para abrir el Cuartel';
     else if (h.k === 'unit') text = h.o.owner === 'p' ? (h.o.kind === 'scout' ? 'Explorador · ' : 'Aldeano · ') + taskText(h.o) : 'Aldeano de ' + D.BOTS.find(b => b.id === h.o.owner).name;

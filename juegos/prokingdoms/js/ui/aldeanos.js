@@ -148,7 +148,7 @@
     ['Recolección', ['lumber', 'mining', 'mill', 'establo', 'farm', 'muelle', 'scout']],
     ['Talleres', ['sawmill', 'masonry', 'smelter', 'forge', 'scriptorium', 'steelworks', 'workshop', 'cartwright']],
     ['Reino', ['market', 'library', 'consejo', 'university', 'monastery', 'guild']],
-    ['Ejército y defensa', ['barracks', 'tower', 'granporton']],
+    ['Ejército y defensa', ['barracks', 'tower', 'fuerte', 'granporton']],
     ['Maravilla (elige una)', D.MARAVILLAS || []],
     ['Decoraciones (ánimo)', D.DECOS || []],
   ];

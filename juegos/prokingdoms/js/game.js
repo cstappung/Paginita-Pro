@@ -240,7 +240,17 @@
   const ley = res => (PK.Leyendas && S && S.leyendas ? PK.Leyendas.recurso(res) : 0);
   // Fase 3 (js/vida.js): árbol 2.0, cartas de era y estación
   const vb = k => (PK.Vida && S ? PK.Vida.bono(k) : 0);
-  const vr = (res, kind) => (PK.Vida && S ? PK.Vida.recoleccion(res, kind) : 1);
+  const vr = (res, kind, extra) => (PK.Vida && S ? PK.Vida.recoleccion(res, kind, extra) : 1);
+  // G5: lo que suma la comarca de esa casilla, si la parcela es tuya (D.COMARCAS). granja: para una granja.
+  const comarca = (x, y, res, granja) => {
+    if (!W.rasgoDe || !W.inb(Math.floor(x), Math.floor(y))) return 0;
+    const k = W.parcel(Math.floor(x), Math.floor(y));
+    if (W.terr[k] !== D.MY_SLOT + 1) return 0;
+    const c = D.COMARCAS[W.rasgoDe(k)];
+    return !c ? 0 : granja ? c.granja || 0 : (c.res && c.res[res]) || 0;
+  };
+  const fortB = (res, granja) => (PK.Fort && S && S.fort ? PK.Fort.bono(res, granja) : 0); // G6: las fortalezas tomadas, en todo el reino
+  G.comarca = comarca;
   G.bono = vb;
   const conMod = cost => { const m = lm('cost') * (1 + vb('cost')); if (m === 1) return cost; const o = {}; for (const r in cost) o[r] = Math.ceil(cost[r] * m); return o; };
   // Mejoras permanentes: decretos y rangos de misiones (G.perk); perkAll suma además las estructuras de Leyendas.
@@ -275,7 +285,7 @@
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
     if (owner !== 'p') return base;
     const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
-    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk);
+    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk, (u ? comarca(u.x, u.y, res) : 0) + fortB(res));
   };
   // Muelle de pesca (V9): rinde según el agua que lo rodea; la Cosecha eficiente no le suma, Pesca con redes sí.
   G.MUELLE_RATE = 0.3;
@@ -294,7 +304,7 @@
     if (owner !== 'p') return D.FARM_RATE;
     if (b && b.def.farmRes) return G.SALINAS_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * dropMult(u) * G.globalMult();
     if (b && b.type === 'muelle') return mareaPesca() * G.MUELLE_RATE * G.aguaMuelle(b) * (1 + (G.bst(b).farm || 0)) * (1 + vb('muelle')) * (1 + G.cerca(b)) * dropMult(u) * G.globalMult() * (1 + ley('food')) * vr('food');
-    return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm');
+    return D.FARM_RATE * (1 + G.cerca(b)) * (1 + 0.15 * G.lvl('harvest')) * (1 + (b ? G.bst(b).farm || 0 : 0)) * dropMult(u) * G.globalMult() * lm('farm') * (1 + ley('food')) * vr('food', 'farm', (b ? comarca(b.cx, b.cy, 'food', true) : 0) + fortB('food', true));
   };
   // Bonos por cercanía (V5, D.CERCANIA en datos-vida.js): un edificio rinde más con un vecino de cierto tipo. Se
   // recalcula cuando cambia algo del mapa (G.blockVer sube al construir, terminar, mover o demoler).
@@ -392,7 +402,7 @@
   // ¿Está llena la bodega de eso? Los aldeanos esperan en vez de gastar el recurso del mapa.
   G.isFull = res => G.cap(res) !== Infinity && (S.res[res] || 0) >= G.cap(res) - 0.5;
   // pk-43: lleno para quien descarga en ese edificio: un campamento mira su propio tope; el pueblo, sus bodegas
-  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) && !(PK.Logi.campoAislado && PK.Logi.campoAislado(b)) ? PK.Libro.campoLleno(b) : G.isFull(res); }; // pk-61: el aislado mira el pueblo
+  G.llenoPara = (b, res) => { if (b && PK.Libro) b = PK.Libro.almacenDe(b); return b && PK.Libro && PK.Libro.esCampo(b) && !(PK.Logi.campoAislado && PK.Logi.campoAislado(b)) ? (res ? PK.Libro.lugarCampo(b, res) < 0.5 : PK.Libro.campoLleno(b)) : G.isFull(res); }; // pk-61: el aislado mira el pueblo; pk-60: un recurso sin salida no llena el campamento
   G.noteFull = function (res) {
     // un solo aviso cada 2 minutos que junta todo lo que se llenó (antes uno por recurso, y se apilaban)
     if (PK.UI && !G.offline) {
@@ -1316,6 +1326,9 @@
     }
     if ((type === 'muelle' || def.agua) && !G.tocaAgua(x, y, def)) return 'sinAgua';
     if (G.encierra(type, x, y, ignorar)) return 'encierra';
+    if (PK.Fort && PK.Fort.cerca(x, y, def.w, def.h)) return 'fortaleza'; // G6
+    // pk-55: una parcela bajo asedio está en disputa: no se construye ahí hasta que termine
+    if (PK.Terr && PK.Terr.enDisputa && S && S.terr && (PK.Terr.enDisputa(W.parcel(x, y)) || PK.Terr.enDisputa(W.parcel(x + def.w - 1, y + def.h - 1)))) return 'disputa';
     return null;
   };
   G.tocaAgua = function (x, y, def) {
@@ -1409,6 +1422,8 @@
     fuera: 'Eso queda fuera del mapa.',
     encierra: 'Así encerrarías a tu pueblo: deja al menos una casilla de paso.',
     sinAgua: 'El muelle va pegado al agua: ponlo en la orilla de un lago o río.',
+    fortaleza: 'Ahí hay una fortaleza: no se construye pegado a sus muros.',
+    disputa: 'Esa parcela está bajo asedio: no se puede construir ahí hasta que termine la batalla.',
   };
   G.place = function (type, x, y, builders) {
     if (G.legendLocked(type)) { toast(D.BUILD[type].name + ' se desbloquea con una misión de la rama Leyendas.', 'warn'); return null; }
@@ -1687,6 +1702,7 @@
     PK.Logi.update(dt);
     const tierra = !G.enMar(); // en el archipiélago (Fase 9) no corren los sistemas de la tierra
     if (tierra) PK.Terr.update(dt, false);
+    if (tierra && PK.Fort) PK.Fort.update(dt, false);
     PK.Exp.update(dt, false);
     if (PK.Heroes) PK.Heroes.update(dt);
     if (PK.Aventura) PK.Aventura.tick(dt);
@@ -1794,7 +1810,7 @@
           // pk-43: si trabaja para un campamento, junta en el campamento (con su tope); si no, en el pueblo
           const alm = u.owner === 'p' && PK.Libro ? PK.Libro.almacenDe(base) : base; // pk-46: en una colonia, su Muelle
           const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(alm) && !aislado;
-          const room = u.owner !== 'p' ? Infinity : campo ? Math.max(0, PK.Libro.capCampo(alm) - PK.Libro.totalCampo(alm)) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
+          const room = u.owner !== 'p' ? Infinity : campo ? PK.Libro.lugarCampo(alm, t.res) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
           const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
           if (take <= 0) continue;
           if (u.owner === 'p' || !W.isShared(n)) n.amount -= take; // L4: los simulados no gastan tus zonas comunes
@@ -1820,6 +1836,7 @@
       PK.Logi.offline(dt);
       const tierra = !G.enMar(); // como en vivo: en el archipiélago no corren los sistemas de la tierra
       if (tierra) PK.Terr.update(dt, true);
+      if (tierra && PK.Fort) PK.Fort.update(dt, true);
       PK.Exp.update(dt, true);
       if (PK.Heroes) PK.Heroes.update(dt);
       if (PK.Aventura) PK.Aventura.tick(dt);

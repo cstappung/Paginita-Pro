@@ -13,7 +13,7 @@
   C.LISTA = [
     { id: 'mayordomo', lvl: 1, name: 'Mayordomo', icon: 'book', cada: 5, desc: 'Lleva una cola de hasta 5 investigaciones, reclama misiones, diarias y semanales, abre el cofre de bienvenida y empieza el avance de era cuando alcanza.' },
     { id: 'cartografo', lvl: 2, name: 'Cartógrafo', icon: 'compass', cada: 15, desc: 'Vuelve a mandar a explorar a los exploradores quietos (primero a tus banderas), repone exploradores y avisa cada lugar nuevo.' },
-    { id: 'mariscal', lvl: 3, name: 'Mariscal', icon: 'war', cada: 20, desc: 'Recluta hasta la guarnición que elijas, repite pisos ya limpiados y acepta encargos del tablón cuando la victoria es probable. Nunca deja la defensa bajo el mínimo.' },
+    { id: 'mariscal', lvl: 3, name: 'Mariscal', icon: 'war', cada: 20, desc: 'Recluta hasta la guarnición que elijas, repite pisos ya limpiados y acepta encargos del tablón cuando la victoria es probable. En la guerra, avisa qué parcela vecina está a tu alcance, sugiere la mezcla de tropas para cada asedio y, si se lo permites, ordena la retirada cuando el asedio va perdido. Nunca deja la defensa bajo el mínimo.' },
     { id: 'tesorero', lvl: 5, name: 'Tesorero', icon: 'market', cada: 30, desc: 'Vende lo que pase del tope que elijas y compra lo que falta para la próxima era, con una reserva de oro y bajo el límite diario del mercado.' },
     { id: 'maestro', lvl: 7, name: 'Maestro mayor', icon: 'hammer', cada: 15, desc: 'Con un Maestro de Obras libre, empieza mejoras según tus reglas: bodegas cuando se llenan, talleres y casas al máximo de la era. No usa tu cola de obras.' },
     { id: 'gobernador', lvl: 9, name: 'Gobernador', icon: 'crown', cada: 30, desc: 'Cuando las bodegas de comida, madera, piedra y oro pasan del 95%, paga horas extra o hace una fiesta.' },
@@ -124,6 +124,27 @@
           let n = 0;
           while (n < 3 && enCasa() + fuera + st.war.q.length < cs.guarnicion && !Soc.trainWhy(tipo) && g.canAfford(D.ARMY[tipo].cost, 3)) n += Soc.trainArmy(tipo, 1);
           if (n) anota('mariscal', 'Reclutó ' + n + ' ' + D.ARMY[tipo].name.toLowerCase() + (n === 1 ? '' : 's') + '.');
+        }
+      }
+      // G8 (pk-65): la guerra. Retirada cuando el asedio va perdido (solo con lo que se ve: ímpetu contra resistencia,
+      // nunca con el final del plan), y un aviso por hora de la parcela vecina más débil a su alcance.
+      const T = PK.Terr;
+      if (T && st.terr) {
+        if (cs.retirada) for (const f of T.frentes()) {
+          if (f.mio !== 'atk' || f.fort) continue;
+          const e = T.estado(f);
+          if (e.fin || (Date.now() - f.ini) / 1000 < 40 || e.impetu >= e.resistencia * 0.75) continue; // nunca en el primer momento
+          if (T.acciones(f).some(a => a.tipo === 'retirada') && T.accion(f.id, { tipo: 'retirada' })) anota('mariscal', 'Ordenó la retirada del asedio a ' + T.nombreFrente(f).otro + ': iba perdido.');
+        }
+        if (st.era >= D.TERR.minEra && Date.now() - (cs.avisoT || 0) > 3600e3) {
+          const W = PK.World, fuerza = Soc.power(army);
+          let mejor = null;
+          for (let k = 0; k < W.terr.length; k++) {
+            if (!W.terr[k] || T.mine(k) || T.canAttack(k)) continue;
+            const d = T.defenseOf(k, W.terr[k] - 1);
+            if (d < fuerza * 0.8 && (!mejor || d < mejor.d)) mejor = { k, d };
+          }
+          if (mejor) { cs.avisoT = Date.now(); anota('mariscal', 'Una parcela de ' + T.realmInfo(W.terr[mejor.k] - 1).realm + ' está a tu alcance: defensa aprox. ' + U.fmt(mejor.d) + ' contra tu ejército de ' + U.fmt(fuerza) + '.'); }
         }
       }
       // una salida por pasada: pisos ya limpiados que se repusieron, después encargos del tablón
@@ -270,7 +291,8 @@
             el('div', { class: 'row small' }, 'Guarnición: ', btn('−', () => { cs.guarnicion = Math.max(0, cs.guarnicion - 5); UI.rerender(); }, { small: true }), el('b', null, String(cs.guarnicion)), btn('+', () => { cs.guarnicion += 5; UI.rerender(); }, { small: true }), ' tropas'),
             el('div', { class: 'row small' }, 'Sale si gana con: ', opt(cs.prob, [0.7, 0.8, 0.85, 0.9, 0.95], v => Math.round(v * 100) + '%', v => { cs.prob = v; })),
             el('div', { class: 'row small' }, 'Deja en casa: ', opt(cs.defensa, [0, 0.2, 0.3, 0.5], v => Math.round(v * 100) + '%', v => { cs.defensa = v; })),
-            el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: cs.heroes !== false, onchange: e => { cs.heroes = e.target.checked; } }), ' Llevar al mejor héroe libre'));
+            el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: cs.heroes !== false, onchange: e => { cs.heroes = e.target.checked; } }), ' Llevar al mejor héroe libre'),
+            el('label', { class: 'chk small' }, el('input', { type: 'checkbox', checked: !!cs.retirada, onchange: e => { cs.retirada = e.target.checked; } }), ' Ordenar la retirada cuando un asedio va perdido'));
           if (c.id === 'tesorero') box.append(
             el('div', { class: 'row small' }, 'Vende sobre: ', opt(cs.vender, [0.8, 0.9, 0.95], v => Math.round(v * 100) + '%', v => { cs.vender = v; })),
             el('div', { class: 'row small' }, 'Reserva de oro: ', opt(cs.oroReserva, [0.1, 0.2, 0.4], v => Math.round(v * 100) + '%', v => { cs.oroReserva = v; })),

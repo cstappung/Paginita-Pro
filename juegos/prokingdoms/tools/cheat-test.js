@@ -26,6 +26,14 @@ async function api(method, route, body, token) {
   });
   return { status: res.status, data: await res.json().catch(() => ({})) };
 }
+// El mismo mapa que el servidor y el navegador: la cuenta honesta solo pide casillas que su cliente dejaría pedir
+// (W.calzadaPuede: sin agua, zonas comunes ni lugares). Sin este filtro la honesta mandaba agua y quedaba anotada.
+const vm = require('vm');
+const ctxW = vm.createContext({ window: {}, console });
+for (const f of ['js/util.js', 'js/data.js', 'js/pase.js', 'js/world.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), ctxW, { filename: f });
+const PKW = ctxW.window.PK;
+PKW.D.setupRealms(-1, null);
+PKW.World.generate(PKW.D.SEED);
 const snap = o => Object.assign({ era: 1, pop: 10, defense: 30, truce: false, res: { food: 200, wood: 200, stone: 100, gold: 100 }, total: 0, army: 0, walls: 0, score: 0 }, o);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -68,7 +76,7 @@ async function main() {
       const dueño = k => terr[Math.floor(Math.floor(k / MAP) / PAR) * PW + Math.floor((k % MAP) / PAR)];
       // casillas de la honesta (su tierra) y de la tramposa
       const deH = [], deC = [];
-      for (let k = 0; k < MAP * MAP && (deH.length < 200 || deC.length < 50); k++) { if (dueño(k) === hs + 1 && deH.length < 200) deH.push(k); else if (dueño(k) === cs + 1 && deC.length < 50) deC.push(k); }
+      for (let k = 0; k < MAP * MAP && (deH.length < 200 || deC.length < 50); k++) { if (dueño(k) === hs + 1 && deH.length < 200) { if (PKW.World.calzadaPuede(k, hs, terr)) deH.push(k); } else if (dueño(k) === cs + 1 && deC.length < 50) deC.push(k); }
       let a = await api('POST', '/api/autopista', { add: deC.concat(deH.slice(0, 20)) }, cheat.token);
       check(a.status === 200 && a.data.aceptadas.every(k => dueño(k) === cs + 1) && a.data.aceptadas.length > 0, 'en tierra ajena se rechaza; en la suya se acepta', a.data.aceptadas && a.data.aceptadas.length + ' de ' + (deC.length + 20));
       a = await api('POST', '/api/autopista', { add: deH }, honest.token);
@@ -188,7 +196,7 @@ async function main() {
     const log = fs.existsSync(path.join(DATA, 'sospechas.log')) ? fs.readFileSync(path.join(DATA, 'sospechas.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l)) : [];
     const kinds = [...new Set(log.map(e => e.kind))];
     check(['foto', 'murallas', 'autopista', 'oferta', 'mercado', 'tablon', 'pedidos', 'regata'].every(k => kinds.includes(k)), 'quedó registrado en sospechas.log', kinds.join(', '));
-    check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro');
+    check(!log.some(e => e.name === 'Honesta'), 'la cuenta honesta no aparece en el registro', JSON.stringify(log.filter(e => e.name === 'Honesta').slice(0, 2)).slice(0, 400));
   } finally {
     srv.kill();
     await wait(200);
