@@ -611,3 +611,21 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   paid off before it arrives (`T.pagarTributo`, 60 % of its power in gold).
 - Not done from the plan's G6: «pedir ayuda» against a probe, probes decided by the server when online (online,
   simulated realms still never attack your border), heroes in fortress sieges, and the Crónica chapter.
+
+### War plan, G7: the war of the world (`pk-64`, server)
+
+- **Ciudadela** (`D.CIUDADELA`; server `ciudDe`/`ciudInfo`/`ciudadela`, route `POST /api/ciudadela` in both
+  `server/index.js` and `functions/index.js`): one per world, `w.ciud = { sem, imp: { gid: n }, gid, gname }`. One
+  campaign per member per day (`checkArmy`, 12 % losses applied by the client), its force × 0.9–1.1 goes to the
+  guild's ímpetu. On the first sync of a new week the top guild takes it (kept if nobody sieged). Members of the
+  holding guild sell to the merchants for +5 %: the client in `Soc.sellPrice` (`Mundo.ciudMia()`, needs
+  `S().guild.id`, set in `applyGuild`) **and** the server's credit in `checkMarket`, or the snapshot check trips.
+- Where it stands: `Fort.ciudadela()`, the free 3×3 in the common zone nearest the map centre (from `W.ORIG`); drawn
+  with `fuerte` and the guild's banner (`Fort.colorGremio(gid)`), clicked as `k: 'ciud'`. Nothing builds next to it.
+- **Diario de guerra**: `w.diario`, the last 20 battles of the world (player sieges with `D.asedioVista(plan,
+  Infinity)`, bot conquests without plan), versioned by `w.dv2` (`dv` was already taken by diplomacy). Shown in
+  Territorio with «Ver» (`Frente.repetir`).
+- Rankings «Conquistas» (`p.conq`, counted by the server in `conquerBot` and `tickCamps`) and «Fortalezas»
+  (`rk.fort` from the snapshot, +2 per snapshot at most).
+- Not done from the plan's G7: the portrait frame for the holding guild (it lives in Juegos, not here), an ally
+  joining your siege, and simulated guilds sieging the Ciudadela.

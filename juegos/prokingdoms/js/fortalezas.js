@@ -43,8 +43,32 @@
     }
     return lista;
   };
+  // G7 (pk-64): dónde está la Ciudadela del mundo: en la zona común más cerca del centro del mapa, en un lugar libre.
+  let ciud;
+  F.ciudadela = function () {
+    if (ciud !== undefined) return ciud;
+    const P = W.PW, PS = D.PARCEL, c = P / 2, O = W.ORIG || { p: [], n: [] }, ocupado = new Uint8Array(W.W * W.H);
+    O.p.forEach(([x0, y0], i) => { const q = W.pois[i]; for (let j = -1; j <= q.h; j++) for (let ii = -1; ii <= q.w; ii++) if (W.inb(x0 + ii, y0 + j)) ocupado[W.idx(x0 + ii, y0 + j)] = 1; });
+    O.n.forEach(([x0, y0]) => { if (W.inb(x0, y0)) ocupado[W.idx(x0, y0)] = 1; });
+    const ks = [];
+    for (let k = 0; k < P * P; k++) if (W.terrCommon[k]) ks.push(k);
+    ks.sort((a, b) => Math.hypot(a % P - c, Math.floor(a / P) - c) - Math.hypot(b % P - c, Math.floor(b / P) - c));
+    ciud = null;
+    for (const k of ks) {
+      const x0 = (k % P) * PS, y0 = Math.floor(k / P) * PS;
+      for (let y = y0; y <= y0 + PS - 3 && !ciud; y++) for (let x = x0; x <= x0 + PS - 3 && !ciud; x++) {
+        let ok = true;
+        for (let j = 0; j < 3 && ok; j++) for (let i = 0; i < 3; i++) { const q = W.idx(x + i, y + j); if (W.terrain[q] === 4 || ocupado[q]) { ok = false; break; } }
+        if (ok) ciud = { k, x, y, w: 3, h: 3, cx: x + 1.5, cy: y + 1.5 };
+      }
+      if (ciud) break;
+    }
+    return ciud;
+  };
+  // color del estandarte de un gremio (sale de su id: todos lo ven igual)
+  F.colorGremio = gid => { let h = 0; for (const ch of String(gid || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return [80 + (h % 160), 80 + ((h >> 8) % 160), 80 + ((h >> 16) % 160)]; };
   F.en = function (x, y) { for (const f of F.lista()) if (x >= f.x && y >= f.y && x < f.x + f.w && y < f.y + f.h) return f; return null; };
-  F.cerca = function (x, y, w, h) { for (const f of F.lista()) if (x < f.x + f.w + 1 && x + w > f.x - 1 && y < f.y + f.h + 1 && y + h > f.y - 1) return f; return null; };
+  F.cerca = function (x, y, w, h) { const z = F.ciudadela(); if (z && x < z.x + z.w + 1 && x + w > z.x - 1 && y < z.y + z.h + 1 && y + h > z.y - 1) return z; for (const f of F.lista()) if (x < f.x + f.w + 1 && x + w > f.x - 1 && y < f.y + f.h + 1 && y + h > f.y - 1) return f; return null; };
 
   // ---------- Estado ----------
   F.ensure = function () {
@@ -223,6 +247,16 @@
       if (!vis(x, y, spr.c.width, spr.c.height)) continue;
       list.push({ d: o.x + o.y + 3, k: 'fort', o, spr, x, y });
     }
+    const z = F.ciudadela();
+    if (z && W.explored(Math.floor(z.cx), Math.floor(z.cy))) {
+      const M = PK.Mundo, gid = M && M.ciud && M.ciud.gid, spr = Sp.building('fuerte', 'ciud', 15), [px, py] = R.iso(z.x, z.y), [fx, fy] = R.iso(z.cx, z.cy);
+      const x = Math.round(px - spr.ox), y = Math.round(py - spr.oy);
+      if (vis(x, y, spr.c.width, spr.c.height)) list.push({ d: z.x + z.y + 3, k: 'ciud', o: z, spr, x, y, after: gid ? ctx => { // el estandarte del gremio que la ocupa
+        const col = F.colorGremio(gid), t = performance.now() / 400;
+        ctx.fillStyle = '#2a1a10'; ctx.fillRect(Math.round(fx), Math.round(fy - 96), 2, 34);
+        ctx.fillStyle = 'rgb(' + col.join(',') + ')'; ctx.fillRect(Math.round(fx + 2), Math.round(fy - 96 + Math.sin(t)), 16, 10);
+      } : null });
+    }
   };
   F.minimapa = function (ctx, toMM) {
     for (const o of F.lista()) {
@@ -232,5 +266,6 @@
       ctx.fillStyle = '#2a1a10'; ctx.fillRect(Math.round(x), Math.round(y) - 3, 1, 1);
     }
   };
+  F.tituloCiudadela = () => { const M = PK.Mundo; return D.CIUDADELA.nombre + (M && M.ciud && M.ciud.gname ? ' · de ' + M.ciud.gname : ' · sin dueño'); };
   F.titulo = function (o) { const e = F.de(o.id); return o.nombre + ' · ' + (e.mia ? 'tuya' : D.ENEMY[o.enemigo].name.toLowerCase()) + ' · nivel ' + e.lvl; };
 })();

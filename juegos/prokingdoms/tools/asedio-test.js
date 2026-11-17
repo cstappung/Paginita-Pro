@@ -162,5 +162,22 @@ c = llegar(900);
 ok(c.plan.parts.towers > 100, 'y también a casi 2 parcelas de distancia', c.plan.parts.towers);
 B.buildings = [];
 
+// ---------- G7: diario, rankings y la Ciudadela ----------
+ok((w.diario || []).length > 0 && w.diario[0].plan && w.diario[0].plan.res === undefined && w.diario.length <= 20, 'el diario guarda las batallas con el plan para «Ver» y sin las tiradas', (w.diario || []).length);
+ok((A.conq || 0) > 0 && sim.ranking(A, { cat: 'conquistas' })[0].v === A.conq, 'el ranking de conquistas lo cuenta el servidor', A.conq);
+let v = sim.sync(C, { dv2: -1, cv: -1 });
+ok(Array.isArray(v.diario) && v.ciud && v.ciud.top.length === 0, 'el sync trae el diario y la Ciudadela');
+ok(sim.sync(C, { dv2: v.dv2, cv: v.cv }).diario === undefined && sim.sync(C, { dv2: v.dv2, cv: v.cv }).ciud === undefined, 'si no cambiaron, no viajan');
+ok(/gremio/.test(falla(() => sim.ciudadela(A, { units: { militia: 10 }, power: 50 })) || ''), 'sin gremio no se sitia la Ciudadela');
+const gr = sim.createGuild(A, { name: 'Los del Norte' }), gA = store.all('guilds').find(x => x.name === 'Los del Norte');
+foto(A, 50000);
+const r1 = sim.ciudadela(A, { units: { militia: 100 }, power: 600 });
+ok(r1.imp > 0 && r1.ciud.top[0].name === 'Los del Norte', 'una campaña suma ímpetu al gremio', r1.imp);
+ok(/hoy/.test(falla(() => sim.ciudadela(A, { units: { militia: 10 }, power: 50 })) || ''), 'una por día');
+const oro0 = (A.cred && A.cred.gold) || 0;
+corre += 8 * 864e5; A.lastSeen = Date.now();
+v = sim.sync(A, { cv: -1 });
+ok(v.ciud.gid === gA.id && v.ciud.top.length === 0, 'la semana siguiente la ocupa el gremio con más ímpetu', v.ciud.gname);
+ok(A.inbox.some(i => i.type === 'ciudadela'), 'y a sus miembros les llega el aviso');
 console.log(fallas ? '\n' + fallas + ' FALLAS' : '\nTodo bien.');
 process.exit(fallas ? 1 : 0);

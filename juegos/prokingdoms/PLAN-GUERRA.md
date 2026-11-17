@@ -38,7 +38,12 @@
     y se le puede pagar tributo. Diferencias con el texto: las fortalezas no son lugares de `W.pois` (módulo aparte,
     sin tocar el despeje ni su prueba) y usan el dibujo del Fuerte; no cuentan los héroes; no hay «pedir ayuda» ni
     tanteos decididos por el servidor en línea; no se hizo el capítulo de la Crónica «La Marca del Norte».
-  - Sigue G7 (la guerra del mundo: Ciudadela y gremios, servidor).
+  - **G7:** hecha en `pk-64` (servidor; no cambia `D.PROTO`, pero la ruta `/api/ciudadela` y el diario necesitan
+    desplegar la función). La Ciudadela semanal de los gremios con su estandarte y el +5 % de oro del Mercado, el
+    diario de guerra del mundo con «Ver», y los rankings «Conquistas» y «Fortalezas» con sus títulos. Diferencias con
+    el texto: no hay marco de retrato (vive en Juegos), un aliado todavía no puede sumarse a tu asedio y los gremios
+    simulados no sitian la Ciudadela.
+  - Sigue G8 (contenido de cierre).
 
 ---
 

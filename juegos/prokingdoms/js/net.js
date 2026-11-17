@@ -142,7 +142,7 @@
       // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
       const mar = PK.Game.enMar && PK.Game.enMar();
       const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
-        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, apv: PK.Calzada ? PK.Calzada.version : 0, asv, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, apv: PK.Calzada ? PK.Calzada.version : 0, asv, cv: PK.Mundo ? PK.Mundo.cv : 0, dv2: PK.Mundo ? PK.Mundo.dv2 : 0, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
@@ -238,6 +238,7 @@
     gs.joined = !!sum;
     gs.stage = sum ? sum.stage : 0;
     gs.name = sum ? sum.name : null;
+    gs.id = sum ? sum.id : null; // G7: para saber si la Ciudadela es de tu gremio
     if (sum) S().flags.guildJoined = true;
   }
 

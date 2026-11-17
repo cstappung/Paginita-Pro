@@ -260,3 +260,21 @@ test('G6: las fortalezas salen del mapa y de la semilla, lejos de los reinos y s
   assert.ok(D.asedioPlan({ atk: 3000, parts: p, semilla: 4 }).etapas.length === 3);
   assert.ok(D2.FORT.fuerza(2) > D2.FORT.fuerza(1) && D2.FORT.tributo(4, 2) > D2.FORT.tributo(4, 1));
 });
+
+// ---------- G7: la Ciudadela y los rankings de guerra ----------
+test('G7: la Ciudadela está en una zona común, en tierra libre, y los rankings de guerra existen', () => {
+  const w2 = {}, c2 = vm.createContext({ window: w2, console, URLSearchParams, location: { search: '' }, performance: { now: () => 0 } });
+  for (const f of ['util.js', 'data.js', 'world.js', 'fortalezas.js']) vm.runInContext(JS(f), c2, { filename: f });
+  const W = w2.PK.World, D2 = w2.PK.D, F = w2.PK.Fort;
+  if (W.generate && !W.terrCommon) W.generate(D2.SEED);
+  const z = F.ciudadela();
+  assert.ok(z && W.terrCommon[z.k], 'en una zona común');
+  for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) assert.ok(W.terrain[W.idx(z.x + i, z.y + j)] !== 4);
+  assert.ok(F.cerca(z.x, z.y, 1, 1) === z, 'no se construye pegado a ella');
+  assert.ok(!F.lista().some(o => Math.abs(o.cx - z.cx) < 6 && Math.abs(o.cy - z.cy) < 6), 'no pisa una fortaleza');
+  assert.ok(D2.RANKINGS.conquistas && D2.RANKINGS.fortalezas && D2.CIUDADELA.bono > 0);
+  assert.deepEqual(F.colorGremio('g1'), F.colorGremio('g1'));
+  const sim = fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8');
+  assert.ok(/'POST \/api\/ciudadela'/.test(fs.readFileSync(path.join(PKDIR, 'server', 'index.js'), 'utf8')) && /'POST \/api\/ciudadela'/.test(fs.readFileSync(path.join(PKDIR, '..', '..', 'functions', 'index.js'), 'utf8')), 'la ruta está en los dos servidores');
+  assert.ok(/diario: !p\.mar && \+b\.dv2/.test(sim) && /D\.asedioVista\(plan, Infinity/.test(sim), 'el diario viaja con versión y sin las tiradas');
+});

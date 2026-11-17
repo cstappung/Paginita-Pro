@@ -210,7 +210,7 @@ function checkMarket(p, ops) {
     left -= value(op.res, n);
     day.market = (day.market || 0) + value(op.res, n);
     out.push({ res: op.res, n, side: op.side });
-    credit(p, op.side === 'buy' ? { [op.res]: n } : { gold: value(op.res, n) });
+    credit(p, op.side === 'buy' ? { [op.res]: n } : { gold: value(op.res, n) * (ciudBono(p) ? 1 + D.CIUDADELA.bono : 1) });
   }
   if (cut > 1) suspect(p, 'mercado', { recortadoOro: Math.round(cut), hoy: Math.round(day.market || 0) });
   return out;
@@ -392,7 +392,7 @@ function sync(p, b) {
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
   const cz = calzadas(w), autopistas = !p.mar && +b.apv !== cz.v ? { v: cz.v, t: cz.t } : undefined; // L5
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
-  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, autopistas, asv: w.asv || 0, asedios: !p.mar && +b.asv !== (w.asv || 0) ? asediosDe(w) : undefined, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
+  return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, autopistas, cv: (ciudDe(w), w.cv || 0), ciud: !p.mar && +b.cv !== (w.cv || 0) ? ciudInfo(w) : undefined, dv2: w.dv2 || 0, diario: !p.mar && +b.dv2 !== (w.dv2 || 0) ? w.diario || [] : undefined, asv: w.asv || 0, asedios: !p.mar && +b.asv !== (w.asv || 0) ? asediosDe(w) : undefined, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
 }
 // Plaza del mundo: un chat corto entre los 16 reinos del mundo (también se ve como globo sobre cada reino).
@@ -583,6 +583,55 @@ function ensureNpcGuild() {
 ensureNpcGuild();
 const guildOf = p => store.all('guilds').find(g => g.members.includes(p.id)) || null;
 function guildSummary(p) { const g = guildOf(p); return g ? { id: g.id, name: g.name, stage: g.stage } : null; }
+
+// ---------- G7 (pk-64): diario de guerra y la Ciudadela ----------
+// El diario: las últimas 20 batallas del mundo, con el plan ya terminado (D.asedioVista, sin las tiradas) para «Ver».
+function diarioPush(w, e) {
+  w.diario = [e].concat(w.diario || []).slice(0, 20);
+  w.dv2 = (w.dv2 || 0) + 1;
+  store.touch('worlds');
+}
+// La Ciudadela de cada mundo: w.ciud = { sem, imp: { gid: n }, gid, gname }. El lunes la ocupa el gremio con más
+// ímpetu la semana anterior (si alguno mandó algo); si nadie la sitió, la conserva el que la tenía.
+function ciudDe(w) {
+  const sem = D.semana(now());
+  if (!w.ciud) w.ciud = { sem, imp: {}, gid: null, gname: null };
+  const c = w.ciud;
+  if (c.sem !== sem) {
+    const ids = Object.keys(c.imp || {}).sort((a, b) => c.imp[b] - c.imp[a]), top = ids[0] && store.get('guilds', ids[0]);
+    if (top) {
+      c.gid = top.id; c.gname = top.name;
+      chatPush(top, 'Gremio', '¡Nuestro estandarte ondea en ' + D.CIUDADELA.nombre + ' de ' + w.name + ' toda esta semana! +' + Math.round(D.CIUDADELA.bono * 100) + '% de oro al venderle a los mercaderes.');
+      for (const pid of top.members) { const o = player(pid); if (o && o.world === w.id) push(o, { type: 'ciudadela', text: '¡Tu gremio ocupa ' + D.CIUDADELA.nombre + '! Esta semana vendes al Mercado con un ' + Math.round(D.CIUDADELA.bono * 100) + '% más de oro.' }); }
+    }
+    c.sem = sem; c.imp = {}; c.hoy = {};
+    w.cv = (w.cv || 0) + 1;
+    store.touch('worlds');
+  }
+  return c;
+}
+function ciudInfo(w) {
+  const c = ciudDe(w);
+  const top = Object.keys(c.imp).map(gid => ({ gid, name: (store.get('guilds', gid) || {}).name || '—', imp: Math.round(c.imp[gid]) })).sort((a, b) => b.imp - a.imp).slice(0, 8);
+  return { sem: c.sem, gid: c.gid, gname: c.gname, fin: (c.sem + 1) * 7 * 864e5 - 3 * 864e5, top };
+}
+function ciudBono(p) { const w = store.get('worlds', p.world), g = guildOf(p); return !!(w && w.ciud && g && w.ciud.gid === g.id); }
+function ciudadela(p, b) {
+  const g = guildOf(p), w = world(p), day = today(p), C = D.CIUDADELA;
+  if (p.mar) throw new GameError('La Ciudadela está en tierra firme.');
+  if (!g) throw new GameError('Solo los gremios sitian la Ciudadela: únete a uno.');
+  if (vEra(p) < C.era) throw new GameError('Sitiar la Ciudadela requiere la Era ' + C.era + '.');
+  if ((day.ciud || 0) >= C.porDia) throw new GameError('Ya mandaste tu campaña de hoy a la Ciudadela.');
+  const { total, power } = checkArmy(p, b.units, b.power);
+  if (!total) throw new GameError('Elige tropas para la campaña.');
+  const c = ciudDe(w), n = Math.round(power * rand(0.9, 1.1));
+  day.ciud = (day.ciud || 0) + 1;
+  c.imp[g.id] = (c.imp[g.id] || 0) + n;
+  w.cv = (w.cv || 0) + 1;
+  chatPush(g, 'Gremio', p.name + ' sumó ' + n + ' de ímpetu al asedio de ' + C.nombre + '.');
+  store.touch('worlds'); store.touch('players');
+  return { imp: n, bajas: C.bajas, ciud: ciudInfo(w), cv: w.cv };
+}
 function guildDetail(g, p) {
   const st = D.guildStage(g.stage), members = [];
   const medals = g.medals || {};
@@ -923,6 +972,8 @@ function conquerBot(p, b) {
   if (pa === 'noAgresion' || pa === 'alianza') throw new GameError('Tienes un pacto con ese reino.');
   relSuma(p, slot, -15); // le quitaste tierra: se ofende (puede romper un tratado)
   w.terr[k] = p.slot + 1; w.tv++;
+  p.conq = (p.conq || 0) + 1; // G7: ranking de conquistas
+  diarioPush(w, { at: now(), k, de: p.slot, a: slot, deN: p.name, aN: ((D.REALM_SLOTS[slot] || {}).bot || {}).realm || 'un reino', gano: true });
   store.touch('worlds');
   return { ok: true, tv: w.tv };
 }
@@ -1028,7 +1079,9 @@ function tickCamps() {
     const plan = c.plan || null, won = !!plan && still && plan.gano;
     // resumen: fuerza contra defensa y de dónde salió la defensa, y el plan entero para la repetición
     const bt = plan ? { atk: plan.atk, def: plan.def, parts: plan.parts, plan, ini: c.ini, lado: c.lado, units: c.units, fromSlot: c.fromSlot, toSlot: c.toSlot, vuelve: !!(c.ref && !c.ref.ok) } : {};
+    if (plan) diarioPush(w, { at: c.ini + plan.total * 1000, k: c.k, de: c.fromSlot, a: c.toSlot, deN: c.fromName, aN: c.toName, gano: won, lado: c.lado || 0, units: c.units, plan: D.asedioVista(plan, Infinity, c.semV) }); // G7
     if (won) {
+      att.conq = (att.conq || 0) + 1;
       w.terr[c.k] = c.fromSlot + 1; w.tv++;
       w.tshield[c.toSlot] = t + D.TERR.shieldLoss * 1000;
       if (att.rev) delete att.rev[c.k];
@@ -1514,11 +1567,11 @@ function visitaRegalo(p, b) {
 // ---------- Rankings y títulos semanales (Fase 5, S5, pk-24) ----------
 // La foto trae `rk` (nivel de la Maravilla, piso más profundo, defensas ganadas). El servidor los acota como a la era:
 // no pueden subir más rápido de lo posible. Los jefes de gremio y las visitas los cuenta él mismo.
-const RK_MAX = { wonder: 3, floor: 5, def: 3 }; // cuánto puede subir cada uno entre dos fotos
+const RK_MAX = { wonder: 3, floor: 5, def: 3, fort: 2 }; // cuánto puede subir cada uno entre dos fotos
 function checkRk(p, raw) {
   if (!raw || typeof raw !== 'object') return;
-  const prev = p.rk || { wonder: 0, floor: 0, def: 0 }, era = vEra(p), out = {}, odd = {};
-  const techo = { wonder: 200, floor: 15, def: 1e6 };
+  const prev = Object.assign({ wonder: 0, floor: 0, def: 0, fort: 0 }, p.rk), era = vEra(p), out = {}, odd = {};
+  const techo = { wonder: 200, floor: 15, def: 1e6, fort: 500 };
   for (const k in RK_MAX) {
     const v = clamp(Math.floor(+raw[k] || 0), 0, techo[k]);
     // una partida nueva baja los números: se acepta (como el pase)
@@ -1530,6 +1583,8 @@ function checkRk(p, raw) {
 }
 const rkValor = (o, cat) => {
   const rk = o.rk || {};
+  if (cat === 'conquistas') return o.conq || 0;
+  if (cat === 'fortalezas') return rk.fort || 0;
   return cat === 'era' ? (o.snap ? o.snap.era * 1e7 + Math.min(9e6, Math.floor(o.snap.total / 100)) : 0) : cat === 'maravilla' ? rk.wonder || 0 : cat === 'piso' ? rk.floor || 0 : cat === 'defensas' ? rk.def || 0 : cat === 'jefes' ? o.jefes || 0 : cat === 'visitas' ? (o.vis ? o.vis.n + 3 * o.vis.likes : 0) : cat === 'regata' ? regataValor(o) : 0;
 };
 function tituloDe(o) { const t = o.titulo; return t && t.sem >= D.semana(now()) - 1 ? D.RANKINGS[t.cat].titulo : null; }
@@ -1876,7 +1931,7 @@ if (!process.env.PK_TICK_PEREZOSO) setInterval(tick, 5000).unref();
 
 module.exports = {
   GameError, byToken, byUid, tick, suspect, LIM, join, sync, listOffers, postOffer, acceptOffer, cancelOffer,
-  listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, asedio, ranking, getSave, putSave, deleteSave, status,
+  listGuilds, createGuild, joinGuild, leaveGuild, contribute, guildChat, eventContribute, askHelp, giveHelp, askNeed, sendNeed, worldChat, claim, conquer, conquerBot, asedio, ciudadela, ranking, getSave, putSave, deleteSave, status,
   paseInfo, paseClaim, paseActivar, pasePeriodo, saqueo, tickSaqueos, tickCamps,
   diploInfo: p => diploInfo(p), diploPropose, diploAccept, diploGift, diploEvento, tickDiplo,
   caravana, tickCaravanas, guildBoss, tickJefes, visita, visitaLike, visitaRegalo, tickTitulos,

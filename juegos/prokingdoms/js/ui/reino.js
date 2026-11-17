@@ -69,6 +69,37 @@
     if (a.peligro && !confirm(a.txt + ': ' + a.title + '\n\n¿Seguro?')) return;
     T.accion(f.id, a);
   };
+  // G7: la Ciudadela del mundo, que sitian los gremios
+  UI.openCiudadela = function () {
+    UI.modal('ciud', D.CIUDADELA.nombre, body => {
+      const M = PK.Mundo, st = PK.Game.state, C = D.CIUDADELA, z = PK.Fort.ciudadela(), c = M && M.ciud;
+      const add = (...a) => body.append(...a.filter(Boolean));
+      add(el('p', null, 'Una fortaleza enorme en tierra de todos. Cada semana los gremios la sitian: cada miembro manda una campaña al día y su fuerza se suma al ímpetu de su gremio. El lunes la ocupa el gremio con más ímpetu: su estandarte ondea aquí toda la semana y sus miembros le venden al Mercado con un ' + Math.round(C.bono * 100) + ' % más de oro.'));
+      if (!PK.Net || !PK.Net.online) { add(el('p', { class: 'small warn-t' }, 'La Ciudadela solo se disputa en el mundo compartido (en línea).')); return; }
+      if (!c) { add(el('p', { class: 'small muted' }, 'Cargando…')); return; }
+      add(el('p', null, c.gname ? el('span', null, 'Esta semana la ocupa ', el('b', { translate: 'no' }, c.gname), M.ciudMia() ? ' (¡tu gremio!).' : '.') : 'Nadie la ocupa todavía.'),
+        el('p', { class: 'small muted' }, 'El asedio de esta semana termina en ' + U.fmtTime(Math.max(0, (c.fin - Date.now()) / 1000)) + '.'),
+        c.top.length ? el('ol', { class: 'rank' }, c.top.map(t => el('li', { class: st.guild && st.guild.id === t.gid ? 'me' : '' }, el('span', { translate: 'no' }, t.name), el('span', null, U.fmt(t.imp) + ' de ímpetu')))) : el('p', { class: 'small' }, 'Ningún gremio mandó tropas esta semana.'));
+      const hoy = D.semana(Date.now()) + ':' + new Date().toISOString().slice(0, 10);
+      const why = !st.guild || !st.guild.joined ? 'Únete a un gremio para sitiarla.' : st.era < C.era ? 'Sitiarla requiere la Era ' + U.roman(C.era) + '.' : M.hoy === hoy ? 'Ya mandaste tu campaña de hoy.' : null;
+      if (why) { add(el('p', { class: 'small warn-t' }, why)); }
+      else {
+        const pk = armyPicker(st.war, 'cd-');
+        add(el('p', { class: 'small' }, 'Pierdes el ' + Math.round(C.bajas * 100) + ' % de las tropas que mandes.'), el('div', { class: 'row' }, pk.box),
+          el('div', { class: 'row' }, UI.btn('Mandar campaña', async () => { if (await M.sitiarCiudadela(pk.read())) UI.rerender(); }, { cls: 'gold' })));
+      }
+      if (z) add(el('div', { class: 'row' }, UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(z.cx, z.cy); }, { small: true })));
+    });
+  };
+  // G7: el diario de guerra del mundo (lo que contó el servidor)
+  function diarioEl() {
+    const M = PK.Mundo, lista = (M && M.diario) || [];
+    if (!PK.Net || !PK.Net.online || !lista.length) return null;
+    return el('div', null, el('h3', null, 'Diario de guerra del mundo'),
+      lista.slice(0, 10).map(e => el('div', { class: 'raid-row' },
+        el('span', { class: 'small' }, el('b', { translate: 'no' }, e.deN), e.gano ? ' tomó una parcela de ' : ' no pudo con ', el('b', { translate: 'no' }, e.aN), ' · hace ' + U.fmtTime(Math.max(0, (Date.now() - e.at) / 1000))),
+        e.plan && PK.Frente ? UI.btn('Ver', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Frente.repetir({ k: e.k, rep: { plan: e.plan, units: e.units, lado: e.lado || 0, de: e.de, a: e.a } }); }, { small: true }) : null)));
+  }
   // G6: la ventana de una fortaleza
   UI.openFort = function (id) {
     UI.modal('fort', 'Fortaleza', body => {
@@ -150,6 +181,8 @@
             UI.btn('Pagar tributo', () => T.pagarTributo(th), { small: true, title: 'Su hueste se vuelve sin pelear' }), ' ', UI.costEl({ gold: T.tributoDe(th) })));
         }
       }
+      const dg = diarioEl(); if (dg) body.append(dg);
+      if (PK.Net && PK.Net.online && PK.Fort && PK.Fort.ciudadela()) body.append(el('div', { class: 'row' }, UI.btn(PK.Fort.tituloCiudadela(), () => UI.openCiudadela(), { small: true, cls: 'gold' })));
       // G6: las fortalezas que ya viste
       const forts = PK.Fort ? PK.Fort.lista().filter(o => T.explored(o.k)) : [];
       if (forts.length) {

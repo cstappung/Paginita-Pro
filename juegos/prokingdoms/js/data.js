@@ -529,7 +529,12 @@
     jefes: { name: 'Jefes de gremio', titulo: 'Cazador de Leviatanes' },
     visitas: { name: 'Más visitados', titulo: 'Reino más Querido' },
     regata: { name: 'Regata', titulo: 'Almirante de la Bruma' }, // pk-30: el mejor tiempo de la semana
+    conquistas: { name: 'Conquistas', titulo: 'Azote de las Fronteras' }, // G7 (pk-64): parcelas tomadas (las cuenta el servidor)
+    fortalezas: { name: 'Fortalezas', titulo: 'Castellano Mayor' }, // G7: fortalezas tomadas (de la foto, acotado)
   };
+  // G7 (pk-64): la Ciudadela, una por mundo. Cada semana los gremios la sitian: cada miembro manda una campaña al día
+  // y su fuerza se suma al ímpetu de su gremio; el domingo la ocupa el gremio con más ímpetu.
+  D.CIUDADELA = { nombre: 'La Ciudadela', era: 3, porDia: 1, bajas: 0.12, bono: 0.05 };
 
   // ---------- La Regata de la Bruma y los duelos navales (Fase 9 «d», pk-30) ----------
   // Los decide el servidor (sim.js) con estas mismas tablas: el tiempo sale del barco, la ruta y el mar de ese
