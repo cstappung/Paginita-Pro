@@ -953,7 +953,7 @@
     if (pz.p === 'u') box.append(el('p', { class: 'small muted' }, 'Toma por turnos de las cintas que le entregan (' + c.ent.length + '): la salida tiene que tener nivel para todas.'));
     if (pz.p === 'v') box.append(el('p', { class: 'small muted' }, 'Reparte por turnos entre sus salidas (' + c.outs.length + '): si una se llena, todo va a las otras.'));
     if (pz.p === 's') {
-      box.append(el('p', { class: 'small muted' }, 'Cada salida lleva lo que elijas. Lo que no calza en ninguna va a «Lo que sobre»; si no hay, se atasca.'));
+      box.append(el('p', { class: 'small muted' }, 'Cada salida lleva lo que elijas. Va a «Lo que sobre» lo que no tiene salida propia y también lo que no entra en la suya (si se llena o se traba). Sin «Lo que sobre», se atasca.'));
       // pk-59: solo «Lo que sobre», «Nada» y lo que llega por esa cinta; «Otros…» abre la lista entera (22 recursos
       // por salida y tres salidas tapaban la pantalla, peor en el celular)
       const todos = D.RES_ORDER.filter(r => PK.Libro.fisico(r)), llegan = Ci.llegan(k);

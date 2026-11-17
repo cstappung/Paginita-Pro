@@ -567,7 +567,10 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   Lanes carry `outs` (`{c|b, d}`) and `ent` (`{c, d}`) instead of a single `sig`; every walker (tramo, alimenta,
   bocasDe, offline) must follow `outs`/`ent`, not `sig`. Sorter filters live in `pz.f2[d]`: a resource, `'*'` (what no
   other output took) or `''`; default front `'*'`, sides `''` (`Ci.filtro`). An item no output takes jams with a
-  message naming it. Costs in `D.CINTA.nodos`; `Ci.convertir` refunds half of the old node.
+  message naming it.
+  `'*'` is also the overflow (pk-69, owner's report): `salir` tries the outputs filtered to that resource first and,
+  if all are full or blocked, the `'*'` ones; offline sends to its own outputs up to what they can take down to the
+  building (`capOut`, one visit per lane) and the rest to `'*'`. Costs in `D.CINTA.nodos`; `Ci.convertir` refunds half of the old node.
 - **Tick carry:** `c.lib` may go down to `-dt` (`credito()`), or a 3/s merger delivered 2.4/s at 10 ticks/s. Keep it.
 - **Items may sit at a negative `q`** (just behind a lane's start): a new item enters when the last one is within one
   tick of `JUNTOS` (`hayLugar` with `tolera`) and is placed exactly `JUNTOS` behind it (`detras`). Waiting for the
