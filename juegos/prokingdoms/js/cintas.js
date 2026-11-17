@@ -304,35 +304,41 @@
   };
   // Pasa el ítem del final a una de las salidas. true si salió.
   function salir(c, it0) {
-    const r = it0[0], cant = cantDe(it0);
+    const r = it0[0];
     if (!c.outs.length) { if (!c.motivo || c.motivo === SIN) c.motivo = SIN; return false; }
-    let elig = c.outs;
+    let grupos = [c.outs];
     if (c.pz.p === 's') {
-      elig = c.outs.filter(o => Ci.filtro(c.pz, o.d) === r);
-      if (!elig.length) elig = c.outs.filter(o => Ci.filtro(c.pz, o.d) === '*');
-      if (!elig.length) { c.motivo = 'Atascada: el clasificador no tiene salida para ' + D.RES[r].name.toLowerCase(); c.atasco = true; return false; }
+      // pk-69 (reporte del dueño): primero las salidas de ese recurso; si están llenas o trabadas, sigue por «lo que
+      // sobre». Antes «lo que sobre» solo tomaba lo que no tenía salida propia: con la madera a la derecha atascada,
+      // la madera frenaba todo el clasificador en vez de seguir derecho.
+      const propias = c.outs.filter(o => Ci.filtro(c.pz, o.d) === r), sobra = c.outs.filter(o => Ci.filtro(c.pz, o.d) === '*');
+      grupos = [propias, sobra].filter(g => g.length);
+      if (!grupos.length) { c.motivo = 'Atascada: el clasificador no tiene salida para ' + D.RES[r].name.toLowerCase(); c.atasco = true; return false; }
     }
-    const n = elig.length, ini = c.rr || 0;
     let noUsa = null, lleno = null;
-    for (let i = 0; i < n; i++) {
-      const o = elig[(ini + i) % n];
-      if (o.c) {
-        if (!hayLugarDesde(o.c, c)) continue;
-        const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
-        dest.push([r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
-        o.c.lib = credito(o.c) + cada(o.c);
-        c.pz.flujo = (c.pz.flujo || 0) + cant;
-        if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
-      } else {
-        const e = entregar(o.b, r, cant);
-        if (e === 'no') { noUsa = noUsa || o.b; continue; }
-        if (e > 0) c.pz.flujo = (c.pz.flujo || 0) + e;
-        if (e < cant) { it0[2] = cant - e; lleno = lleno || o.b; continue; } // lo que no entró espera en la punta
+    for (const elig of grupos) {
+      const n = elig.length, ini = (c.rr || 0) % n;
+      for (let i = 0; i < n; i++) {
+        const o = elig[(ini + i) % n], cant = cantDe(it0);
+        if (o.c) {
+          if (!hayLugarDesde(o.c, c)) continue;
+          const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
+          dest.push([r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
+          o.c.lib = credito(o.c) + cada(o.c);
+          c.pz.flujo = (c.pz.flujo || 0) + cant;
+          if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
+        } else {
+          const e = entregar(o.b, r, cant);
+          if (e === 'no') { noUsa = noUsa || o.b; continue; }
+          if (e > 0) c.pz.flujo = (c.pz.flujo || 0) + e;
+          if (e < cant) { it0[2] = cant - e; lleno = lleno || o.b; continue; } // lo que no entró espera en la punta (o prueba la otra salida)
+        }
+        c.rr = (ini + i + 1) % n; c.motivo = null; c.atasco = false;
+        return true;
       }
-      c.rr = (ini + i + 1) % n; c.motivo = null; c.atasco = false;
-      return true;
     }
-    if (noUsa && !lleno && elig.every(o => o.b && !recibe(o.b, r))) { c.motivo = 'Atascada: llega ' + D.RES[r].name.toLowerCase() + ' y ' + noUsa.def.name + ' no lo usa'; c.atasco = true; }
+    const todas = grupos.flat();
+    if (noUsa && !lleno && todas.every(o => o.b && !recibe(o.b, r))) { c.motivo = 'Atascada: llega ' + D.RES[r].name.toLowerCase() + ' y ' + noUsa.def.name + ' no lo usa'; c.atasco = true; }
     else if (lleno) c.motivo = (L().isShop(lleno) ? lleno.def.name + ' está lleno de ' : 'Tus bodegas están llenas de ') + D.RES[r].name.toLowerCase();
     return false;
   }
@@ -372,7 +378,7 @@
     if (!st || !st.logi || !st.logi.red) return;
     rearmarSiHace();
     const k0 = K(), acc = new Map();
-    const pasaFiltro = (c, o, r) => c.pz.p !== 's' || Ci.filtro(c.pz, o.d) === r || (Ci.filtro(c.pz, o.d) === '*' && !c.outs.some(x => Ci.filtro(c.pz, x.d) === r));
+    const pasaFiltro = (c, o, r) => c.pz.p !== 's' || Ci.filtro(c.pz, o.d) === r || Ci.filtro(c.pz, o.d) === '*'; // pk-69: lo que no cabe en su salida, por «lo que sobre»
     const accDe = c => {
       if (acc.has(c)) return acc.get(c);
       const s = new Set();
@@ -396,16 +402,37 @@
         for (const r of vivos) { const m = Math.min(parte, quedan[r]); quedan[r] -= m; presu -= m; sumar(c, r, m); ofertas.push({ c, b, r, n: m }); }
       }
     }
-    const entregas = [];
+    const entregas = [], pend = new Map();
+    const repartir = (outs, r, n) => { for (const o of outs) { const m = n / outs.length; if (o.b) { entregas.push({ b: o.b, r, n: m }); pend.set(o.b.id + r, (pend.get(o.b.id + r) || 0) + m); } else sumar(o.c, r, m); } };
+    // cuánto más puede tomar una salida en este paso: una cinta, lo que le falta para su tope; un edificio, su lugar
+    // (y lo que acepta lo que tiene adelante, hasta un edificio: una cinta que termina en un taller lleno no toma nada)
+    const capOut = (o, r, vistos) => {
+      if (o.b) return Math.max(0, lugarEn(o.b, r) - (pend.get(o.b.id + r) || 0));
+      const c2 = o.c;
+      vistos = vistos || new Set();
+      if (vistos.has(c2)) return 0; // ciclos y ramas que se juntan: cada cinta cuenta una vez
+      vistos.add(c2);
+      const f2 = flujo.get(c2), va = f2 ? Object.values(f2).reduce((a, b) => a + b, 0) : 0;
+      const propio = Math.max(0, NIV(c2.pz.n).rate * PILA() * k0 * dt - va);
+      const adelante = c2.outs.filter(x => pasaFiltro(c2, x, r) && (x.b ? recibe(x.b, r) : accDe(x.c).has(r))).reduce((a, x) => a + capOut(x, r, vistos), 0);
+      return Math.min(propio, adelante);
+    };
     for (let i = orden.length - 1; i >= 0; i--) {
       const c = orden[i], f = flujo.get(c);
       if (!f) continue;
       const cap = NIV(c.pz.n).rate * PILA() * k0 * dt, tot = Object.values(f).reduce((a, b) => a + b, 0), esc = tot > cap ? cap / tot : 1;
       for (const r in f) {
-        const n = f[r] * esc;
-        const elig = c.outs.filter(o => pasaFiltro(c, o, r) && (o.b ? recibe(o.b, r) : accDe(o.c).has(r)));
-        if (!elig.length || n <= 0) continue;
-        for (const o of elig) { if (o.b) entregas.push({ b: o.b, r, n: n / elig.length }); else sumar(o.c, r, n / elig.length); }
+        const n = f[r] * esc, ok = o => (o.b ? recibe(o.b, r) : accDe(o.c).has(r));
+        if (n <= 0) continue;
+        if (c.pz.p === 's') { // pk-69: primero su salida, hasta lo que da; el resto por «lo que sobre»
+          const propias = c.outs.filter(o => Ci.filtro(c.pz, o.d) === r && ok(o)), sobra = c.outs.filter(o => Ci.filtro(c.pz, o.d) === '*' && ok(o));
+          let resto = n;
+          if (propias.length) { const vs = new Set([c]), va = Math.min(resto, propias.reduce((a, o) => a + capOut(o, r, vs), 0)); repartir(propias, r, va); resto -= va; }
+          if (resto > 1e-9 && sobra.length) repartir(sobra, r, resto);
+          continue;
+        }
+        const elig = c.outs.filter(o => pasaFiltro(c, o, r) && ok(o));
+        if (elig.length) repartir(elig, r, n);
       }
     }
     const dado = {};
