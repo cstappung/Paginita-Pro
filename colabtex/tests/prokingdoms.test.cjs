@@ -1581,3 +1581,36 @@ test('pk-67: paquetes de 4, varias cintas desde un mismo edificio, menú de cint
     assert.match(JS('input.js'), /k === 'k'/);
   } finally { Ci.libre = libre0; W.ownerAt = owner0; G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; G.pay = pay0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+test('pk-69: el clasificador manda por «lo que sobre» lo que no entra en la salida de ese recurso (en vivo y sin conexión)', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  const buf0 = L.bufCap;
+  G.stat = () => {}; G.cap = () => 1e9;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  // aserradero (x 20..22, fila 41) → cinta → clasificador en x 26: madera a la derecha (abajo, a la forja A), lo que sobre adelante (a la forja B)
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 100000 } }), fa = mk(2, 'forge', 26, 43, { inb: {}, outb: {} }), fb = mk(3, 'forge', 31, 41, { inb: {}, outb: {} });
+  G.buildings = [saw, fa, fb]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  L.bufCap = b => (b === fa ? 20 : 100000); // la forja de la derecha se llena enseguida
+  G.state = Object.assign({}, st0 || {}, { era: 6, res: { planks: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, pz = (x, y, d, n, p) => { t[W.idx(x, y)] = { p: p || 'c', d, n, i: [] }; };
+  try {
+    for (let x = 23; x <= 25; x++) pz(x, 41, 0, 3);
+    pz(26, 41, 0, 3, 's'); t[W.idx(26, 41)].f2 = { 1: 'planks', 0: '*' };
+    pz(26, 42, 1, 3);
+    for (let x = 27; x <= 30; x++) pz(x, 41, 0, 3);
+    Ci.init(G.state);
+    assert.equal(Ci.carrilesEn(W.idx(26, 41))[0].outs.length, 2);
+    for (let i = 0; i < 600; i++) Ci.update(0.1);
+    assert.equal(fa.inb.planks, 20, 'la de la derecha recibe hasta llenarse');
+    assert.ok((fb.inb.planks || 0) > 300, 'lo que no entra sigue por «lo que sobre» (' + fb.inb.planks + ')');
+    assert.ok(!Ci.carrilesEn(W.idx(26, 41))[0].atasco, 'el clasificador no se traba');
+    // sin conexión, igual
+    for (const k in t) t[k].i = [];
+    fa.inb = { planks: 15 }; fb.inb = {};
+    Ci.offline(60);
+    assert.equal(fa.inb.planks, 20, 'sin conexión: la derecha se completa');
+    assert.ok(fb.inb.planks >= 150 * PILA, 'sin conexión: el resto va adelante (' + fb.inb.planks + ')');
+  } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
+});
