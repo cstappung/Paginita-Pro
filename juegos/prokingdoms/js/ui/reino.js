@@ -127,6 +127,7 @@
     const L = PK.Logi;
     if (v === 'campo') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(tipo || L.tipoDeRes(res) || 'mining'), alt: '' }), res ? UI.resIcon(res) : el('b', { class: 'rt-asterisco' }, '*'));
     if (v === 'bodega') return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon('warehouse'), alt: '' }), el('b', { class: 'rt-asterisco' }, '*'));
+    if (L.esTallerComodin(v)) return el('span', { class: 'rt-comodin' }, el('img', { class: 'ico', src: Sp.buildingIcon(L.tipoTaller(v)), alt: '' }), el('b', { class: 'rt-asterisco' }, '*'));
     const b = G().bById.get(v);
     return b ? el('img', { class: 'ico', src: Sp.buildingIcon(b.type, undefined, undefined, b.asp), alt: '' }) : '';
   };
@@ -134,7 +135,7 @@
     const L = PK.Logi, g = G(), cs = L.cartsDe(r), mala = L.rutaMala(r), rep = L.extremosRep(r), a = rep.from, b = rep.to;
     const T = mala ? null : L.tiempos(r, true);
     const clase = L.claseRuta(r), carro = clase !== 'cart', nom = clase === 'barcaza' ? 'Barcazas' : carro ? 'Carromatos' : 'Carretas';
-    const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica).' : 'No hay camino: las carretas no salen de tu territorio. Une los dos edificios por tierra tuya.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
+    const estado = mala || (!T ? 'Calculando el camino…' : !T.ok ? (carro ? 'No hay camino: si tu muralla rodea el destino, necesitas un Gran Portón (los carromatos no caben por una puerta chica). Las cintas también les cortan el paso: déjales un hueco o usa un paso elevado.' : 'No hay camino: las carretas no salen de tu territorio ni cruzan cintas. Une los dos edificios por tierra tuya, dejando un hueco en las cintas o con un paso elevado.') : !cs.length ? (carro ? 'Sin carromatos: súmale uno con +.' : 'Sin carretas: súmale una con +.') : cs[0].estado || '');
     const malo = mala || (T && !T.ok) || !cs.length;
     return el('div', { class: 'ruta-row' + (malo ? ' mala' : '') + (carro ? ' carro' : '') },
       el('div', { class: 'ruta-nom' }, iconoExtremo(r.de, r.res, r.tipo), el('b', null, L.nombreExtremo(r.de, r.res, r.tipo)), ' → ',
@@ -186,6 +187,9 @@
     // pk-55: los tipos de campamento que tienes (y cuyo botín alguna bodega recibe)
     const dropsDe = t => (D.BUILD[t].drop || []).filter(k => L.bodegasRuta(k).length);
     const tiposCampos = L.TIPOS_CAMPO.filter(t => L.camposDe(null, t).length && dropsDe(t).length);
+    // pk-57: los tipos de taller de los que tienes dos o más («Cualquier Aserradero»)
+    const tiposTaller = [...new Set(talleres.map(b => b.type))].filter(t => L.talleresDe(t).length >= 2);
+    const nomT = t => 'Cualquier ' + D.BUILD[t].name;
     const F = rutaForm, B = v => (L.comodin(v) ? null : g.bById.get(v));
     if (F.de && !L.comodin(F.de) && !B(F.de)) F.de = 0;
     if (F.a && !L.comodin(F.a) && !B(F.a)) F.a = 0;
@@ -207,7 +211,8 @@
     // 1. ¿De dónde?
     const paso1 = el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '1'), el('b', null, '¿De dónde sale?')),
       grupo('Comodines', [tiposCampos.length ? ficha('campo', F.de === 'campo', 'Cualquier campamento', 'el que tenga más; trae de todo', iconoExtremo('campo', null, F.tipo || tiposCampos[0]), () => elegirDe('campo')) : '',
-        talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].filter(Boolean)),
+        talleres.length && bodegas.length ? ficha('bodega', F.de === 'bodega', 'Cualquier bodega', 'para llevar a un taller', iconoExtremo('bodega'), () => elegirDe('bodega')) : ''].concat(
+        tiposTaller.map(t => ficha('taller:' + t, F.de === 'taller:' + t, nomT(t), 'el que tenga más hecho', iconoExtremo('taller:' + t), () => elegirDe('taller:' + t)))).filter(Boolean)),
       grupo('Campamentos (carromato)', campos.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
       grupo('Muelles de colonias (barcaza)', colonias.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
       grupo('Talleres (carreta)', talleres.map(b => fichaB(b, F.de === b.id, () => elegirDe(b.id)))),
@@ -231,17 +236,19 @@
     }
     // 2. ¿A dónde? (solo los destinos que sirven con ese origen)
     const sirve = v => !(L.comodin(F.de) || L.comodin(v) ? L.comodinMalo(F.de, v, F.de === 'campo' ? F.res || null : null, F.de === 'campo' ? F.tipo : null) : L.parMalo(A0, B(v)));
-    const dests = { bodega: sirve('bodega'), tall: talleres.filter(b => b.id !== F.de && sirve(b.id)), bods: bodegas.filter(b => b.id !== F.de && sirve(b.id)), embs: embs.filter(b => sirve(b.id)) };
+    const dests = { bodega: sirve('bodega'), tipos: tiposTaller.filter(t => 'taller:' + t !== F.de && sirve('taller:' + t)), tall: talleres.filter(b => b.id !== F.de && sirve(b.id)), bods: bodegas.filter(b => b.id !== F.de && sirve(b.id)), embs: embs.filter(b => sirve(b.id)) };
     caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '2'), el('b', null, '¿A dónde lo lleva?')),
-      grupo('Comodín', dests.bodega && F.de !== 'bodega' ? [ficha('bodega', F.a === 'bodega', 'Cualquier bodega', 'la más cercana con lugar', iconoExtremo('bodega'), () => elegirA('bodega'))] : []),
+      grupo('Comodines', (dests.bodega && F.de !== 'bodega' ? [ficha('bodega', F.a === 'bodega', 'Cualquier bodega', 'la más cercana con lugar', iconoExtremo('bodega'), () => elegirA('bodega'))] : []).concat(
+        dests.tipos.map(t => ficha('taller:' + t, F.a === 'taller:' + t, nomT(t), 'el que tenga menos', iconoExtremo('taller:' + t), () => elegirA('taller:' + t))))),
       grupo('Embarcadero', dests.embs.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
       grupo('Bodegas', dests.bods.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
       grupo('Talleres', dests.tall.map(b => fichaB(b, F.a === b.id, () => elegirA(b.id), true))),
-      !dests.bodega && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res || null, F.tipo || null) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
+      !dests.bodega && !dests.tipos.length && !dests.tall.length && !dests.bods.length && !dests.embs.length ? el('p', { class: 'small warn-t' }, L.comodin(F.de) ? (L.comodinMalo(F.de, 'bodega', F.res || null, F.tipo || null) || 'No hay a dónde llevarlo.') : 'No hay a dónde llevar lo de ' + (A0 ? A0.def.name : 'ahí') + '.') : ''));
     if (!F.a) return;
 
     // 3. ¿Qué lleva?
-    const Bd = B(F.a), A = A0;
+    const muestra = v => (L.esTallerComodin(v) ? L.talleresDe(L.tipoTaller(v))[0] || null : B(v)); // pk-57
+    const Bd = muestra(F.a), A = A0 || muestra(F.de);
     const resOps = F.de === 'campo' ? [] : A && L.esCampo(A) ? (A.def.drop || []).filter(k => (Bd ? L.acepta(Bd, k) : L.bodegasRuta(k).length)) : Bd && L.isShop(Bd) ? Object.keys(L.recipe(Bd).in) : A && L.isShop(A) ? [L.output(A)] : [];
     if (F.res && F.de !== 'campo' && !resOps.includes(F.res)) F.res = '';
     if (F.de !== 'campo' && resOps.length > 1) caja.append(el('div', { class: 'rt-paso' }, el('div', { class: 'rt-paso-t' }, el('span', { class: 'rt-num' }, '3'), el('b', null, '¿Qué lleva?')),
@@ -274,12 +281,14 @@
         el('div', null, el('b', null, 'Carretas: '), L.carts().length + '/' + L.cartMax() + (g.countB('cartwright') ? '' : ' (construye una Carretería, Era II)')),
         el('div', { class: sinRuta ? 'warn-t' : '' }, el('b', null, 'Sin ruta: '), String(sinRuta)),
         el('div', null, el('b', null, 'Talleres lejos de un almacén: '), far.length + ' de ' + shops.length),
-        el('div', null, el('b', null, 'Cintas: '), st.logi.belts.length)));
+        el('div', null, el('b', null, 'Cintas: '), Object.keys((st.logi.red && st.logi.red.t) || {}).length + ' casillas')));
       body.append(el('div', { class: 'row' },
         UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
         g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Logi.tool = 'calzada'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
         UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos, murallas y Calzada Real (la tuya, o la de otro en tu tierra); vuelve la mitad del material' }),
-        UI.btn('Tender cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'belt'; PK.Logi.beltFrom = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? '' : L.beltLockText() })));
+        UI.btn('Trazar cinta', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'cinta'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? 'Piezas de cinta con nivel, bocas en los edificios, cruces y pasos elevados' : L.beltLockText() }),
+        UI.btn('Paso elevado', () => { if (!L.beltUnlocked()) { UI.toast(L.beltLockText(), 'warn'); return; } UI.closeModal(); PK.Logi.tool = 'paso'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { disabled: !L.beltUnlocked(), title: 'La cinta pasa por arriba: por debajo cruzan carretas, carromatos, caminos y otras cintas' }),
+        Object.keys((st.logi.red && st.logi.red.t) || {}).length ? UI.btn(PK.Cintas.verFlujo ? 'Ocultar flujo' : 'Ver flujo', () => { PK.Cintas.verFlujo = !PK.Cintas.verFlujo; UI.closeModal(); UI.refreshPanel(true); }, { title: 'Colorea cada pieza: gris vacía, verde corre con lugar, amarillo a tope, rojo atascada o frenada por una pieza de menos nivel' }) : ''));
 
       // ----- Rutas -----
       UI.rutasSugeridas(body);
@@ -299,7 +308,10 @@
         el('li', null, 'Lo que juntan los campamentos queda en el campamento (hasta su tope) y no sirve para construir: un carromato del Establo lo lleva a una bodega del pueblo o a un taller. Lo que está en cualquier bodega del pueblo sirve en todo el pueblo.'),
         el('li', null, 'Los carromatos salen de tu territorio y van rápido por los caminos, pero no caben por una puerta chica: tu muralla necesita un Gran Portón. Cruzar tierra de otro reino les cuesta cuatro veces más.'),
         el('li', null, 'Las carretas no salen de tu territorio ni van a los campamentos.'),
-        el('li', null, 'Las cintas (' + L.beltLockText().replace('Las cintas requieren ', 'requieren ') + ') unen dos edificios y mueven ' + D.BELT.rate + ' unidades por segundo sin que nadie cargue nada.')));
+        el('li', null, 'Las cintas (desde la Era ' + U.roman(D.CINTA.niv[0].era) + ') se arman pieza por pieza. Una cinta que nace junto a un edificio saca de él (un taller, lo que hace; un campamento, todo lo que junta, mezclado; una bodega, lo que elijas) y una que apunta a un edificio le entrega.'),
+        el('li', null, 'Cada pieza tiene su nivel (I ' + D.CINTA.niv[0].rate * 60 + '/min, II ' + D.CINTA.niv[1].rate * 60 + ', III ' + D.CINTA.niv[2].rate * 60 + '): una de nivel más bajo frena toda la cinta. Mejorar es al instante, con recursos.'),
+        el('li', null, 'Si a un edificio le llega algo que no usa, la cinta se atasca y te avisa. Dos cintas se cruzan sin mezclarse en un cruce; las carretas no cruzan cintas: pasan bajo un paso elevado.'),
+        el('li', null, 'Para armar la red: un unidor junta hasta 3 cintas en una, un divisor reparte una en hasta 3 y un clasificador separa por recurso (piedra a un lado, hierro a otro, lo que sobre al Almacén). Sale una rama si empiezas a trazar en medio de una cinta; se unen si terminas sobre una que ya recibe. Cualquier pieza se convierte desde su panel.')));
       if (shops.length) {
         body.append(el('h3', null, 'Talleres'));
         for (const b of shops) {
@@ -310,13 +322,12 @@
             UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'building', id: b.id }; PK.Render.centerOn(b.cx, b.cy); UI.refreshPanel(true); }, { small: true })));
         }
       }
-      if (st.logi.belts.length) {
-        body.append(el('h3', null, 'Cintas'));
-        for (const bl of st.logi.belts) {
-          const a = g.bById.get(bl.a), b = g.bById.get(bl.b);
-          body.append(el('div', { class: 'work-row' }, el('span', null, (a ? a.def.name : '?') + ' → ' + (b ? b.def.name : '?') + ' · ' + bl.path.length + ' casillas'),
-            UI.btn('Desarmar', () => { L.removeBelt(bl); UI.rerender(); }, { small: true, cls: 'danger' })));
-        }
+      // pk-58: cintas atascadas o sin destino
+      const Ci = PK.Cintas, malas = Ci.carriles().filter(c => c.atasco || (c.motivo && !c.sig && !c.dst && (c.pz.i || []).length));
+      if (malas.length) {
+        body.append(el('h3', null, 'Cintas con problemas'));
+        for (const c of malas.slice(0, 8)) body.append(el('div', { class: 'work-row' }, el('span', { class: 'small warn-t' }, c.motivo),
+          UI.btn('Ver', () => { UI.closeModal(); g.sel = { type: 'belt', id: c.k }; PK.Render.centerOn((c.k % W.W) + 0.5, ((c.k / W.W) | 0) + 0.5); UI.refreshPanel(true); }, { small: true })));
       }
     }, { wide: true });
   };

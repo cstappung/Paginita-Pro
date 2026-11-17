@@ -532,6 +532,7 @@
         ctx2.fillStyle = '#b02020'; ctx2.fillRect(x + 2, y, 12, 8 + ond); ctx2.fillStyle = '#ffd040'; ctx2.fillRect(x + 6, y + 2, 4, 4);
       } });
     }
+    if (PK.Cintas) for (const it of PK.Cintas.elevados(R, Sp, seen)) list.push(it); // pk-58: tableros de los pasos elevados
     // lobos
     for (const w of PK.Life.wolves) {
       if (!seen(w.x, w.y)) continue;
@@ -725,7 +726,12 @@
       const c = [[Math.min(sx, x1), Math.min(sy, y1)], [Math.max(sx, x1) + 1, Math.min(sy, y1)], [Math.max(sx, x1) + 1, Math.max(sy, y1) + 1], [Math.min(sx, x1), Math.max(sy, y1) + 1]].map(([a, b]) => R.iso(a, b));
       ctx.beginPath(); ctx.moveTo(c[0][0], c[0][1]); for (const p of c.slice(1)) ctx.lineTo(p[0], p[1]); ctx.closePath(); ctx.stroke();
     }
-    if (R.beltGhost) for (const [x, y] of R.beltGhost) diamondFill(ctx, x, y, 'rgba(140,200,255,0.45)');
+    if (R.beltGhost) for (const t of R.beltGhost) { // pk-58: el plan de la cinta, con flechas (rojo: ahí no se puede)
+      const x = t.x !== undefined ? t.x : t[0], y = t.y !== undefined ? t.y : t[1];
+      diamondFill(ctx, x, y, t.mala ? 'rgba(230,70,50,0.55)' : t.cruce ? 'rgba(255,210,90,0.6)' : 'rgba(140,200,255,0.5)');
+      if (t.d !== undefined) { const D4 = [[1, 0], [0, 1], [-1, 0], [0, -1]][t.d], [ax, ay] = R.iso(x + 0.5 - D4[0] * 0.25, y + 0.5 - D4[1] * 0.25), [bx, by] = R.iso(x + 0.5 + D4[0] * 0.3, y + 0.5 + D4[1] * 0.3); ctx.strokeStyle = 'rgba(20,30,50,0.85)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.fillStyle = 'rgba(20,30,50,0.85)'; ctx.fillRect(Math.round(bx) - 1, Math.round(by) - 1, 3, 3); }
+    }
+    if (R.cintaMarca !== undefined && R.cintaMarca !== null && Math.floor(performance.now() / 300) % 2) { const k = R.cintaMarca; diamondFill(ctx, k % W.W, (k / W.W) | 0, 'rgba(230,50,40,0.6)'); } // el cuello de botella elegido
 
     // mapas del tesoro (H7): una X roja en el suelo, también sobre la niebla
     for (const m of (g.state && g.state.mapas) || []) {
@@ -884,37 +890,8 @@
     }
   }
   // ---------- Cintas ----------
-  const dirOf = (a, b) => (b[0] > a[0] ? 'E' : b[0] < a[0] ? 'W' : b[1] > a[1] ? 'S' : 'N');
-  const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
-  function sideToward(t, b) { // de la casilla t hacia el edificio b
-    if (t[0] < b.x) return 'E'; if (t[0] >= b.x + b.w) return 'W'; if (t[1] < b.y) return 'S'; return 'N';
-  }
-  function drawBelts(ctx, vis) {
-    const st = G().state;
-    if (!st || !st.logi || !st.logi.belts.length) return;
-    const phase = Math.floor(performance.now() / 110) % 4;
-    for (const bl of st.logi.belts) {
-      const a = G().bById.get(bl.a), b = G().bById.get(bl.b), p = bl.path;
-      if (!a || !b) continue;
-      for (let i = 0; i < p.length; i++) {
-        const [px, py] = R.iso(p[i][0], p[i][1]);
-        if (!vis(px - 16, py, 32, 16)) continue;
-        const inD = i === 0 ? OPP[sideToward(p[0], a)] : OPP[dirOf(p[i - 1], p[i])];
-        const outD = i === p.length - 1 ? sideToward(p[i], b) : dirOf(p[i], p[i + 1]);
-        const spr = Sp.belt(inD, outD, phase);
-        ctx.drawImage(spr.c, px - 16, py);
-      }
-      // carga que viaja por la cinta
-      for (const it of bl.items) {
-        const i = Math.min(p.length - 1, Math.floor(it.p)), f = it.p - i, q = p[Math.min(p.length - 1, i + 1)];
-        const tx = p[i][0] + 0.5 + (q[0] - p[i][0]) * f, ty = p[i][1] + 0.5 + (q[1] - p[i][1]) * f;
-        const [px, py] = R.iso(tx, ty);
-        const col = Sp.CARRY[it.r] || [200, 200, 200];
-        ctx.fillStyle = 'rgba(20,14,10,0.85)'; ctx.fillRect(Math.round(px) - 2, Math.round(py) - 4, 5, 4);
-        ctx.fillStyle = Sp.rgb(col); ctx.fillRect(Math.round(px) - 1, Math.round(py) - 3, 3, 2);
-      }
-    }
-  }
+  // pk-58: las dibuja js/cintas.js (piezas por nivel, cruces, rampas e ítems)
+  function drawBelts(ctx, vis) { if (PK.Cintas) PK.Cintas.dibujar(ctx, vis, R, Sp); }
 
   // pk-43: lo abierto del Gran Portón (0 a 4). Se abre si una unidad tuya está a menos de 2,5 casillas del paso y se
   // cierra 1,5 s después de que se va; suena al empezar a abrirse.

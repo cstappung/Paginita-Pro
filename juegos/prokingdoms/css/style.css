@@ -314,8 +314,13 @@ ul.sub li.ok::marker { content: '✔ '; }
 .rt-comodin > .ico + .ico { width: 13px; height: 13px; margin-left: -8px; margin-bottom: -2px; }
 .rt-asterisco { position: absolute; right: -3px; top: -5px; color: #c07818; font-size: 15px; }
 .rt-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.rt-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; background: #fbf1da; border: 2px solid #c8a878; border-radius: 12px; cursor: pointer; font: inherit; color: inherit; }
+.rt-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; background: #fbf1da; border: 2px solid #c8a878; border-radius: 12px; cursor: pointer; font: inherit; color: #3a2a1a; }
 .rt-chip.sel { border-color: #d8a020; background: #fff0b8; }
+.rt-chip:disabled { opacity: 0.45; cursor: default; }
+/* pk-58: muestra del color de cada nivel de cinta */
+.cinta-muestra { display: inline-block; width: 12px; height: 8px; border: 2px solid #3a3028; border-radius: 2px; margin-right: 2px; }
+.cinta-muestra.n1 { background: #a87a4a; } .cinta-muestra.n2 { background: #a0a2a8; } .cinta-muestra.n3 { background: #b0bac6; }
+.cinta-muestra.n4 { background: #e2ba5c; } .cinta-muestra.n5 { background: #b288da; }
 .rt-resumen { border-top: 2px dashed #c8a878; padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
 .rt-sugs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
 .rt-sug { padding: 6px 8px; background: rgba(255, 232, 150, 0.35); border: 2px solid #d8b058; border-radius: 3px; display: flex; flex-direction: column; gap: 3px; }

@@ -12,6 +12,9 @@ owner outside this repo and dropped in.
 - `PLAN-LOGISTICA.md` (Nov 15 2026): the next plan, «Caminos y Campamentos», phases L1–L6 («implementa la Fase
   L<N> del plan de logística»; L6 is the sea with cargo barges). §10 lists traps; §11 has the owner's answered
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
+- `PLAN-CINTAS.md` (Nov 16 2026): the belt redesign («Red de cintas»), phases C1–C3 («implementa la Fase C<N> del
+  plan de cintas»): belts as pieces on tiles with level I–V, building ports, mixed items, splitter/merger/sorter,
+  bottlenecks. §9 holds the owner's answered decisions (Nov 16). C1 done in `pk-58`.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
@@ -422,3 +425,69 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `Lb.fuera`, `inbound` (`job.carga`), `dropCargo`, `descargar` (leftovers → another store, or back to the town if the
   destination does not take them) and `L.offline` all handle it. `mejorBodega` takes a list and prefers the store that
   takes most of it (a Granary next door does not catch a mining load). pk-54 routes (`res` without `tipo`) still work.
+- **Campaign place is 3×3** (`pk-57`): `lugarLibre` checks the nine tiles (passable, not water, no wall/foreign wall,
+  POI or building, no territory, 2+ from any territory) and `revisarLugar` uses the same distance map. Checking only
+  the centre left the camp on top of your wall and half in the sea.
+- **«Cualquier <taller>»** (`pk-57`, `'taller:<type>'` as `r.de` or `r.a`, `L.esTallerComodin`, `L.talleresDe`):
+  as destination, the workshop of that type that needs most (`tallerDestino`: missing input minus what other carts of
+  the route are fetching); as origin, the one with most output (`tallerOrigen`). Validated with a sample of the type
+  (`tallerMalo`). A full one sends the cart to the next; a cart waiting with nothing to do re-picks. The route builder
+  shows them for types you own two or more of; recommendations group 2+ far workshops of a type into one route.
+
+## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, `js/cintas.js`, `PK.Cintas`)
+
+- **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
+  `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
+  (≥ 0 = occupied; every old `W.belt[k] >= 0` check still means "taken"). Items live on the piece (`i`, and `j` for a
+  crossing's second lane) as `[res, q]`, so they are saved with `S`.
+- **`rearmar()`** (cached by `Ci.version` + own buildings' done-state) builds lanes: each lane's `sig` (next lane),
+  `dst` (building it points at = input port) and `src` (building behind/beside a lane nobody feeds = output port).
+  One input per lane in C1 (the one behind wins; others get «hace falta un unidor»). A crossing's cross lane takes its
+  direction from whoever enters from the side.
+- **Throughput:** each lane accepts one item every `1 / (rate·K)` s (`c.lib`). A gap rule alone did not work: a 1-tile
+  lane empties before a 1.2-tile gap is ever measured, and a level I piece let 165/2 min through. Queued items sit
+  `JUNTOS` (0.34) apart. `K` is the tree bonus `belt`.
+- **Ports:** a workshop gives its output; a camp gives everything it holds, round-robin (mixed); a store gives what the
+  player ticks in the port (`pz.f`), never below the workshop reserve. Inputs: workshop inputs up to `bufCap`, stores
+  through `Lb.poner`. Something the destination does not use **jams** the lane (`c.atasco`, `c.motivo`, red blink).
+- **Carts and carromatos do not cross belts** (`pasa()` in logistics.js; `W.beltVer` is in the table version).
+  Villagers walk over. The elevated pass leaves its middle tiles unmarked, so carts go under.
+- **Offline:** per output port, the chain's slowest level × dt, split round-robin; a port that would emit something the
+  sink rejects moves nothing (it would jam live). Tested against a level I piece (exactly 60/min).
+- **Building:** two taps (`L.tool = 'cinta'`), L-shaped plan (`Ci.plan`), starts at a building's free border tile or
+  continues a dead end, ends pointing into a building or an existing belt; crossing a perpendicular straight belt
+  makes a crossing. `L.tool = 'paso'`: entry and exit 2..`D.CINTA.pasoMax` apart. On touch the panel folds while
+  tracing (`plegarAlColocar`). Belts may not go on roads or the Calzada (use a pass). «Quitar varios» removes pieces.
+- **Old saves:** `st.logi.belts` become level III pieces with their items (`Ci.init`), `st.logi.avisoCintas` toasts once.
+- The server never sees belts; `Lb.fuera` counts what rides on them (`Ci.enCinta`). The autopilot does not build them.
+- Levels I–V (`D.CINTA.maxFase` 5 since C3): IV from Era V (300/min), V from Era VI (480/min).
+- **C2 nodes** (`Ci.NODO`): `u` unidor (takes from every lane that enters, turn by turn: `turno`/`listo`/`hayLugarDesde`),
+  `v` divisor and `s` clasificador (one input, outputs ahead and both sides, round-robin `c.rr` among outs with room).
+  Lanes carry `outs` (`{c|b, d}`) and `ent` (`{c, d}`) instead of a single `sig`; every walker (tramo, alimenta,
+  bocasDe, offline) must follow `outs`/`ent`, not `sig`. Sorter filters live in `pz.f2[d]`: a resource, `'*'` (what no
+  other output took) or `''`; default front `'*'`, sides `''` (`Ci.filtro`). An item no output takes jams with a
+  message naming it. Costs in `D.CINTA.nodos`; `Ci.convertir` refunds half of the old node.
+- **Tick carry:** `c.lib` may go down to `-dt` (`credito()`), or a 3/s merger delivered 2.4/s at 10 ticks/s. Keep it.
+- **Items may sit at a negative `q`** (just behind a lane's start): a new item enters when the last one is within one
+  tick of `JUNTOS` (`hayLugar` with `tolera`) and is placed exactly `JUNTOS` behind it (`detras`). Waiting for the
+  next tick capped level V (0.32 tiles per tick < 0.34) at 5/s instead of 8. Drawing clamps `q` to the piece.
+- **Copy** (`Ci.molde(k)` → `Ci.planCopia(molde, x, y, rot)` → `Ci.estampar(plan)`, tool `L.tool = 'copiar'`): the
+  whole connected group (4-neighbours plus both ends of each elevated pass, up to 400 pieces) with sorter filters and
+  store-port picks, rotated by quarter turns (`d`, `f2` keys and pass ends rotate together), paid as new
+  (`Ci.costoMolde`), empty. Mouse: the ghost follows the cursor, click stamps, R rotates; touch: tap places the
+  ghost, a second tap on the same tile or «Estampar aquí» stamps.
+- **Drawing cost** (pk-60): `armarDib` builds, once per `rearmar` (`armado`), each piece's screen position and sprite
+  per animation phase, and each lane's three item waypoints (`c.pts`); items are batched into one path per colour.
+  `K()` caches the tree bonus per game instant (`G.bono` checks the season). Measure with the phone CPU ×4: 1,056 full
+  level V pieces ≈ 300 villagers on screen.
+- **Autopilot** (`tools/piloto.js`, `cintas()`): from Era III it belts each camp to the nearest store that takes its
+  drops (clean plan, ≤ 26 tiles), keeps carromatos on that camp only while it is half full, and upgrades a tramo when
+  it holds twice the cost. `?sincintas` turns it off for before/after runs.
+- **Auto-joins when tracing** (`Ci.plan`): starting mid-belt turns that piece into a divisor (`dividir`); ending on a
+  belt that already has an input turns it into a unidor (`unir`); ending head-on is refused.
+- **Offline:** offers from sources flow downstream with each lane's cap, split evenly at divisors and by filter at
+  sorters, limited by what sinks accept (`accDe`); sources lose exactly what was delivered.
+- **«Ver flujo»** (`Ci.verFlujo`, `Ci.estadoFlujo`): red only for jammed or held back by a lower-level next piece; a
+  belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
+  The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
+  options) feeds the sorter panel's short list.

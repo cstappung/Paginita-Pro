@@ -218,21 +218,22 @@
     for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
       if (!W.inb(x, y)) continue;
       const k = W.idx(x, y);
-      if (W.wall[k] || (W.road[k] && W.bAt[k] < 0) || (PK.Calzada && PK.Calzada.quitables(x, y, x, y).length)) out.push([x, y]);
+      if (W.wall[k] || (W.road[k] && W.bAt[k] < 0) || (PK.Calzada && PK.Calzada.quitables(x, y, x, y).length) || (PK.Cintas && PK.Cintas.piezaEn(x, y))) out.push([x, y]);
     }
     return out;
   };
   Dz.quitar = function (tiles) {
-    let muros = 0, caminos = 0;
+    let muros = 0, caminos = 0, cintas = 0;
     for (const [x, y] of tiles) {
       const k = W.idx(x, y);
+      if (PK.Cintas && PK.Cintas.piezaEn(x, y)) { PK.Cintas.quitar(k); cintas++; continue; } // pk-58
       if (W.wall[k]) { PK.Def.remove(k); muros++; }
       else if (W.road[k]) { PK.Logi.removeRoad(x, y); caminos++; }
     }
     const cz = PK.Calzada ? tiles.filter(([x, y]) => PK.Calzada.quitables(x, y, x, y).length) : [];
     if (cz.length) { PK.Calzada.quitar(cz); caminos += cz.length; } // L5: la Calzada Real (la tuya, o la de otro en tu tierra)
-    if (muros || caminos) { G().blockVer++; if (PK.Sfx) PK.Sfx.play('build'); }
-    return { muros, caminos };
+    if (muros || caminos || cintas) { G().blockVer++; if (PK.Sfx) PK.Sfx.play('build'); }
+    return { muros, caminos, cintas };
   };
 
   // ---------- Herramientas (PK.Def.tool: 'quitar', 'talar' o 'plantar'; input.js las rutea por Def.click) ----------
@@ -260,9 +261,9 @@
       toast('Quitaste ' + r.n + (r.n === 1 ? ' árbol o arbusto' : ' árboles y arbustos') + (Object.keys(r.vuelve).length ? ': ' + Dz.vuelveTxt(r.vuelve) : '') + '.', 'good');
     } else {
       const ts = Dz.quitables(x0, y0, x1, y1);
-      if (!ts.length) { toast('No hay murallas ni caminos en esa zona.', 'info'); return; }
+      if (!ts.length) { toast('No hay murallas, caminos ni cintas en esa zona.', 'info'); return; }
       const r = Dz.quitar(ts);
-      toast('Quitaste ' + [r.muros ? r.muros + (r.muros === 1 ? ' muralla o puerta' : ' murallas y puertas') : '', r.caminos ? r.caminos + (r.caminos === 1 ? ' casilla de camino' : ' casillas de camino') : ''].filter(Boolean).join(' y ') + '. Vuelve la mitad del material.', 'good');
+      toast('Quitaste ' + [r.muros ? r.muros + (r.muros === 1 ? ' muralla o puerta' : ' murallas y puertas') : '', r.caminos ? r.caminos + (r.caminos === 1 ? ' casilla de camino' : ' casillas de camino') : '', r.cintas ? r.cintas + (r.cintas === 1 ? ' pieza de cinta' : ' piezas de cinta') : ''].filter(Boolean).join(' y ') + '. Vuelve la mitad del material.', 'good');
     }
   };
 

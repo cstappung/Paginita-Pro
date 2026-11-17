@@ -4,7 +4,7 @@
 //  - Las carretas (Carretería) llevan insumos desde los almacenes o desde otro taller, y sacan lo producido
 //    hacia el taller que lo necesita o al almacén. Así se arman cadenas: madera → tablones → herramientas.
 //  - Los caminos aceleran a todos; las carretas fuera del camino van lentas.
-//  - Muy avanzado: cintas transportadoras que unen dos edificios y mueven todo solas, rapidísimo.
+//  - Las cintas transportadoras (red de piezas, niveles, cruces) viven en js/cintas.js (pk-58).
 (function () {
   'use strict';
   const PK = window.PK, U = PK.U, D = PK.D, W = PK.World;
@@ -31,9 +31,9 @@
     for (const u of L.carts()) if (u.ruta && !st.logi.rutas.some(r => r.id === u.ruta)) u.ruta = null;
     caminos.clear();
     for (const i of st.logi.roads) W.road[i] = 1;
-    for (const bl of st.logi.belts) markBelt(bl, true);
+    PK.Cintas.init(st); // pk-58: convierte las cintas de antes y marca W.belt
     W.roadVer++;
-    L.tool = null; L.beltFrom = null; caminosRevisados = false;
+    L.tool = null; L.beltFrom = null; L.cintaNivel = 1; caminosRevisados = false;
   };
   L.save = function (st) {
     const roads = [];
@@ -81,10 +81,10 @@
   };
   // ¿Le llega algo a este taller? (junto a un almacén, con carretas o con una cinta que lo alimenta).
   // Sin eso no recibe insumos: no se le asignan trabajadores (antes aceptaba y prometía «≈30 por minuto»).
-  L.supplied = b => !!(L.nearStore(b) || S().logi.belts.some(bl => bl.b === b.id) || L.rutasHacia(b).some(r => L.cartsDe(r).length));
+  L.supplied = b => !!(L.nearStore(b) || PK.Cintas.alimenta(b) || L.rutasHacia(b).some(r => L.cartsDe(r).length));
   // pk-54: también las rutas comodín que lo pueden usar («cualquier campamento de madera», «cualquier bodega»)
-  L.rutasHacia = b => S().logi.rutas.filter(r => r.a === b.id || (r.a === 'bodega' && L.esBodegaRuta(b) && (!r.res || acepta(b, r.res))));
-  L.rutasDesde = b => S().logi.rutas.filter(r => r.de === b.id || (r.de === 'campo' && L.camposRuta(r).includes(b)) || (r.de === 'bodega' && L.esBodegaRuta(b)));
+  L.rutasHacia = b => S().logi.rutas.filter(r => r.a === b.id || (r.a === 'bodega' && L.esBodegaRuta(b) && (!r.res || acepta(b, r.res))) || (L.esTallerComodin(r.a) && L.talleresDe(L.tipoTaller(r.a)).includes(b)));
+  L.rutasDesde = b => S().logi.rutas.filter(r => r.de === b.id || (r.de === 'campo' && L.camposRuta(r).includes(b)) || (r.de === 'bodega' && L.esBodegaRuta(b)) || (L.esTallerComodin(r.de) && L.talleresDe(L.tipoTaller(r.de)).includes(b)));
   // Almacén cercano: el taller se abastece y descarga solo, a un ritmo moderado.
   L.nearStore = function (b) {
     if (b._nsT === G().time) return b._ns;
@@ -130,7 +130,6 @@
   // la carga hasta que quepa. No hay modo automático (decisión 2 del dueño): una carreta sin ruta queda parada en la
   // Carretería. Las carretas son del pueblo: no salen de tu territorio y no van a los campamentos (decisión 3).
   L.cartMax = () => G().buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).carts : 0), 0);
-  const beltK = () => 1 + (G().bono ? G().bono('belt') : 0); // Cintas reforzadas (árbol 2.0)
   L.cartCap = () => Math.round(G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartCap : 0), D.CART.cap) * (1 + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost') + (G().bono ? G().bono('cartCap') : 0))));
   L.cartSpeed = () => G().buildings.reduce((m, b) => Math.max(m, b.owner === 'p' && b.done && b.type === 'cartwright' ? G().bst(b).cartSpeed : 0), 0) + (G().best('beasthouse', 'cartBoost') + G().best('faro', 'cartBoost'));
   L.carts = () => G().units.filter(u => u.owner === 'p' && u.kind === 'cart');
@@ -283,11 +282,12 @@
     if (perfil === 'barcaza') return W.terrain[k] === 4 && W.bAt[k] < 0; // solo agua
     if (W.block[k] !== 0 || W.terrain[k] === 4 || W.wallOwner[k]) return false; // L4: tampoco por una puerta ajena
     const x = k % W.W, y = (k / W.W) | 0;
+    if (W.belt[k] >= 0) return false; // pk-58: carretas y carromatos no cruzan cintas (decisión 3): pasan bajo un paso elevado
     if (perfil === 'carreta') return W.ownerAt(x, y) === 'p';
     if (perfil === 'carromato') return W.wall[k] !== 2;
     return true;
   }
-  const verMapa = () => W.roadVer + '|' + G().blockVer + '|' + (W.terrVer || 0) + '|' + (W.apVer || 0) + '|' + rk();
+  const verMapa = () => W.roadVer + '|' + G().blockVer + '|' + (W.terrVer || 0) + '|' + (W.apVer || 0) + '|' + rk() + '|' + (W.beltVer || 0);
   const tablas = {};
   L.tabla = function (perfil) {
     const v = verMapa();
@@ -429,11 +429,51 @@
     }
     return best;
   }
+  // ---- «Cualquier Aserradero» (pk-57, pedido del dueño): 'taller:<tipo>' como origen o destino ----
+  // Destino: el taller de ese tipo al que más le falta (el que tiene menos), descontando lo que ya le llevan y lo que
+  // van a buscar los otros vehículos de la ruta. Origen: el que más guarda de lo que hace.
+  L.esTallerComodin = v => typeof v === 'string' && v.startsWith('taller:');
+  L.tipoTaller = v => v.slice(7);
+  L.talleresDe = t => G().buildings.filter(b => b.owner === 'p' && b.done && b.type === t && L.isShop(b) && L.puntoCarreta(b) && PK.Libro.almacenDe(b) === b);
+  const enTaller = (b, v) => !!b && L.talleresDe(L.tipoTaller(v)).includes(b);
+  const posDe = o => (o ? [o.cx !== undefined ? o.cx : o.x, o.cy !== undefined ? o.cy : o.y] : null);
+  function yendoA(r, u, campo, soloVacios) {
+    const cap = L.capDe(L.claseRuta(r)), m = new Map();
+    for (const o of G().units) if (o !== u && o.ruta === r.id && o[campo] && !(soloVacios && o.carry > 0.5)) m.set(o[campo], (m.get(o[campo]) || 0) + cap);
+    return m;
+  }
+  function tallerDestino(r, u, from, sinReserva, excl) {
+    const ts = L.talleresDe(L.tipoTaller(r.a)).filter(b => b.id !== excl);
+    if (!ts.length) return null;
+    const ins = r.res ? [r.res] : u && u.carry > 0.5 ? Object.keys(L.cargaDe(u)) : from && L.isShop(from) ? [L.output(from)] : from && L.esCampo(from) ? listaPara(null, r, from) : Object.keys(L.recipe(ts[0]).in);
+    const yendo = sinReserva ? new Map() : yendoA(r, u, 'rA', true), pos = posDe(from || u);
+    let best = null, bs = -Infinity;
+    for (const b of ts) {
+      let falta = 0;
+      for (const k of ins) if (acepta(b, k)) falta += necesita(b, k, !sinReserva);
+      const sc = falta - (yendo.get(b.id) || 0) - (pos ? U.dist(pos[0], pos[1], b.cx, b.cy) * 0.01 : 0);
+      if (sc > bs) { bs = sc; best = b; }
+    }
+    return best;
+  }
+  function tallerOrigen(r, u, sinReserva, excl) {
+    const ts = L.talleresDe(L.tipoTaller(r.de)).filter(b => b.id !== excl);
+    const yendo = sinReserva ? new Map() : yendoA(r, u, 'rDe', true), pos = posDe(u);
+    let best = null, bs = -Infinity;
+    for (const b of ts) {
+      ensure(b);
+      const sc = (b.outb[L.output(b)] || 0) - (yendo.get(b.id) || 0) - (pos ? U.dist(pos[0], pos[1], b.cx, b.cy) * 0.01 : 0);
+      if (sc > bs) { bs = sc; best = b; }
+    }
+    return best;
+  }
   // Los extremos de esta ruta para este vehículo (los elige si hace falta).
   L.extremos = function (u, r) {
-    const g = G();
+    const g = G(), excl = u.rExcl && u.rExclT > g.ahora() ? u.rExcl : null;
     let from = L.comodin(r.de) ? g.bById.get(u.rDe) : g.bById.get(r.de), to = L.comodin(r.a) ? g.bById.get(u.rA) : g.bById.get(r.a);
-    if (r.de === 'campo' && !(from && L.camposRuta(r).includes(from))) { from = mejorCampo(r, u, u.rExcl && u.rExclT > g.ahora() ? u.rExcl : null); u.rDe = from ? from.id : null; }
+    if (r.de === 'campo' && !(from && L.camposRuta(r).includes(from))) { from = mejorCampo(r, u, excl); u.rDe = from ? from.id : null; }
+    if (L.esTallerComodin(r.de) && !enTaller(from, r.de)) { from = tallerOrigen(r, u, false, excl); u.rDe = from ? from.id : null; }
+    if (L.esTallerComodin(r.a) && !enTaller(to, r.a)) { to = tallerDestino(r, u, from); u.rA = to ? to.id : null; }
     if (r.a === 'bodega' && !(to && L.esBodegaRuta(to))) { const o = from || u; to = mejorBodega(listaPara(u, r, from), o.cx !== undefined ? o.cx : o.x, o.cy !== undefined ? o.cy : o.y); u.rA = to ? to.id : null; }
     if (r.de === 'bodega' && !(from && L.esBodegaRuta(from))) { from = to ? cercana(L.bodegasRuta(), to.cx, to.cy) : null; u.rDe = from ? from.id : null; }
     return { from, to };
@@ -444,6 +484,8 @@
     const g = G();
     let from = L.comodin(r.de) ? null : g.bById.get(r.de), to = L.comodin(r.a) ? null : g.bById.get(r.a);
     if (r.de === 'campo') from = mejorCampo(r, null, null, true);
+    if (L.esTallerComodin(r.de)) from = tallerOrigen(r, null, true);
+    if (L.esTallerComodin(r.a)) to = tallerDestino(r, null, from, true);
     if (r.a === 'bodega' && from) to = mejorBodega(listaPara(null, r, from), from.cx, from.cy);
     if (r.de === 'bodega' && to) from = cercana(L.bodegasRuta(), to.cx, to.cy);
     return { from, to };
@@ -455,12 +497,13 @@
     if (v === 'campo' && tipo) return L.TIPO_NOMBRE[tipo] + (res && (D.BUILD[tipo].drop || []).length > 1 ? ' (solo ' + D.RES[res].name.toLowerCase() + ')' : '');
     if (v === 'campo') return 'Cualquier campamento' + (res ? ' de ' + D.RES[res].name.toLowerCase() : '');
     if (v === 'bodega') return 'Cualquier bodega';
+    if (L.esTallerComodin(v)) return 'Cualquier ' + D.BUILD[L.tipoTaller(v)].name;
     const b = G().bById.get(v);
     return b ? b.def.name : '?';
   };
   L.nombreRuta = r => L.nombreExtremo(r.de, r.res, r.tipo) + ' → ' + L.nombreExtremo(r.a, r.res) + (r.res && r.de !== 'campo' ? ' (' + D.RES[r.res].name.toLowerCase() + ')' : '');
   // Una ruta que sale de un campamento es de carromatos; las demás, de carretas.
-  L.claseRuta = r => { if (r.de === 'campo') return 'carromato'; if (r.de === 'bodega') return 'cart'; const a = G().bById.get(r.de); return a && a.type === 'colonia' ? 'barcaza' : a && L.esCampo(a) ? 'carromato' : 'cart'; };
+  L.claseRuta = r => { if (r.de === 'campo') return 'carromato'; if (r.de === 'bodega' || L.esTallerComodin(r.de)) return 'cart'; const a = G().bById.get(r.de); return a && a.type === 'colonia' ? 'barcaza' : a && L.esCampo(a) ? 'carromato' : 'cart'; };
   L.cartsDe = r => { const k = L.claseRuta(r); return G().units.filter(u => u.owner === 'p' && u.kind === k && u.ruta === r.id); };
   L.libres = kind => (kind === 'carromato' ? L.carromatos() : kind === 'barcaza' ? L.barcazas() : L.carts()).filter(u => !L.rutaDe(u));
   // Por qué una ruta no sirve (texto), o null si está bien.
@@ -483,6 +526,7 @@
   };
   // pk-54: rutas con un extremo comodín
   L.comodinMalo = function (de, a, res, tipo) {
+    if (L.esTallerComodin(de) || L.esTallerComodin(a)) return tallerMalo(de, a, res, tipo);
     const g = G(), A = L.comodin(de) ? null : g.bById.get(de), B = L.comodin(a) ? null : g.bById.get(a);
     if (de === 'campo') {
       if (!res && !tipo) return 'Elige de qué campamentos.';
@@ -509,6 +553,27 @@
     }
     return null;
   };
+  // pk-57: rutas con «cualquier <taller>» en una punta: se valida con uno de muestra de ese tipo
+  function tallerMalo(de, a, res, tipo) {
+    const g = G(), muestra = v => (L.esTallerComodin(v) ? L.talleresDe(L.tipoTaller(v))[0] || null : L.comodin(v) ? null : g.bById.get(v));
+    for (const v of [de, a]) if (L.esTallerComodin(v) && !L.talleresDe(L.tipoTaller(v)).length) return 'Necesitas al menos un edificio terminado de tipo ' + D.BUILD[L.tipoTaller(v)].name + '.';
+    if (de === a) return 'El origen y el destino son del mismo tipo.';
+    const A = muestra(de), B = muestra(a);
+    if (de === 'campo') {
+      if (!res && !tipo) return 'Elige de qué campamentos.';
+      const cs = L.camposDe(res, tipo);
+      if (!cs.length) return 'No tienes esos campamentos terminados.';
+      const lista = res ? [res] : [...new Set(cs.flatMap(b => b.def.drop || []))];
+      return lista.some(k => acepta(B, k)) ? null : B.def.name + ' no usa nada de lo que juntan esos campamentos.';
+    }
+    if (de === 'bodega') return L.bodegasRuta().length ? null : 'No tienes bodegas.';
+    if (a === 'bodega') return L.bodegasRuta(L.output(A)).length ? null : 'No tienes una bodega que reciba ' + D.RES[L.output(A)].name.toLowerCase() + '.';
+    if (!A || !B) return 'Elige el ' + (!A ? 'origen' : 'destino') + '.';
+    if (L.esCampo(A)) return (A.def.drop || []).some(k => acepta(B, k)) ? null : B.def.name + ' no usa nada de lo que junta ' + A.def.name + '.';
+    if (L.isShop(A) && L.isShop(B) && !L.recipe(B).in[L.output(A)]) return B.def.name + ' no usa lo que hace ' + A.def.name + ' (' + D.RES[L.output(A)].name.toLowerCase() + ').';
+    if (res && !acepta(B, res)) return B.def.name + ' no recibe ' + D.RES[res].name.toLowerCase() + '.';
+    return L.parMalo(A, B);
+  }
   L.rutaMala = function (r) {
     if (L.comodin(r.de) || L.comodin(r.a)) {
       const why = L.comodinMalo(r.de, r.a, r.res, r.tipo);
@@ -595,12 +660,23 @@
       if (cs.length >= 2 && !yaEsta('campo', 'bodega', null, t)) out.push({ id: 'c:' + t, tipo: 'ruta', de: 'campo', a: 'bodega', res: null, ctipo: t, txt: L.nombreExtremo('campo', null, t) + ' → Cualquier bodega', por: cs.length + ' ' + L.TIPO_PLURAL[t] + ' sin carromato (guardan ' + U.fmt(Math.floor(tot)) + '). Cada viaje va al que tiene más' + (varios ? ' y trae de todo lo que junten, mezclado.' : '.'), peso: 60 + tot / 50 });
       else if (cs.length === 1 && !yaEsta(cs[0].id, 'bodega', null)) out.push({ id: 'c1:' + cs[0].id, tipo: 'ruta', de: cs[0].id, a: 'bodega', res: null, txt: cs[0].def.name + ' → Cualquier bodega', por: 'Nadie lo vacía' + (PK.Libro.campoLleno(cs[0]) ? ' y está lleno: sus aldeanos esperan.' : ' (guarda ' + U.fmt(Math.floor(PK.Libro.totalCampo(cs[0]))) + ').'), peso: 50 + PK.Libro.totalCampo(cs[0]) / 50 + (PK.Libro.campoLleno(cs[0]) ? 30 : 0) });
     }
-    // 2) talleres lejos de una bodega: que alguien les traiga y les saque
+    // 2) talleres lejos de una bodega: que alguien les traiga y les saque (pk-57: dos o más del mismo tipo, con
+    // «cualquier <taller>»: una sola ruta para todos)
+    const sinIn = {}, sinOut = {};
     for (const b of g.buildings) {
       if (b.owner !== 'p' || !b.done || !L.isShop(b) || L.nearStore(b) || PK.Libro.almacenDe(b) !== b) continue;
-      if (!L.supplied(b) && !L.rutasHacia(b).length && !st.logi.belts.some(bl => bl.b === b.id)) out.push({ id: 'i:' + b.id, tipo: 'ruta', de: 'bodega', a: b.id, res: null, txt: 'Cualquier bodega → ' + b.def.name, por: 'Está lejos de las bodegas y nadie le trae insumos: no produce.', peso: 45 });
-      const outR = L.output(b);
-      if (!L.rutasDesde(b).length && !st.logi.belts.some(bl => bl.a === b.id) && L.bodegasRuta(outR).length) out.push({ id: 'o:' + b.id, tipo: 'ruta', de: b.id, a: 'bodega', res: null, txt: b.def.name + ' → Cualquier bodega', por: 'Nadie saca lo que hace (' + D.RES[outR].name.toLowerCase() + ')' + ((b.outb && b.outb[outR] >= L.bufCap(b) - 1) ? ': su depósito está lleno y paró.' : '.'), peso: 40 + ((b.outb && b.outb[outR]) || 0) / 20 });
+      if (!L.supplied(b) && !L.rutasHacia(b).length) (sinIn[b.type] = sinIn[b.type] || []).push(b);
+      if (!L.rutasDesde(b).length && !PK.Cintas.bocasDe(b).salen.length && L.bodegasRuta(L.output(b)).length) (sinOut[b.type] = sinOut[b.type] || []).push(b);
+    }
+    for (const t in sinIn) {
+      const bs = sinIn[t], b = bs[0], n = D.BUILD[t].name;
+      if (bs.length >= 2) out.push({ id: 'i:' + t, tipo: 'ruta', de: 'bodega', a: 'taller:' + t, res: null, txt: 'Cualquier bodega → Cualquier ' + n, por: bs.length + ' de tus ' + n + ' están lejos de las bodegas y nadie les trae insumos. Cada viaje va al que tiene menos.', peso: 47 + bs.length });
+      else out.push({ id: 'i:' + b.id, tipo: 'ruta', de: 'bodega', a: b.id, res: null, txt: 'Cualquier bodega → ' + n, por: 'Está lejos de las bodegas y nadie le trae insumos: no produce.', peso: 45 });
+    }
+    for (const t in sinOut) {
+      const bs = sinOut[t], b = bs[0], n = D.BUILD[t].name, outR = L.output(b), lleno = bs.some(o => o.outb && o.outb[outR] >= L.bufCap(o) - 1), tot = bs.reduce((m, o) => m + ((o.outb && o.outb[outR]) || 0), 0);
+      if (bs.length >= 2) out.push({ id: 'o:' + t, tipo: 'ruta', de: 'taller:' + t, a: 'bodega', res: null, txt: 'Cualquier ' + n + ' → Cualquier bodega', por: 'Nadie saca lo que hacen ' + bs.length + ' de tus ' + n + ' (' + D.RES[outR].name.toLowerCase() + '). Cada viaje va al que tiene más.' + (lleno ? ' Alguno ya paró por depósito lleno.' : ''), peso: 42 + tot / 20 });
+      else out.push({ id: 'o:' + b.id, tipo: 'ruta', de: b.id, a: 'bodega', res: null, txt: n + ' → Cualquier bodega', por: 'Nadie saca lo que hace (' + D.RES[outR].name.toLowerCase() + ')' + (lleno ? ': su depósito está lleno y paró.' : '.'), peso: 40 + tot / 20 });
     }
     // 3) colonias sin barcaza
     for (const b of PK.Libro.campos()) {
@@ -691,7 +767,7 @@
       u.estado = lleva ? 'Lleva ' + nombresCarga(L.cargaDe(u)) + ' a ' + to.def.name : 'Va a cargar a ' + from.def.name;
       if (!ir(u, desde, tgt)) {
         if (L.comodin(lleva ? r.a : r.de)) { if (lleva) u.rA = null; else { u.rExcl = from.id; u.rExclT = G().ahora() + 60; u.rDe = null; } } // pk-54: probar con otro
-        u.estado = 'Sin camino hasta ' + tgt.def.name + (u.kind === 'barcaza' ? ' (necesita agua libre cerca de los dos muelles)' : u.kind === 'carromato' ? ' (los carromatos solo cruzan tu muralla por un Gran Portón)' : ' (las carretas no salen de tu territorio)'); u.mode = 'idle'; u.wait = 4; }
+        u.estado = 'Sin camino hasta ' + tgt.def.name + (u.kind === 'barcaza' ? ' (necesita agua libre cerca de los dos muelles)' : u.kind === 'carromato' ? ' (los carromatos solo cruzan tu muralla por un Gran Portón, y no cruzan cintas)' : ' (las carretas no salen de tu territorio ni cruzan cintas)'); u.mode = 'idle'; u.wait = 4; }
       return;
     }
     if (lleva) descargar(u, to); else cargar(u, r, from, to);
@@ -717,6 +793,8 @@
       }
     }
     u.espera = (u.espera || 0) + 3; u.wait = 3;
+    if (L.esTallerComodin(r.a) && (!q || q.need < 1)) u.rA = null; // pk-57: ese ya no necesita: el próximo, otro
+    if (L.esTallerComodin(r.de) && (!q || q.n < 1)) u.rDe = null; // pk-57: ese no tiene: vuelve a elegir
     u.estado = !q && L.esCampo(from) ? 'Esperando carga: ' + from.def.name + ' está vacío' : !q || q.need < 1 ? to.def.name + ' no necesita nada por ahora: espera en el origen' : q.n >= 1 ? 'Esperando carga (' + q.n + ' de ' + Math.floor(lleno) + ')' : 'Esperando carga: no hay ' + D.RES[q.res].name.toLowerCase() + (L.isShop(from) ? '' : ' (o lo guarda la reserva)');
   }
   // pk-55: carga mezclada desde un campamento
@@ -761,6 +839,7 @@
     if (u.carry > 0.5) {
       const r = L.rutaDe(u), resto = Object.keys(c), recibe = resto.some(k => acepta(to, k));
       if (r && r.a === 'bodega') { const d = mejorBodega(resto, to.cx, to.cy); if (d && d !== to && resto.some(k => acepta(d, k) && PK.Libro.lugar(d, k) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + (recibe ? ' está lleno' : ' no recibe ' + nombresCarga(c)) + ': va a ' + d.def.name; return; } } // pk-54
+      if (r && L.esTallerComodin(r.a)) { const d = tallerDestino(r, u, null, false, to.id); if (d && resto.some(k => acepta(d, k) && necesita(d, k, true) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + ' está lleno: va a ' + d.def.name; return; } } // pk-57
       if (recibe) { u.estado = to.def.name + ' está lleno: espera para descargar'; u.mode = 'idle'; u.wait = 3; return; }
       dropCargo(u); // lo que ese destino no recibe (cambiaron la ruta) vuelve a la bodega
     }
@@ -830,113 +909,9 @@
   L.onRoad = (x, y) => W.road[W.idx(Math.floor(x), Math.floor(y))] === 1;
 
   // ---------- Cintas transportadoras ----------
-  L.beltUnlocked = () => S().era >= D.BELT.era && G().levelCount(D.BELT.need.lvl, D.BELT.need.b) > 0;
-  L.beltLockText = () => 'Las cintas requieren la Era ' + U.roman(D.BELT.era) + ' y un ' + D.BUILD[D.BELT.need.b].name + ' de nivel ' + D.BELT.need.lvl + '.';
-  function markBelt(bl, on) {
-    for (const [x, y] of bl.path) W.belt[W.idx(x, y)] = on ? bl.id : -1;
-  }
-  const canBelt = (x, y) => {
-    if (!W.inb(x, y)) return false;
-    const k = W.idx(x, y), o = W.ownerAt(x, y);
-    return W.fog[k] && W.terrain[k] !== 4 && W.bAt[k] < 0 && W.belt[k] < 0 && W.poiAt[k] < 0 && W.block[k] !== 1 && o === 'p';
-  };
-  // Ruta de la cinta: de una casilla junto a A hasta una casilla junto a B, por casillas libres propias.
-  L.beltPlan = function (a, b) {
-    const starts = [];
-    for (let y = a.y - 1; y <= a.y + a.h; y++) for (let x = a.x - 1; x <= a.x + a.w; x++) {
-      const edge = x === a.x - 1 || x === a.x + a.w || y === a.y - 1 || y === a.y + a.h;
-      if (edge && !((x === a.x - 1 || x === a.x + a.w) && (y === a.y - 1 || y === a.y + a.h)) && canBelt(x, y)) starts.push([x, y]);
-    }
-    starts.sort((p, q) => U.dist(p[0], p[1], b.cx, b.cy) - U.dist(q[0], q[1], b.cx, b.cy));
-    for (const s of starts.slice(0, 4)) {
-      const path = bfs(s, b);
-      if (path) return path;
-    }
-    return null;
-  };
-  // Búsqueda en anchura por casillas de cinta (4 direcciones: las cintas no van en diagonal).
-  function bfs(s, b) {
-    const prev = new Map(), q = [s], key = (x, y) => y * W.W + x;
-    prev.set(key(s[0], s[1]), -1);
-    const goal = (x, y) => (x === b.x - 1 || x === b.x + b.w) && y >= b.y && y < b.y + b.h || (y === b.y - 1 || y === b.y + b.h) && x >= b.x && x < b.x + b.w;
-    for (let qi = 0; qi < q.length && qi < 6000; qi++) {
-      const [x, y] = q[qi];
-      if (goal(x, y)) {
-        const out = [];
-        let k = key(x, y);
-        while (k !== -1) { out.push([k % W.W, Math.floor(k / W.W)]); k = prev.get(k); }
-        return out.reverse();
-      }
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + dx, ny = y + dy, nk = key(nx, ny);
-        if (prev.has(nk) || !(canBelt(nx, ny) || goal(nx, ny) && canBelt(nx, ny))) continue;
-        prev.set(nk, key(x, y));
-        q.push([nx, ny]);
-      }
-    }
-    return null;
-  }
-  L.beltCost = n => { const c = {}; for (const r in D.BELT.cost) c[r] = D.BELT.cost[r] * n; return c; };
-  L.buildBelt = function (a, b) {
-    if (!L.beltUnlocked()) { toast(L.beltLockText(), 'warn'); return null; }
-    if (a === b) return null;
-    const path = L.beltPlan(a, b);
-    if (!path) { toast('No hay por dónde pasar la cinta (tiene que ir por tu territorio, sin cruzar edificios).', 'warn'); return null; }
-    if (!G().pay(L.beltCost(path.length))) { toast('Faltan recursos: cada casilla de cinta cuesta ' + D.BELT.cost.steel + ' acero y ' + D.BELT.cost.machinery + ' maquinaria (' + path.length + ' casillas).', 'warn'); return null; }
-    const st = S(), bl = { id: st.logi.nextBelt++, a: a.id, b: b.id, res: null, path, items: [], acc: 0 };
-    st.logi.belts.push(bl);
-    markBelt(bl, true);
-    G().stat('belts', 1);
-    if (PK.Sfx) PK.Sfx.play('level');
-    toast('Cinta de ' + path.length + ' casillas lista: ' + a.def.name + ' → ' + b.def.name + '.', 'good');
-    return bl;
-  };
-  L.removeBelt = function (bl) {
-    const st = S();
-    markBelt(bl, false);
-    st.logi.belts.splice(st.logi.belts.indexOf(bl), 1);
-    G().give(L.beltCost(bl.path.length), 0.5);
-  };
-  L.beltAt = (x, y) => { const id = W.belt[W.idx(x, y)]; return id >= 0 ? S().logi.belts.find(b => b.id === id) : null; };
-
-  // Qué lleva la cinta: lo que produce el origen, o el insumo que más le falta al destino.
-  function beltRes(bl, a, b) {
-    if (bl.res) return bl.res;
-    if (L.isShop(a)) return L.output(a);
-    if (L.isShop(b)) {
-      const r = L.recipe(b);
-      let best = null, bn = 0;
-      for (const k in r.in) { const n = L.need(b, k); if (n > bn && L.storeAccepts(a, k) && S().res[k] > reserveOf(k, L.output(b), b)) { bn = n; best = k; } }
-      return best;
-    }
-    return null;
-  }
-  function beltTick(bl, dt) {
-    const g = G(), a = g.bById.get(bl.a), b = g.bById.get(bl.b);
-    if (!a || !b || !a.done || !b.done) return;
-    const len = bl.path.length, sp = D.BELT.speed;
-    // avanzar y entregar
-    for (let i = bl.items.length - 1; i >= 0; i--) {
-      const it = bl.items[i], ahead = bl.items[i + 1];
-      it.p = Math.min(it.p + sp * dt, ahead ? ahead.p - 0.34 : len);
-      if (it.p >= len - 0.01 && !ahead) {
-        if (L.isShop(b) && L.need(b, it.r) < 1) continue; // destino lleno: la cinta se detiene
-        if (!L.isShop(b) && S().res[it.r] >= g.cap(it.r)) continue;
-        put(b, it.r, 1);
-        bl.items.pop();
-        g.stat('belted', 1);
-      }
-    }
-    // cargar
-    bl.acc = Math.min(1, bl.acc + dt * D.BELT.rate * beltK());
-    const res = beltRes(bl, a, b);
-    if (!res || bl.acc < 1 || (bl.items.length && bl.items[0].p < 0.34)) return;
-    if (L.isShop(b) && L.need(b, res) - bl.items.length < 1) return;
-    let ok = false;
-    if (L.isShop(a)) { ensure(a); if ((a.outb[res] || 0) >= 1) { a.outb[res] -= 1; ok = true; } }
-    else if (S().res[res] - 1 >= (L.isShop(b) ? reserveOf(res, L.output(b), b) : 0)) { S().res[res] -= 1; ok = true; }
-    if (ok) { bl.acc = 0; bl.items.unshift({ p: 0, r: res }); }
-  }
+  // pk-58: la red de cintas vive en js/cintas.js (PK.Cintas). Aquí solo quedan los nombres que usa el resto.
+  L.beltUnlocked = () => PK.Cintas.desbloqueado();
+  L.beltLockText = () => PK.Cintas.lockText();
 
   // ---------- Bucle ----------
   L.update = function (dt) {
@@ -944,27 +919,13 @@
     if (!st || !st.logi) return;
     presupuesto = 2; // caminos que se pueden recalcular en este paso
     revisarCaminos();
-    for (const bl of st.logi.belts) beltTick(bl, dt);
+    PK.Cintas.update(dt); // pk-58
+    PK.Cintas.medir(dt);
   };
   // Sin ti, las carretas no se mueven de verdad: se calcula cuánto habrían llevado según cuántas hay.
   L.offline = function (dt) {
     const g = G(), st = S();
-    for (const bl of st.logi.belts) {
-      const a = g.bById.get(bl.a), b = g.bById.get(bl.b);
-      if (!a || !b) continue;
-      let n = D.BELT.rate * beltK() * dt;
-      const res = beltRes(bl, a, b);
-      if (!res) continue;
-      if (L.isShop(b)) n = Math.min(n, L.need(b, res));
-      // como en vivo (beltTick): de la bodega a un taller, nunca por debajo de la reserva. Sin esto, al volver
-      // la bodega estaba vacía aunque el taller respetara la reserva.
-      if (L.isShop(b) && !L.isShop(a)) n = Math.min(n, Math.max(0, S().res[res] - reserveOf(res, L.output(b), b)));
-      // a una bodega, solo lo que cabe (como beltTick): lo que no cabía salía del taller y se perdía
-      if (!L.isShop(b)) n = Math.min(n, Math.max(0, g.cap(res) - (S().res[res] || 0)));
-      if (n <= 0) continue;
-      n = take(a, res, n);
-      if (n > 0) put(b, res, n);
-    }
+    PK.Cintas.offline(dt); // pk-58: el caudal de la red de cintas
     // las rutas (pk-41): cada una mueve lo que harían sus carretas en ese tiempo, con la ida y la vuelta de su camino
     // guardado. Las mismas reglas que en vivo: lo que hay en el origen (menos la reserva) y el lugar en el destino.
     for (const r of st.logi.rutas) {
@@ -997,7 +958,7 @@
   L.onTerritory = function () {
     const st = S();
     if (!st.logi) return;
-    for (const bl of st.logi.belts.slice()) if (bl.path.some(([x, y]) => W.ownerAt(x, y) !== 'p')) { markBelt(bl, false); st.logi.belts.splice(st.logi.belts.indexOf(bl), 1); }
+    PK.Cintas.onTerritory(); // pk-58: las piezas que quedaron fuera de tu tierra
     for (let i = 0; i < W.road.length; i++) if (W.road[i]) { const o = W.ownerAt(i % W.W, Math.floor(i / W.W)); if (o !== 'p') W.road[i] = 0; }
     W.roadVer++;
   };
@@ -1016,11 +977,10 @@
     if (!G().offline) setTimeout(() => toast('Los caminos ahora van solo dentro de tu tierra: se quitaron ' + n + ' casillas de afuera y te devolvimos la mitad. Afuera usa la Calzada Real.', 'info'), 1500);
   }
   L.revisarCaminos = revisarCaminos;
-  // Al demoler un edificio, sus cintas se desarman (se devuelve la mitad).
+  // Al demoler un edificio, lo de sus depósitos vuelve al pueblo (pk-58: sus cintas quedan; la red se rearma sola).
   L.onRemove = function (b) {
     const st = S();
     if (!st || !st.logi) return;
-    for (const bl of st.logi.belts.slice()) if (bl.a === b.id || bl.b === b.id) L.removeBelt(bl);
     if (b.inb) for (const k in b.inb) st.res[k] += Math.floor(b.inb[k]);
     if (b.outb) for (const k in b.outb) st.res[k] += Math.floor(b.outb[k]);
   };
