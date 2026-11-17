@@ -44,7 +44,9 @@
   // VERSIONES: las que se pueden rehacer. La 5 suma los bufos de estructuras distintas
   // (engine.js: recalcAll); la 4 sigue valiendo para las partidas empezadas antes, que se
   // juegan y se rehacen con su regla (el motor recibe la versión: new PD.Game(…, ve)).
-  const VERSION = 5, VERSIONES = [4, 5];
+  // La 6 (Nov 2026) hace a los jefes la mitad de lentos que en la 5 y cambia las torres de
+  // Biblioteca, Estelar y Tiempo (levels.js `v6`); las partidas de la 5 siguen con lo suyo.
+  const VERSION = 6, VERSIONES = [4, 5, 6];
 
   const categoria = r => 'club-prodefender-' + REINOS[r];
   const reinoDe = cat => { const m = /^club-prodefender-([a-z]+)$/.exec(String(cat || '')); return m ? REINOS.indexOf(m[1]) : -1; };
@@ -83,7 +85,7 @@
     if (g.over && c !== 5) return 'jugada con la partida perdida';
     if (c === 0) {
       const type = PD.TOWER_ORDER[j[2]];
-      if (!type || PD.towersFor(st.r).indexOf(type) < 0) return 'torre que no existe en este reino';
+      if (!type || PD.towersFor(st.r, st.ve).indexOf(type) < 0) return 'torre que no existe en este reino';
       if (!Number.isInteger(j[3]) || !Number.isInteger(j[4])) return 'posición inválida';
       return g.place(type, j[3], j[4]) ? null : 'no se podía colocar esa torre ahí';
     }

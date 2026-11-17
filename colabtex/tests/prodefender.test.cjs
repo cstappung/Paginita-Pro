@@ -679,7 +679,7 @@ test('reinos 12-15: los enemigos se endurecen desde la ronda 30 (la Necrópolis 
 });
 
 test('versión 5: los bufos de estructuras distintas se suman, los del mismo tipo no; la 4 sigue con el mejor',()=>{
- assert.equal(P.VERSION,5);assert.deepEqual(P.VERSIONES,[4,5]);
+ assert.equal(P.VERSION,6);assert.deepEqual(P.VERSIONES,[4,5,6]);
  const rod=PD.TOWERS.pararrayos;let pRod=-1,nRod=0;rod.paths.forEach((pa,i)=>pa.ups.forEach((u,n)=>{if(pRod<0&&/Carga Est/.test(u.name)){pRod=i;nRod=n+1;}}));
  assert.ok(pRod>=0,'el Pararrayos tiene un bufo de velocidad');
  const arma=ve=>{const g=new PD.Game(0,null,1,ve);g.money=1e9;
@@ -700,6 +700,31 @@ test('versión 5: los jefes tienen x20 de vida y van a un quinto de la velocidad
  const v4=mide(4),v5=mide(5);
  assert.ok(Math.abs(v5.hp/v4.hp-20)<1e-6,'x20 de vida');
  assert.ok(v5.avance>0&&Math.abs(v5.avance/v4.avance-1/5)<0.02,'un quinto de la velocidad: '+(v5.avance/v4.avance));
+ const v6=mide(6);
+ assert.ok(Math.abs(v6.hp/v5.hp-1)<1e-9,'v6: la misma vida que en la 5');
+ assert.ok(v6.avance>0&&Math.abs(v6.avance/v5.avance-1/2)<0.02,'v6: la mitad de rápido que en la 5: '+(v6.avance/v5.avance));
+});
+
+test('versión 6: Biblioteca, Estelar y Tiempo cambian sus torres; las partidas de la 5 siguen con las suyas',()=>{
+ for(const li of [17,18,19]){
+  const L=PD.LEVELS[li];assert.ok(L.v6&&Array.isArray(L.v6.torres),L.short+' tiene torres de la 6');
+  assert.deepEqual(PD.towersFor(li,5).filter(id=>!PD.TOWERS[id].hero),PD.TOWER_ORDER.filter(id=>L.torres.includes(id)),L.short+': la 5 vende las de antes');
+  assert.deepEqual(PD.towersFor(li,6).filter(id=>!PD.TOWERS[id].hero),PD.TOWER_ORDER.filter(id=>L.v6.torres.includes(id)),L.short+': la 6 las nuevas');
+  assert.deepEqual(PD.towersFor(li),PD.towersFor(li,6),'sin versión, la de ahora');
+  assert.deepEqual(PD.heroesOf(li,5),PD.heroesOf(li,6),'los mismos héroes');
+  for(const id of L.v6.torres)assert.ok(PD.TOWERS[id]&&!PD.TOWERS[id].hero,id+' existe');
+  assert.ok(!L.v6.torres.includes('desintegrador'),'sin Desintegrador (anula la vida tardía)');
+  assert.equal(new PD.Game(li,null,1,5).rounds.length,new PD.Game(li,null,1,6).rounds.length);
+ }
+ // la prueba de la 5 sigue aceptando una torre que la 6 ya no vende, y la 6 la rechaza
+ const quitada=PD.LEVELS[19].torres.find(id=>!PD.LEVELS[19].v6.torres.includes(id));
+ assert.ok(quitada,'Tiempo quita alguna');
+ const prueba=ve=>{const G=new P.Grabadora(19,'uidT',null);G.st.ve=ve;G.st.game=new PD.Game(19,null,P.semillaTramo(G.st.s,'uidT',0),ve);
+  let t=null;for(let r=0;r<400&&!t;r+=6)for(let a=0;a<6.283&&!t;a+=0.35)t=G.colocar(quitada,Math.round(300+Math.cos(a)*r),Math.round(250+Math.sin(a)*r));
+  return {t,p:G.prueba()};};
+ const r5=prueba(5);assert.ok(r5.t,'en la 5 se puede poner');
+ assert.equal(P.rehace(r5.p,'uidT').ronda,0,'y la prueba de la 5 se rehace');
+ assert.throws(()=>P.rehace({...r5.p,ve:6},'uidT'),/no existe en este reino|no se podía/,'en la 6 no se vende');
 });
 
 const ponCercaG=(G,type,x0,y0)=>{for(let r=0;r<400;r+=6)for(let a=0;a<6.283;a+=0.35){const t=G.colocar(type,Math.round(x0+Math.cos(a)*r),Math.round(y0+Math.sin(a)*r));if(t)return t;}return null;};
