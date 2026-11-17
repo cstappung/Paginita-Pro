@@ -75,7 +75,7 @@
   }
   function moverNodo(n, x, y) { sacarNodo(n); ponerNodo(n, x, y); }
   function moverPoi(p, x, y) {
-    const st = G().poiState(p), suelto = p.kind === 'camp' && st && st.d; // un campamento derrotado ya no bloquea (W.poiFree)
+    const st = G().poiState(p), suelto = (p.kind === 'camp' && st && st.d) || !!D.POI[p.kind].dungeon; // un campamento derrotado ya no bloquea (W.poiFree); la entrada de una mazmorra se pisa (pk-62)
     for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) {
       const k = W.idx(p.x + i, p.y + j);
       if (W.poiAt[k] === p.id) W.poiAt[k] = -1;
@@ -84,6 +84,22 @@
     p.x = x; p.y = y;
     for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) { const k = W.idx(x + i, y + j); W.poiAt[k] = p.id; if (!suelto) W.block[k] = 3; }
     if (st && st.f) W.reveal(x + p.w / 2, y + p.h / 2, Math.max(p.w, p.h) + 1); // si ya lo conocías, lo sigues viendo
+  }
+  // pk-62: bajo tierra, sin casilla en el mapa; W.subAt la encuentra cuando se explora la casilla de arriba
+  function hundir(p, at) {
+    const k = W.idx(p.x, p.y);
+    if (W.poiAt[k] === p.id) W.poiAt[k] = -1;
+    if (W.block[k] === 3) W.block[k] = 0;
+    p.x = at[0]; p.y = at[1]; p.sub = true;
+    W.subAt.set(W.idx(p.x, p.y), p.id);
+  }
+  // una mazmorra que se muda (o se hunde) bajo tierra ya explorada se descubre ahí mismo, sin un aviso por cada una
+  function hallar(p, at) {
+    if (!D.POI[p.kind].dungeon || !W.fog[W.idx(at[0], at[1])]) return 0;
+    const st = G().poiState(p);
+    if (st && st.f) return 0;
+    G().discoverPoi(p, true);
+    return 1;
   }
   const poiEnTierras = p => { for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) if (mio(p.x + i, p.y + j)) return true; return false; };
 
@@ -115,14 +131,25 @@
     let n = 0, tuyo = false;
     if (PK.Campana && PK.Campana.revisarLugar && PK.Campana.revisarLugar()) n++; // pk-55: el lugar del capítulo, también
     if (g.revisarPuestos) g.revisarPuestos(); // pk-55: tus campamentos que quedaron en tierra de otro
+    let halladas = 0;
     for (let id = 0; id < W.ORIG.p.length; id++) {
-      const p = W.pois[id], to = ub.p[id] || W.ORIG.p[id];
-      if (!p || (p.x === to[0] && p.y === to[1])) continue;
+      const p = W.pois[id];
+      if (!p) continue;
+      if (ub.sub[id]) { // pk-62: una mazmorra sin lugar afuera queda bajo tierra (se entra desde el Cuartel)
+        if (!p.sub) { if (poiEnTierras(p)) tuyo = true; hundir(p, W.ORIG.p[id]); n++; }
+        halladas += hallar(p, W.ORIG.p[id]);
+        continue;
+      }
+      const to = ub.p[id] || W.ORIG.p[id], salia = !!p.sub;
+      if (!salia && p.x === to[0] && p.y === to[1]) continue;
       const dest = poiCabe(p, to[0], to[1]) ? to : lugarPoi(Object.assign({}, p, { x: to[0], y: to[1] }));
-      if (!dest || (dest[0] === p.x && dest[1] === p.y)) continue;
-      if (poiEnTierras(p)) tuyo = true;
+      if (!dest || (!salia && dest[0] === p.x && dest[1] === p.y)) continue;
+      if (!salia && poiEnTierras(p)) tuyo = true;
+      if (salia) { p.sub = false; W.subAt.delete(W.idx(p.x, p.y)); }
       moverPoi(p, dest[0], dest[1]); n++;
+      halladas += hallar(p, dest);
     }
+    if (halladas && !g.offline && !Dz.cargando) toast(halladas === 1 ? 'Apareció la entrada de una mazmorra en tierra ya explorada: está en Expediciones.' : 'Aparecieron ' + halladas + ' entradas de mazmorra en tierra ya explorada: están en Expediciones.', 'quest');
     for (let id = 0; id < W.ORIG.n.length; id++) {
       const o = W.nodes[id];
       if (!o || o.gone || o.temp || o.planta || W.QUEDAN[o.kind]) continue;

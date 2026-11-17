@@ -334,10 +334,11 @@ test('H4: mazmorras, enemigos y estructuras nuevas', () => {
     for (const e in d.enemy) assert.ok(D.ENEMY[e], k + ' pelea contra ' + e);
     assert.ok(W.pois.filter(p => p.kind === k).length >= 5, k + ' está en el mapa');
   }
-  // el Templo Hundido, siempre junto a un lago
+  // el Templo Hundido, siempre junto a un lago (medido con la huella con la que se ubicó: desde pk-62 queda la entrada)
   for (const p of W.pois.filter(o => o.kind === 'temple')) {
     let agua = false;
-    for (let j = -3; j <= p.h + 3 && !agua; j++) for (let i = -3; i <= p.w + 3; i++) if (W.inb(p.x + i, p.y + j) && W.terrain[W.idx(p.x + i, p.y + j)] === 4) { agua = true; break; }
+    const T = D.POI.temple;
+    for (let j = -3; j <= T.h + 3 && !agua; j++) for (let i = -3; i <= T.w + 3; i++) if (W.inb(p.x + i, p.y + j) && W.terrain[W.idx(p.x + i, p.y + j)] === 4) { agua = true; break; }
     assert.ok(agua, 'templo en ' + p.x + ',' + p.y);
   }
   // cada enemigo nuevo tiene al menos dos respuestas buenas entre las tropas
@@ -1488,4 +1489,41 @@ test('pk-61: las cantidades grandes no pierden ceros (reporte: 220K se veía 22K
   assert.equal(U.fmt(1500000), '1.5M');
   assert.equal(U.fmt(300000000), '300M');
   assert.equal(U.fmt(9999), '9999');
+});
+
+test('pk-62: de cada mazmorra queda la entrada (1 casilla que se pisa), las mudadas a 6 de toda otra, y las que no caben, bajo tierra', () => {
+  W.generate(D.SEED);
+  const mz = W.pois.filter(p => D.POI[p.kind].dungeon);
+  assert.ok(mz.length > 150);
+  for (const p of mz) {
+    assert.ok(p.w === 1 && p.h === 1, p.kind + ' de una casilla');
+    const k = W.idx(p.x, p.y);
+    assert.equal(W.poiAt[k], p.id);
+    assert.equal(W.block[k], 0, 'la entrada se pisa');
+  }
+  // nada más del mapa queda marcado por una mazmorra (la huella vieja volvió a ser libre)
+  let marcas = 0;
+  for (let k = 0; k < W.W * W.H; k++) if (W.poiAt[k] >= 0 && D.POI[W.pois[W.poiAt[k]].kind].dungeon) marcas++;
+  assert.equal(marcas, mz.length);
+  assert.deepEqual(W.ORIG.p.filter((o, id) => D.POI[W.pois[id].kind].dungeon).length, mz.length);
+  const ub = W.ubicarLugares(), ids = mz.map(p => p.id);
+  const pos = id => ub.p[id] || W.ORIG.p[id];
+  const mudadas = ids.filter(id => ub.p[id]), hundidas = ids.filter(id => ub.sub[id]);
+  assert.ok(mudadas.length > 0, 'algunas se mudan');
+  for (const id of mudadas) {
+    const [x, y] = pos(id);
+    assert.ok(PK.U.dist(x, y, W.ORIG.p[id][0], W.ORIG.p[id][1]) <= 32.01, 'cerca de donde estaba');
+    for (const o of ids) {
+      if (o === id || ub.sub[o]) continue;
+      const [x2, y2] = pos(o);
+      assert.ok(Math.max(Math.abs(x - x2), Math.abs(y - y2)) >= 6, 'mazmorra ' + id + ' a menos de 6 de ' + o);
+    }
+  }
+  for (const id of hundidas) { assert.ok(!ub.p[id]); assert.ok(!ub.ocupa[W.idx(W.ORIG.p[id][0], W.ORIG.p[id][1])], 'bajo tierra no ocupa casilla'); } // lo mudado nunca cae en territorio
+  // se dibujan con su propio dibujo de una casilla, y solo cuando las encontraste
+  assert.match(JS('sprites.js'), /if \(def\.dungeon\) return \(BCACHE\[key\] = isoSprite\(1, 1, ETOP\[kind\]/);
+  const pent = JS('sprites.js').split('const PENT = {')[1].split('\n  };')[0];
+  for (const k of Object.keys(D.POI).filter(k => D.POI[k].dungeon)) assert.match(pent, new RegExp('\\n    ' + k + '\\(p\\) \\{'), k + ' tiene entrada');
+  assert.match(JS('render.js'), /R\.poiVisible = function/);
+  assert.match(JS('game.js'), /W\.subAt\.get\(i\)/);
 });

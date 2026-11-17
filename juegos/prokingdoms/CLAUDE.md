@@ -462,6 +462,23 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Pilot**: switches a camp's fixed `extrae` to a needed resource when the old one has weight 0; a full camp no
   longer counts as «covering» nodes (`lugarPara`); buys marble/ore/gems the meta needs when nobody can gather them.
 
+### Dungeons show only their entrance (`pk-62`, owner's request)
+
+- **A dungeon is a 1×1 entrance you can walk on** (`W.block` 0, `W.poiAt` set so nothing is built on it). The
+  generator still places them with their old 2×2/3×3 footprint (so its random sequence and the POI fixture do not
+  change) and shrinks them at the end of `W.generate`, before `W.ORIG`, giving the rest of the footprint back as
+  grass. Their drawing is `PENT` in `sprites.js` (`S.poi` picks it when `D.POI[kind].dungeon`); `PDRAW` keeps the
+  big drawings, unused for dungeons. Anything placed "around" a dungeon must use `p.w`/`p.h`, never `D.POI` sizes.
+- **Moved entrances keep apart**: `W.ubicarLugares` puts a moved dungeon at ≥`MZ_SEP` (6, Chebyshev) from every
+  other entrance and within `MZ_R` (32) of its original spot, at `W.LEJOS` or nothing. One with no such spot goes in
+  `out.sub` («bajo tierra»): `despeje.js` takes it off the map (`p.sub`, position back to `W.ORIG`, `W.subAt` maps
+  that tile to it) and it is still entered from the Cuartel. It comes back when the territory no longer covers it.
+- **An entrance appears only once found** (`R.poiVisible`: drawing, picking and minimap). Revealing a tile finds an
+  underground one through `W.subAt` (`G.revealAt`); one that moves or sinks under already explored land is found on
+  the spot with one summary toast (`G.discoverPoi(p, true)`, `hallar` in `despeje.js`).
+- No `D.PROTO` bump: the server only uses `W.ubicarLugares` for the Calzada's `ocupa`. Until `firebase deploy --only
+  functions`, the deployed server still treats the old footprints as occupied (a Calzada tile there is refused).
+
 ## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, `js/cintas.js`, `PK.Cintas`)
 
 - **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,

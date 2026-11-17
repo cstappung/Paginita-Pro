@@ -814,12 +814,13 @@
   G.poiTier = p => D.poiTier(U.dist(p.x + p.w / 2, p.y + p.h / 2, D.PLAYER_HOME[0], D.PLAYER_HOME[1]));
   G.explorePct = () => W.fogCount / (W.W * W.H);
 
+  G.discoverPoi = discoverPoi;
   G.revealAt = function (x, y, r, ok) {
     const idx = W.reveal(x, y, r, ok);
     if (!idx.length) return;
     G.stat('explored', idx.length);
     for (const i of idx) {
-      const pid = W.poiAt[i];
+      const pid = W.poiAt[i] >= 0 ? W.poiAt[i] : W.subAt.size ? W.subAt.get(i) : undefined; // pk-62: o una mazmorra bajo tierra
       if (pid >= 0) discoverPoi(W.pois[pid]);
     }
     for (const bot of D.BOTS) {
@@ -832,12 +833,13 @@
     }
   };
 
-  function discoverPoi(p) {
+  function discoverPoi(p, callado) {
     const st = S.pois[p.id] || (S.pois[p.id] = {});
     if (st.f) return;
     st.f = 1;
     const tier = G.poiTier(p), name = D.POI[p.kind].name;
     G.stat('pois_found', 1);
+    if (callado && D.POI[p.kind].dungeon) { G.stat('dungeons_found', 1); return; } // pk-62: el despeje junta los avisos
     if (p.kind === 'chest') {
       const r = D.chestReward(tier);
       G.give(r); st.d = 1; G.stat('chests', 1);
