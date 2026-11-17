@@ -390,7 +390,7 @@ function sync(p, b) {
   });
   ensureTerr(w);
   // la diplomacia solo viaja cuando cambió su versión (S6: el sync no crece)
-  const cz = calzadas(w), autopistas = !p.mar && +b.apv !== cz.v ? { v: cz.v, t: cz.t } : undefined; // L5
+  const cz = calzadas(w), autopistas = !p.mar && +b.apv !== cz.v ? { v: cz.v, t: cz.t, d: cz.d || {} } : undefined; // L5
   const diplo = vEra(p) >= DP.era ? (diploDe(p).v === +b.dv ? undefined : diploInfo(p)) : undefined;
   return { now: t, ver: w.ver, players, prices: market().p, inbox: p.inbox, pase: b.pase ? paseInfo(p) : undefined, incoming: incomingFor(p), saqueo: saqueoInfo(p), diplo, caravanas: p.caravanas && p.caravanas.length ? caravanasInfo(p) : undefined, titulo: tituloDe(p) || undefined, guild: guildSummary(p), tv: w.tv, autopistas, cv: (ciudDe(w), w.cv || 0), ciud: !p.mar && +b.cv !== (w.cv || 0) ? ciudInfo(w) : undefined, dv2: w.dv2 || 0, diario: !p.mar && +b.dv2 !== (w.dv2 || 0) ? w.diario || [] : undefined, asv: w.asv || 0, asedios: !p.mar && +b.asv !== (w.asv || 0) ? asediosDe(w) : undefined, terr: +b.tv === w.tv || p.mar ? undefined : w.terr,
     wchat: w.chat.filter(m => m.at > wsince).slice(-30) };
@@ -442,9 +442,13 @@ function autopista(p, b) {
   const tope = A.porDia(vEra(p)), lista = x => (Array.isArray(x) ? x.slice(0, A.lote).map(k => Math.floor(+k)) : []);
   let total = Object.keys(doc.t).length, malas = 0, topadas = 0;
   const aceptadas = [], quitadas = [];
+  // pk-78: la regla mira dónde quedaron los lugares con la capa de hoy (uno que una Calzada pisa se muda) y deja ir sobre
+  // un campamento o una mazmorra que el jugador dice haber vencido (b.venc: lo que pasa dentro de cada reino es suyo)
+  const ub = W.ubicarLugares(w.terr, k => doc.t[k] > 0, doc.v);
+  const venc = new Set(lista(b.venc).filter(id => W.pois[id] && W.PISABLE(W.pois[id].kind)));
   for (const k of lista(b.add)) {
     if (doc.t[k]) continue;
-    if (!W.calzadaPuede(k, p.slot, w.terr)) { malas++; continue; }
+    if (!W.calzadaPuede(k, p.slot, w.terr, ub, venc)) { malas++; continue; }
     if (p.apDia.n >= tope || total >= A.totalMundo) { topadas++; continue; }
     doc.t[k] = me1; p.apDia.n++; total++; aceptadas.push(k);
   }
@@ -453,11 +457,28 @@ function autopista(p, b) {
     if (!o) continue;
     if (o !== me1 && w.terr[W.parcel(k % D.MAP, Math.floor(k / D.MAP))] !== me1) { malas++; continue; } // la de otro, solo en tu tierra
     delete doc.t[k]; quitadas.push(k);
+    if (doc.d) delete doc.d[k]; // pk-78: su decoración se va con ella
+  }
+  // pk-78: decoraciones, solo sobre tu Calzada (b.deco = { casilla: tipo, o 0 para quitarla }), con un tope por jugador
+  let decos = 0;
+  if (b.deco && typeof b.deco === 'object') {
+    doc.d = doc.d || {};
+    let mias = 0;
+    for (const ks in doc.d) if (doc.t[ks] === me1) mias++;
+    for (const ks of Object.keys(b.deco).slice(0, A.lote)) {
+      const k = Math.floor(+ks), tipo = Math.floor(+b.deco[ks]) || 0;
+      if (!(k >= 0) || doc.t[k] !== me1) { malas++; continue; }
+      if (!tipo) { if (doc.d[k]) { delete doc.d[k]; mias--; decos++; } continue; }
+      if (!D.AUTOPISTA.decos[tipo - 1]) { malas++; continue; }
+      if (!doc.d[k] && mias >= D.AUTOPISTA.decoMax) { topadas++; continue; }
+      if (!doc.d[k]) mias++;
+      doc.d[k] = tipo; decos++;
+    }
   }
   if (malas) suspect(p, 'autopista', { malas, aceptadas: aceptadas.length });
-  if (aceptadas.length || quitadas.length) { doc.v++; store.touch('autopistas'); }
+  if (aceptadas.length || quitadas.length || decos) { doc.v++; store.touch('autopistas'); }
   store.touch('players');
-  return { ok: true, aceptadas, quitadas, topadas, hoy: p.apDia.n, tope, autopistas: { v: doc.v, t: doc.t } };
+  return { ok: true, aceptadas, quitadas, topadas, decos, hoy: p.apDia.n, tope, autopistas: { v: doc.v, t: doc.t, d: doc.d || {} } };
 }
 
 // ---------- Mercado global ----------

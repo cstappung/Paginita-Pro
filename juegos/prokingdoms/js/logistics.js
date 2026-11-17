@@ -361,6 +361,49 @@
     }
     return v;
   };
+  // pk-78 (reporte del dueño: «si se les atraviesa algo en el camino se quedan paradas»). Las tablas y los caminos
+  // guardados solo se rehacen cuando sube una versión del mapa; un árbol que vuelve a crecer (W.regrow), un nodo de un
+  // evento o algo que no avisa tapaba una casilla sin que se enteraran: la carreta chocaba, pedía camino, recibía el
+  // mismo y quedaba parada para siempre. L.tapar marca la casilla en todas las tablas y olvida los caminos que la
+  // usan; L.vigilar (cada segundo, desde unstick) despierta a la que lleva rato sin avanzar.
+  L.tapar = function (k) {
+    for (const p in tablas) tablas[p].costo[k] = Infinity;
+    for (const [key, e] of caminos) if (e.path.some(c => W.idx(c[0], c[1]) === k)) caminos.delete(key);
+  };
+  L.destapar = function (k) {
+    for (const p in tablas) if (pasa(p, k)) tablas[p].costo[k] = 1 / L.factor(p, k);
+  };
+  W.onBloqueo = k => L.tapar(k);
+  W.onDesbloqueo = k => L.destapar(k);
+  let rehechoT = 0;
+  function desatascar(u) {
+    const perfil = L.PERFIL_DE[u.kind] || 'carreta', ahora = Date.now();
+    if (ahora - rehechoT > 4000) { rehechoT = ahora; for (const p in tablas) tablas[p].ver = ''; } // se rehacen desde lo que hay de verdad
+    if (u.job) for (const key of Array.from(caminos.keys())) { const [a, b] = key.split(':')[0].split('>'); if (+a === u.job.from || +b === u.job.from || +a === u.job.to || +b === u.job.to) caminos.delete(key); }
+    // parada sobre algo que no deja pasar (una cinta, un edificio nuevo, una muralla): a la casilla libre más cercana
+    const x0 = Math.floor(u.x), y0 = Math.floor(u.y);
+    if (W.inb(x0, y0) && !pasa(perfil, W.idx(x0, y0))) {
+      let mejor = null, md = Infinity;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const x = x0 + dx, y = y0 + dy;
+        if (!W.inb(x, y) || !pasa(perfil, W.idx(x, y))) continue;
+        const d = dx * dx + dy * dy;
+        if (d < md) { md = d; mejor = [x, y]; }
+      }
+      if (mejor) { u.x = mejor[0] + 0.5; u.y = mejor[1] + 0.5; }
+    }
+    u.path = []; u.pchk = -1; u.wait = 0;
+  }
+  L.vigilar = function (u, el) {
+    if (u.vgX === undefined || Math.abs(u.x - u.vgX) + Math.abs(u.y - u.vgY) > 0.5) { u.vgX = u.x; u.vgY = u.y; u.vgT = 0; return; }
+    // quieta a propósito: cargando, descargando o esperando carga junto a un edificio
+    if (!u.path.length && !u.sinCamino) { u.vgT = 0; return; }
+    u.vgT = (u.vgT || 0) + el;
+    if (u.vgT < 5) return;
+    u.vgT = 0;
+    desatascar(u);
+  };
+  L.desatascar = desatascar;
   const velocidad = perfil => (perfil === 'carreta' ? D.CART.speed * (1 + L.cartSpeed()) : perfil === 'carromato' ? D.CARROMATO.speed * (1 + L.carroSpeed()) : perfil === 'barcaza' ? (D.BARCAZA ? D.BARCAZA.speed : 1.5) * L.marMult() : 1.3);
   L.velocidad = velocidad;
   // Pone a la unidad en camino hacia un edificio: por el camino guardado si está junto a su comienzo, o con uno de una
@@ -846,7 +889,9 @@
     const llego = u.kind === 'barcaza' ? (pt => !!pt && U.dist(u.x, u.y, pt[0] + 0.5, pt[1] + 0.5) < 1.9)(L.atracadero(tgt)) : Un.nearRect(u, tgt.x, tgt.y, tgt.x + tgt.w - 1, tgt.y + tgt.h - 1, 1.2);
     if (!llego) {
       u.estado = lleva ? 'Lleva ' + nombresCarga(L.cargaDe(u)) + ' a ' + to.def.name : 'Va a cargar a ' + from.def.name;
+      u.sinCamino = false;
       if (!ir(u, desde, tgt)) {
+        u.sinCamino = true; // pk-78: L.vigilar rehace las tablas si sigue así
         if (L.comodin(lleva ? r.a : r.de)) { if (lleva) u.rA = null; else { u.rExcl = from.id; u.rExclT = G().ahora() + 60; u.rDe = null; } } // pk-54: probar con otro
         u.estado = 'Sin camino hasta ' + tgt.def.name + (u.kind === 'barcaza' ? ' (necesita agua libre cerca de los dos muelles)' : u.kind === 'carromato' ? ' (los carromatos solo cruzan tu muralla por un Gran Portón, y no cruzan cintas)' : ' (las carretas no salen de tu territorio ni cruzan cintas)'); u.mode = 'idle'; u.wait = 4; }
       return;

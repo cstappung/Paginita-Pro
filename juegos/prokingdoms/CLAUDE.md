@@ -374,7 +374,8 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   (`Sp.calzada`: slabs, curb where it ends, a milestone with the owner's colour every 8 tiles on the edge). In the
   cost tables (`L.factor`): carromato `D.CARROMATO.highway` 3.2, carreta ≥ `D.AUTOPISTA.carreta` 2.2, walkers ≥ 1.5.
 - **One rule, both sides:** `W.calzadaPuede(k, slot, terr)` (world.js, pure): not water, common zones, foreign land or
-  a place/resource at its `W.ubicarLugares` position (`.ocupa`, non-enumerable). Buildings are checked only by the
+  a place/resource at its `W.ubicarLugares` position (`.ocupa`, non-enumerable). pk-78 changed it (common zones and
+  beaten places allowed): see «Owner's requests, third round». Buildings are checked only by the
   client (`Cz.libre`). Trees and bushes under it are hidden per client (`n.calzada`) and come back when it goes.
 - **Server:** doc `autopistas/<world>` = `{ v, t: { tile: slot + 1 } }`; `POST /api/autopista { add, del }` (both
   `server/index.js` and `functions/index.js`) trims to the rule, `D.AUTOPISTA.porDia(era)` (60 × era per UTC day,
@@ -780,3 +781,41 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   store port does not emit while `S.res[r] < pila`; offline flow is keyed by `res` or `res|b` (from a store), so the
   pk-70 margin and the per-source discount never mix camps and stores.
 
+
+### Owner's requests, third round (`pk-78`)
+
+- **Stuck vehicles:** cost tables and cached paths only rebuild on a version bump; a tree regrowing (`W.regrow`), an
+  event node or anything else that sets `W.block` without bumping left a cart re-asking the same blocked path forever.
+  `W.onBloqueo(k)` / `W.onDesbloqueo(k)` (world.js, life.js) → `L.tapar` / `L.destapar` patch every table and drop the
+  cached paths through `k`; `step()` calls `L.tapar` when a cart hits a blocked tile, and `L.vigilar` (from `unstick`,
+  every second) rebuilds tables, drops the route's paths and snaps the cart to a passable tile after 5 s without
+  progress while it has a path or `u.sinCamino`. Anything new that blocks a tile silently must call `W.onBloqueo`.
+- **Dismissing villagers** (`G.despedir`, `UI.confirmDespedir`; villager panel and «Despedir ociosos…» in Aldeanos):
+  cargo goes to the town (`G.give`), nothing of the cost comes back.
+- **Calzada Real rule** (`W.calzadaPuede(k, slot, terr, ub, venc)`, client and server): common zones are allowed;
+  `ocupa` is an `Int32Array` (`-1` resource, `id + 1` POI), so minerals are refused and a camp or dungeon is allowed
+  when its id is in `venc`. The server trusts `b.venc` (in-kingdom state is the client's) but only for `W.PISABLE`
+  kinds. `ub` must be `W.ubicarLugares(terr, ap, apv)` with the Calzada layer (`ap(k)`); pass it once per batch.
+- **What you beat disappears for you** (`G.poiVencido`: camp with `d`, dungeon with `best >= floors`; checked in
+  `R.poiVisible`). Dungeons are still repeated from the Cuartel.
+- **A POI a Calzada covers moves for everyone**: `W.ubicarLugares(terr, ap, apv)` runs a second pass (cache keyed by
+  terr + covered POI ids + `apv`) where covered camps/dungeons are forced to move to the nearest free spot ≥ 2 from any
+  territory within `MZ_R` (`cerca`), never onto Calzada tiles; with no covered POI it returns the plain cached result
+  (same object). `Dz.revisar` reruns on `terrVer:apVer:moverVer`.
+- **Owner colour:** slabs are tinted with `Sp.ownerColor(D.ownerOfSlot(o - 1))` and the curb also marks where another
+  realm's Calzada starts (mask compares owners).
+- **Decorations** (`D.AUTOPISTA.decos`, index + 1 is what is stored, never reorder; `decoMax` 300): only on your own
+  Calzada tiles, drawn in the depth list (`Cz.collect`, `k: 'deco'`, skipped by `R.pick`), lamps glow at night
+  (`Cz.luces` in `dibujarClima`). Online in the same doc (`autopistas.d`, `b.deco` in `POST /api/autopista`); local in
+  `st.calzada.d`. Removing a tile removes its decoration; replacing or removing refunds half.
+- **Moving map resources** (`Dz.planMover` / `Dz.mover`, tool `mrecurso`, node panel «Mover (monedas)…»):
+  `D.moverRecursoCosto(dist)` kingdom coins per resource (1 every 3 tiles), groups up to `D.MOVER_RECURSO.max` keep
+  their shape. Saved per node id in `st.despeje.mover` (planted trees update `plantas`); `Dz.revisar` puts them there
+  instead of the `W.ubicarLugares` spot (trees too), and drops an override that ended up in foreign land. Client only:
+  the server's `ocupa` still has the old spot (a Calzada there is refused and refunded).
+- **Roads menu** (`js/ui/caminos.js`, `#caminobar`, key J, menu «Caminos», Logística «Caminos…»): tools in
+  `PK.Input.HERR_CAMINO` (`road`, `calzada`, `czdeco` with `L.decoTipo` (0 = remove), `qcamino` two-corner removal,
+  `mrecurso`). Same CSS pattern as `#cintabar`.
+- **Server:** no `D.PROTO` bump. Until `firebase deploy --only functions`, the deployed server refuses Calzada on common
+  zones and beaten places (refunded, and logged as `autopista` suspects) and does not keep decorations
+  (`autopistas.d` missing → «falta actualizarlo»).

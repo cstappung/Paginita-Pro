@@ -82,7 +82,7 @@
   }
 
   // L5: agregar o quitar casillas de Calzada Real (el servidor valida, recorta y devuelve la capa entera)
-  Net.autopista = (add, del) => api('POST', '/api/autopista', { add, del }, 8000);
+  Net.autopista = (add, del, extra) => api('POST', '/api/autopista', Object.assign({ add, del }, extra || {}), 8000); // pk-78: extra = { venc, deco }
   Net.marketOp = function (op) { if (Net.online) marketOps.push(op); };
 
   // ---------- Foto del reino ----------

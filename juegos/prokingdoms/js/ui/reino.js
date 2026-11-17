@@ -446,8 +446,8 @@
         el('div', null, el('b', null, 'Talleres lejos de un almacén: '), far.length + ' de ' + shops.length),
         el('div', null, el('b', null, 'Cintas: '), Object.keys((st.logi.red && st.logi.red.t) || {}).length + ' casillas')));
       body.append(el('div', { class: 'row' },
-        UI.btn('Trazar camino', () => { UI.closeModal(); PK.Logi.tool = 'road'; PK.Input.cancelTool && (PK.Input.roadStart = null); UI.refreshPanel(true); }, { cls: 'gold' }),
-        g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Logi.tool = 'calzada'; PK.Input.roadStart = null; UI.refreshPanel(true); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
+        UI.btn('Caminos…', () => { UI.closeModal(); PK.Input.abrirCaminos('road'); }, { cls: 'gold', title: 'Abre el menú de caminos (J): camino, Calzada Real, decoraciones, quitar y mover recursos' }),
+        g.enMar && g.enMar() ? '' : UI.btn('Trazar Calzada Real', () => { UI.closeModal(); PK.Input.abrirCaminos('calzada'); }, { title: 'Franja de piedra de 2 casillas que usan todos los reinos: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5' }),
         UI.btn('Quitar caminos', () => PK.Despeje.empezar('quitar'), { title: 'Marca una zona y se quitan sus caminos, murallas y Calzada Real (la tuya, o la de otro en tu tierra); vuelve la mitad del material' }),
         UI.btn('Cintas…', () => { UI.closeModal(); PK.Input.abrirCintas(); }, { disabled: !L.beltUnlocked(), title: L.beltUnlocked() ? 'Abre el menú de cintas (K): trazar, pasos elevados, unidores, divisores, clasificadores, mejorar y copiar' : L.beltLockText() }),
         Object.keys((st.logi.red && st.logi.red.t) || {}).length ? UI.btn(PK.Cintas.verFlujo ? 'Ocultar flujo' : 'Ver flujo', () => { PK.Cintas.verFlujo = !PK.Cintas.verFlujo; UI.closeModal(); UI.refreshPanel(true); }, { title: 'Colorea cada pieza: gris vacía, verde corre con lugar, amarillo a tope, rojo atascada o frenada por una pieza de menos nivel' }) : ''));

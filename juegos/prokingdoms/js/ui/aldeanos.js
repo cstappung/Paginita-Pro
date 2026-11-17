@@ -97,7 +97,9 @@
       body.append(el('div', { class: 'war-top' },
         el('div', null, el('b', null, all + ' aldeanos'), el('span', { class: 'small' }, ' · ' + (jc.idle || 0) + ' ociosos' + (held ? ' (' + held + ' quietos a propósito)' : '') + ' · población ' + G().pop() + '/' + G().popCap())),
         el('div', { class: 'row' }, (jc.idle || 0) ? UI.btn('Repartir ociosos ahora', () => { A.freeIdle(); UI.rerender(); }, { small: true, cls: 'gold', title: 'El Capataz les da trabajo según tus prioridades' }) : null,
-          UI.btn('Entrenar en ' + D.elB('tc'), () => { const tc = G().buildings.find(b => b.owner === 'p' && b.type === 'tc' && b.done); if (tc) { UI.closeModal(); UI.selectBuilding(tc); } }, { small: true }))));
+          UI.btn('Entrenar en ' + D.elB('tc'), () => { const tc = G().buildings.find(b => b.owner === 'p' && b.type === 'tc' && b.done); if (tc) { UI.closeModal(); UI.selectBuilding(tc); } }, { small: true }),
+          // pk-78: despedir a los que no hacen nada (los quietos a propósito primero, después los ociosos)
+          (jc.idle || 0) || held ? UI.btn('Despedir ociosos…', () => { const qs = A.villagers().filter(u => !u.task && !u.inside); UI.closeModal(); UI.confirmDespedir(qs); }, { small: true, cls: 'danger', title: 'Quitar del reino a los aldeanos que no tienen trabajo' }) : null)));
       body.append(el('h3', null, 'Trabajos'), el('p', { class: 'small muted' }, '+ suma un ocioso (o uno del trabajo con más gente) y lo manda al lugar más conveniente. − deja uno quieto, sin trabajo, hasta que le des otra cosa.'));
       const rows = el('div', { class: 'job-rows' });
       for (const id in A.JOBS) {

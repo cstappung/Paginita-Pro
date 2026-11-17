@@ -114,7 +114,12 @@
         u.pchk = u.path.length;
       }
       const [tx, ty] = u.path[0];
-      if (!walkable(tx, ty)) { u.path = []; return; } // el camino quedó bloqueado; la tarea pedirá otro
+      if (!walkable(tx, ty)) { // el camino quedó bloqueado; la tarea pedirá otro
+        // pk-78: una carreta pide su camino a una tabla guardada; si nadie le avisó que esa casilla se tapó (un árbol que
+        // volvió a crecer, algo de otro reino), recalculaba el mismo camino bloqueado y quedaba parada para siempre
+        if (carro && PK.Logi.tapar) PK.Logi.tapar(W.idx(tx, ty));
+        u.path = []; return;
+      }
       const cx = tx + 0.5 + (u.path.length === 1 ? u.ox || 0 : 0), cy = ty + 0.5 + (u.path.length === 1 ? u.oy || 0 : 0);
       const dx = cx - u.x, dy = cy - u.y, d = Math.hypot(dx, dy);
       face(u, cx, cy);
@@ -502,7 +507,7 @@
     const el = u.stT;
     u.stT = 0;
     if (!walkable(Math.floor(u.x), Math.floor(u.y))) { rescue(u, homeRegions(u.owner), true); return; }
-    if (u.kind === 'cart' || u.kind === 'carromato') return; // las carretas tienen su propia lógica de caminos
+    if (u.kind === 'cart' || u.kind === 'carromato') { if (u.owner === 'p' && PK.Logi.vigilar) PK.Logi.vigilar(u, el); return; } // las carretas tienen su propia lógica de caminos
     if (u.stX === undefined || Math.abs(u.x - u.stX) + Math.abs(u.y - u.stY) > 0.6 || u.mode === 'work') {
       u.stX = u.x; u.stY = u.y; u.stS = 0; return;
     }

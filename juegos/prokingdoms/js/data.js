@@ -915,6 +915,21 @@
   // tierra de nadie o en su territorio y que ven todos los del mundo. El servidor la valida con world.js
   // (W.calzadaPuede) y con estos topes: casillas por día UTC y por jugador, y un total por mundo.
   D.AUTOPISTA = { nombre: 'Calzada Real', costo: era => (era >= 3 ? { blocks: 4 } : { stone: 10, wood: 2 }), porDia: era => 60 * era, totalMundo: 6000, carreta: 2.2, aldeano: 1.5, lote: 400 };
+  // pk-78: decoraciones de la Calzada Real (pedido del dueño). Van sobre una casilla de tu Calzada, no estorban el paso
+  // y las ven todos; el servidor guarda el tipo (índice + 1) y aplica decoMax por jugador. El orden no cambia nunca: el
+  // índice es lo que se guarda.
+  D.AUTOPISTA.decos = [
+    { id: 'farol', name: 'Farol', era: 1, cost: { stone: 4, gold: 6 }, desc: 'Un poste con su farol: de noche alumbra la calzada.' },
+    { id: 'estandarte', name: 'Estandarte', era: 1, cost: { wood: 10, gold: 10 }, desc: 'Un mástil con la bandera de tu reino.' },
+    { id: 'seto', name: 'Seto en maceta', era: 1, cost: { stone: 6, food: 10 }, desc: 'Un arbusto recortado en una maceta de piedra.' },
+    { id: 'banco', name: 'Banco', era: 1, cost: { wood: 12 }, desc: 'Para que descansen los viajeros.' },
+    { id: 'estatua', name: 'Estatua', era: 2, cost: { stone: 30, gold: 20 }, desc: 'Un caballero de piedra sobre su pedestal.' },
+    { id: 'fuente', name: 'Fuente', era: 2, cost: { stone: 40, gold: 30 }, desc: 'Una fuente de piedra con agua que corre.' },
+  ];
+  D.AUTOPISTA.decoMax = 300;
+  // pk-78: mover un recurso del mapa cuesta monedas del reino: 1 cada 3 casillas, por cada recurso
+  D.MOVER_RECURSO = { cada: 3, min: 1, max: 40 };
+  D.moverRecursoCosto = dist => Math.max(D.MOVER_RECURSO.min, Math.ceil(dist / D.MOVER_RECURSO.cada));
   D.CARROMATO = { cost: { wood: 150, gold: 10 }, time: 45, speed: 1.6, offRoad: 0.7, road: 1.5, highway: 3.2, ajeno: 4, cap: 250, capLvl: 50 };
   D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
   // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.

@@ -36,7 +36,7 @@
   function libre(x, y) {
     if (!W.inb(x, y)) return false;
     const k = W.idx(x, y);
-    return W.block[k] === 0 && W.terrain[k] !== 4 && W.nodeAt[k] < 0 && W.poiAt[k] < 0 && W.bAt[k] < 0 && !W.wall[k] && !W.road[k] && W.belt[k] < 0 &&
+    return W.block[k] === 0 && W.terrain[k] !== 4 && W.nodeAt[k] < 0 && W.poiAt[k] < 0 && W.bAt[k] < 0 && !W.wall[k] && !W.road[k] && W.belt[k] < 0 && !W.autopista[k] &&
       !W.reserved[k] && W.zoneAt[k] < 0 && W.ownerAt(x, y) === null && !W.terrCommon[W.parcel(x, y)];
   }
   function lugarNodo(x0, y0) {
@@ -117,7 +117,7 @@
       const xx = x + i, yy = y + j;
       if (!W.inb(xx, yy)) return false;
       const k = W.idx(xx, yy);
-      if ((W.poiAt[k] >= 0 && W.poiAt[k] !== p.id) || W.nodeAt[k] >= 0 || W.bAt[k] >= 0 || W.wall[k] || W.road[k] || W.belt[k] >= 0 || W.terrain[k] === 4) return false;
+      if ((W.poiAt[k] >= 0 && W.poiAt[k] !== p.id) || W.nodeAt[k] >= 0 || W.bAt[k] >= 0 || W.wall[k] || W.road[k] || W.belt[k] >= 0 || W.terrain[k] === 4 || W.autopista[k]) return false;
     }
     return true;
   }
@@ -125,9 +125,11 @@
   Dz.revisar = function (forzar) {
     const g = G(), st = S();
     if (!st || !st.despeje || (g.enMar && g.enMar()) || !W.ORIG) return 0;
-    if (!forzar && ver === W.terrVer) return 0;
-    ver = W.terrVer;
-    const ub = W.ubicarLugares();
+    // pk-78: también cuando cambia la Calzada Real (un lugar que pisa se muda) o un recurso que moviste
+    const v = W.terrVer + ':' + (W.apVer || 0) + ':' + Dz.moverVer;
+    if (!forzar && ver === v) return 0;
+    ver = v;
+    const ub = W.ubicarLugares(W.terr, k => W.autopista[k] > 0, W.apVer || 0), mv = movidos(st);
     let n = 0, tuyo = false;
     if (PK.Campana && PK.Campana.revisarLugar && PK.Campana.revisarLugar()) n++; // pk-55: el lugar del capítulo, también
     if (g.revisarPuestos) g.revisarPuestos(); // pk-55: tus campamentos que quedaron en tierra de otro
@@ -152,12 +154,17 @@
     if (halladas && !g.offline && !Dz.cargando) toast(halladas === 1 ? 'Apareció la entrada de una mazmorra en tierra ya explorada: está en Expediciones.' : 'Aparecieron ' + halladas + ' entradas de mazmorra en tierra ya explorada: están en Expediciones.', 'quest');
     for (let id = 0; id < W.ORIG.n.length; id++) {
       const o = W.nodes[id];
-      if (!o || o.gone || o.temp || o.planta || W.QUEDAN[o.kind]) continue;
-      const to = ub.n[id] || W.ORIG.n[id];
+      if (!o || o.gone || o.temp || o.planta) continue;
+      // pk-78: un recurso que moviste va donde lo pusiste (st.despeje.mover), si sigue siendo tierra tuya o de nadie
+      let m = mv[id];
+      if (m && !moverDestinoOk(m[0], m[1])) { delete mv[id]; m = null; }
+      const orig = W.ORIG.n[id];
+      if (W.QUEDAN[o.kind] && !m && o.x === orig[0] && o.y === orig[1]) continue;
+      const to = m || (W.QUEDAN[o.kind] ? orig : ub.n[id] || orig);
       if (o.x === to[0] && o.y === to[1]) continue;
       const dest = nodoCabe(o, to[0], to[1]) ? to : lugarNodo(to[0], to[1]);
       if (!dest || (dest[0] === o.x && dest[1] === o.y)) continue;
-      if (mio(o.x, o.y)) tuyo = true;
+      if (mio(o.x, o.y) && !m && !W.QUEDAN[o.kind]) tuyo = true;
       moverNodo(o, dest[0], dest[1]); n++;
     }
     if (n) {
@@ -294,9 +301,74 @@
     }
   };
 
+  // ---------- Mover recursos (pk-78, pedido del dueño) ----------
+  // Un recurso del mapa (árbol, arbusto, mina, veta, ciervo…) se puede llevar a otra casilla pagando monedas del reino:
+  // D.moverRecursoCosto(distancia) por cada uno (1 cada 3 casillas). Se guarda la casilla nueva por id del recurso
+  // (st.despeje.mover) y Dz.revisar la respeta en vez de la de W.ubicarLugares. Solo en tu partida: los demás siguen
+  // viendo el mapa como siempre, y el servidor no sabe de recursos desde L4.
+  Dz.moverVer = 0;
+  const movidos = st => (st.despeje.mover = st.despeje.mover || {});
+  function moverDestinoOk(x, y) {
+    if (!W.inb(x, y)) return false;
+    const o = W.ownerAt(x, y);
+    return o === null || o === 'p';
+  }
+  // ¿Puede ir un recurso a esa casilla? propios: casillas del mismo grupo, que cuentan como libres
+  Dz.porQueNoMover = function (x, y, propios) {
+    if (!W.inb(x, y)) return 'fuera del mapa';
+    const k = W.idx(x, y), suyo = propios && propios.has(k);
+    if (!W.fog[k]) return 'sin explorar';
+    if (!moverDestinoOk(x, y)) return 'tierra de otro reino';
+    if (W.terrain[k] === 4) return 'agua';
+    if (!suyo && (W.nodeAt[k] >= 0 || W.block[k] !== 0)) return 'ocupada';
+    if (W.poiAt[k] >= 0 || W.bAt[k] >= 0 || W.wall[k] || W.wallOwner[k] || W.road[k] || W.belt[k] >= 0 || W.autopista[k] || W.reserved[k]) return 'ocupada';
+    if (PK.Fort && PK.Fort.cerca(x, y, 1, 1)) return 'junto a una fortaleza';
+    // como al plantar: nunca pegado a un edificio (podía cerrar el patio del Centro Urbano)
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (W.inb(x + i, y + j) && W.bAt[W.idx(x + i, y + j)] >= 0) return 'pegada a un edificio';
+    return null;
+  };
+  Dz.movible = n => !!(n && !n.gone && !n.temp && !n.calzada && (n.id < W.ORIG.n.length || n.planta) && moverDestinoOk(n.x, n.y));
+  Dz.movibles = function (x0, y0, x1, y1) {
+    const out = [];
+    for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+      if (!W.inb(x, y) || !W.fog[W.idx(x, y)]) continue;
+      const id = W.nodeAt[W.idx(x, y)], n = id >= 0 ? W.nodes[id] : null;
+      if (Dz.movible(n)) out.push(n);
+      if (out.length >= D.MOVER_RECURSO.max) return out;
+    }
+    return out;
+  };
+  // El plan de mover el grupo para que el recurso de referencia (ref) quede en (x, y): cada uno con su casilla nueva,
+  // las que no pueden ir y lo que cuesta. El grupo conserva su forma.
+  Dz.planMover = function (nodos, ref, x, y) {
+    const dx = x - ref.x, dy = y - ref.y, propios = new Set(nodos.map(n => W.idx(n.x, n.y)));
+    const dist = Math.hypot(dx, dy), uno = D.moverRecursoCosto(dist);
+    const tiles = nodos.map(n => { const tx = n.x + dx, ty = n.y + dy, why = Dz.porQueNoMover(tx, ty, propios); return { n, x: tx, y: ty, mala: !!why, why }; });
+    const malas = tiles.filter(t => t.mala);
+    return { tiles, malas, dist, uno, costo: (dx || dy) ? uno * nodos.length : 0, ok: !!(dx || dy) && !malas.length };
+  };
+  Dz.mover = function (plan) {
+    if (!plan || !plan.ok) return 0;
+    const st = S(), mv = movidos(st), monedas = plan.costo;
+    if (!PK.Platform.spendCoins(monedas, 'mover-recurso')) { toast('Te faltan monedas del reino (' + monedas + ').', 'warn'); return 0; }
+    for (const t of plan.tiles) sacarNodo(t.n);
+    for (const t of plan.tiles) {
+      const n = t.n;
+      if (n.planta) { const e = st.despeje.plantas.find(o => o[0] === n.x && o[1] === n.y); if (e) { e[0] = t.x; e[1] = t.y; } }
+      else mv[n.id] = [t.x, t.y];
+      ponerNodo(n, t.x, t.y);
+      for (const u of G().units) if (u.task && u.task.node === n.id) u.path = [];
+    }
+    Dz.moverVer++;
+    G().blockVer++;
+    G().stat('recursos_movidos', plan.tiles.length);
+    if (PK.Sfx) PK.Sfx.play('build');
+    return plan.tiles.length;
+  };
+
   // ---------- Cargar ----------
   Dz.init = function (st) {
-    st.despeje = Object.assign({ talados: [], plantas: [] }, st.despeje);
+    st.despeje = Object.assign({ talados: [], plantas: [], mover: {} }, st.despeje);
     const dz = st.despeje;
     if (G().enMar && G().enMar()) return;
     Dz.cargando = true;
@@ -304,6 +376,9 @@
       // L4: las posiciones salen de W.ubicarLugares (Dz.revisar, abajo); las guardadas por partida ya no hacen falta
       delete dz.n; delete dz.p;
       for (const id of dz.talados) { const n = W.nodes[id]; if (n && !n.gone) quitarArbol(n); }
+      // pk-78: los árboles que moviste, a su lugar antes de mirar si quedaron bajo un edificio (el de su lugar original
+      // puede ser uno que construiste después de moverlo)
+      for (const id in movidos(st)) { const n = W.nodes[id], m = dz.mover[id]; if (n && !n.gone && Dz.QUEDAN[n.kind] && nodoCabe(n, m[0], m[1])) moverNodo(n, m[0], m[1]); }
       // un arbusto que vuelve a su lugar y encuentra un edificio encima (se construyó mientras estaba mudado): no va
       for (const n of W.nodes) if (Dz.QUEDAN[n.kind] && !n.gone && !n.temp && W.bAt[W.idx(n.x, n.y)] >= 0) quitarArbol(n);
       const plantas = dz.plantas;
