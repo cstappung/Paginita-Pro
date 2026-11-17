@@ -458,8 +458,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   battles still resolve on arrival.
 - At most 2 campaigns against the same player at once. `incoming` only lists campaigns still marching.
 - Not done from the plan's G3: `guarn` (the defender's real troop mix in stage 3; the cast is still generic).
-- Tests: `node tools/asedio-test.js`. `tools/cheat-test.js` fails one check («la cuenta honesta no aparece en el
-  registro») since the belts branch, before this work; not looked into.
+- Tests: `node tools/asedio-test.js`.
 ### Owner's tweaks, second round (`pk-56`; built as pk-55 in parallel with another pk-55)
 
 - **Roads only on your own land** (`L.roadAllowed` needs `ownerAt === 'p'`; outside goes the Calzada Real).
@@ -637,8 +636,9 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   troop). The ram is ×3 in the defences stage only if the parcel has walls (`asedioOficio(units, muros)`); a siege
   tower in the host takes 5 points off the losses (`plan.torre`).
 - Not measured: the pace with the autopilot before/after (the plan asks comarcas to move it under 5 %).
-- `tools/cheat-test.js`: its one failing check («la cuenta honesta…») is the Calzada Real part of the test (24 of
-  the honest account's tiles are refused as invalid), from before the war plan.
+- `tools/cheat-test.js`: the honest account must only send Calzada Real tiles its client would allow
+  (`W.calzadaPuede`, the test loads the same map as the server): it used to send water from its own land, was
+  logged as a suspect and «la cuenta honesta no aparece en el registro» failed.
 
 ### War plan, G6: fortresses and visible threats (`pk-63`, client only)
 
