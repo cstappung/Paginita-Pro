@@ -241,6 +241,10 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   at most 2: centred they covered the middle of the map.
 - The standalone page has `data-i18n-sin-selector`: the floating language button covered game buttons. In
   landscape (≤500 px tall) menu labels are hidden, otherwise the wide menu slid under `#acciones` and hid «Libro».
+- **Troop pickers on phones** (pk-76): `armyPicker` (conquest, reinforcements, fortress, Ciudadela) shows only units
+  you have at home and `.raid-in` wraps. With the 12 Cuartel units in one row it ran off a 390 px screen, so rams
+  and siege towers could not be chosen. `.modal select` has `max-width: 100%` (the tactic select was 800 px wide).
+  Check new windows at phone width.
 - Fog (`fogPaint`) paints only inside the map diamond: painting outside cut buildings and trees on the edges.
 - **Performance** (`pk-32`, 300 villagers): the villager sprite cache is an LRU `Map` with a per-frame budget; `mine()`
   in `game.js` is cached (never mutate what it returns); one `fillStyle` per figure; while a battle is open the map is
@@ -759,3 +763,20 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   leaves with half a load or whatever there is after 30 s. Town totals do not change. Offline too (`queTraslado`).
 - A store «guarda» a resource only if `capDe(b, k) > 0`: the Almacén accepts food but has no room for it, so a food
   transfer without a Granero is refused (`trasladoMalo`).
+
+### Bug review (`pk-77`, `REVISION-BUGS.md`)
+
+- **A store-to-store cart carries what already counted under the town cap**: it unloads with `Lb.poner(b, k, m, m)`
+  capped at that store's own room (`ponerTraslado`), never `put()` (which measures the town cap). A loaded transfer
+  cart picks its destination by its cargo (`bodegaParaCarga`), never the fixed end.
+- **`D.asedioReplan` returns null for a plan with `fin`** (retreat or surrender ended it). Pending reinforcements are
+  applied before any decision, server (`aplicarRefuerzo` in `sim.js`) and local (`terr.js`), with the condition «they
+  arrived before the end», not «now is before the end». A server decision costs (sally, tactic flag) only after the
+  replan succeeded.
+- **`D.asedioVista` sends the ending only once `estandarte` started or the siege ended**, never by «all the plan's
+  stages started» (a broken attack has a one-stage plan); partial views drop `rota`.
+- **Belts:** a unidor's turn is «ready» only if its tip item can go to it (`listo` checks the sorter filter and
+  `aceptaAbajo`); a sorter skips any lane out whose downstream does not receive the item, even a single own out; a
+  store port does not emit while `S.res[r] < pila`; offline flow is keyed by `res` or `res|b` (from a store), so the
+  pk-70 margin and the per-source discount never mix camps and stores.
+

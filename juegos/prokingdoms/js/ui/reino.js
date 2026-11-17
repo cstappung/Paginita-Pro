@@ -11,7 +11,10 @@
   function armyPicker(w, prefix) {
     const ids = {};
     for (const k in D.ARMY) ids[k] = prefix + k;
-    const box = el('span', { class: 'raid-in' }, Object.keys(ids).map(k => el('label', null, D.ARMY[k].name.slice(0, 3) + ' ', el('input', { id: ids[k], type: 'number', min: 0, max: w.army[k], value: w.army[k] }))));
+    // pk-76: solo las tropas que hay en casa, y la fila baja de línea (con las 12 del Cuartel se salía de la pantalla
+    // del celular y no se podían elegir arietes ni torres de asedio)
+    const hay = Object.keys(ids).filter(k => (w.army[k] || 0) > 0);
+    const box = el('span', { class: 'raid-in' }, hay.length ? hay.map(k => el('label', { title: D.ARMY[k].name }, D.ARMY[k].name.slice(0, 3) + ' ', el('input', { id: ids[k], type: 'number', min: 0, max: w.army[k], value: w.army[k] }))) : el('span', { class: 'small muted' }, 'No tienes tropas en casa.'));
     const read = () => { const u = {}; for (const k in ids) { const i = document.getElementById(ids[k]); u[k] = U.clamp(Math.floor(+(i && i.value) || 0), 0, w.army[k]); } return u; };
     return { box, read };
   }
@@ -46,7 +49,7 @@
     const T = PK.Terr, e = T.estado(f), n = T.nombreFrente(f), A = D.ASEDIO;
     const cp = f.mio === 'atk' ? PK.Game.state.terr.camps.find(c => 'c' + c.k === f.id) : null, ref = cp && cp.ref;
     return el('div', { class: 'battle' },
-      el('b', null, n.titulo, el('span', { translate: 'no' }, n.otro)), el('span', { class: 'small' }, ' · etapa ' + (e.etapa + 1) + ' de 3: ' + A.nombres[e.id] + (f.plan.parcial ? ' · esta etapa termina en ' + U.fmtTime(e.queda) : ' · quedan aprox. ' + U.fmtTime(e.quedaTotal))),
+      el('b', null, n.quien ? el('span', { translate: 'no' }, n.quien) : null, n.titulo, el('span', { translate: 'no' }, n.otro)), el('span', { class: 'small' }, ' · etapa ' + (e.etapa + 1) + ' de 3: ' + A.nombres[e.id] + (f.plan.parcial ? ' · esta etapa termina en ' + U.fmtTime(e.queda) : ' · quedan aprox. ' + U.fmtTime(e.quedaTotal))),
       el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Tu ímpetu' : f.mio === 'ver' ? 'Ímpetu del ataque' : 'Su ímpetu'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'green' : 'red'), style: { width: Math.round(e.impetu * 100) + '%' } }), el('span', null, Math.round(e.impetu * 100) + ' %'))),
       el('div', { class: 'g-row' }, el('span', { class: 'small', style: { minWidth: '120px' } }, f.mio === 'atk' ? 'Su resistencia' : f.mio === 'ver' ? 'Resistencia' : 'Tu resistencia'), el('div', { class: 'bar thin' }, el('div', { class: 'fill ' + (f.mio === 'atk' ? 'red' : 'green'), style: { width: Math.round(e.resistencia * 100) + '%' } }), el('span', null, Math.round(e.resistencia * 100) + ' %'))),
       f.plan.tac && D.ASEDIO.tacticas[f.plan.tac] ? el('p', { class: 'small' }, 'Táctica del atacante: ', el('b', null, D.ASEDIO.tacticas[f.plan.tac].nombre), '.') : null,

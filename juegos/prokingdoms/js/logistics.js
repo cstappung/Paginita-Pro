@@ -484,6 +484,21 @@
     }
     return best;
   }
+  // pk-77: a qué bodega lleva una carreta de traslado lo que YA cargó: la que más recibe de esa carga, nunca la fija de
+  // la ruta. Antes, si su destino desaparecía, otraBodega elegía según lo que hay en el origen (un Granero para una
+  // carga de madera) y descargar la mandaba de vuelta a la fija, que extremos rechaza: daba vueltas para siempre.
+  function bodegaParaCarga(u, fija) {
+    const c = L.cargaDe(u);
+    let best = null, bs = -1, bd = Infinity;
+    for (const b of L.bodegasRuta()) {
+      if (b === fija || !Object.keys(c).some(k => acepta(b, k) && G().capDe(b, k) > 0)) continue;
+      let n = 0;
+      for (const k in c) if (acepta(b, k)) n += Math.min(c[k], PK.Libro.lugar(b, k));
+      const d = U.dist(u.x, u.y, b.cx, b.cy);
+      if (n > bs + 0.5 || (Math.abs(n - bs) <= 0.5 && d < bd)) { best = b; bs = n; bd = d; }
+    }
+    return best;
+  }
   // ---- «Cualquier Aserradero» (pk-57, pedido del dueño): 'taller:<tipo>' como origen o destino ----
   // Destino: el taller de ese tipo al que más le falta (el que tiene menos), descontando lo que ya le llevan y lo que
   // van a buscar los otros vehículos de la ruta. Origen: el que más guarda de lo que hace.
@@ -530,7 +545,7 @@
     if (L.esTallerComodin(r.de) && !enTaller(from, r.de)) { from = tallerOrigen(r, u, false, excl); u.rDe = from ? from.id : null; }
     if (L.esTallerComodin(r.a) && !enTaller(to, r.a)) { to = tallerDestino(r, u, from); u.rA = to ? to.id : null; }
     if (L.esTraslado(r)) { // pk-67: entre una bodega fija y otra cualquiera
-      if (r.a === 'bodega' && !(to && L.esBodegaRuta(to) && to !== from)) { to = otraBodega(r, from, false); u.rA = to ? to.id : null; }
+      if (r.a === 'bodega' && !(to && L.esBodegaRuta(to) && to !== from)) { to = u.carry > 0.5 ? bodegaParaCarga(u, from) : otraBodega(r, from, false); u.rA = to ? to.id : null; }
       if (r.de === 'bodega' && !(from && L.esBodegaRuta(from) && from !== to)) { from = otraBodega(r, to, true); u.rDe = from ? from.id : null; }
       return { from, to };
     }
@@ -913,11 +928,11 @@
     u.estado = vacio ? 'Esperando carga: ' + from.def.name + ' está vacío' : tot < 1 ? to.def.name + ' no necesita nada de lo que hay: espera en el origen' : 'Esperando carga (' + Math.floor(tot) + ' de ' + Math.floor(lleno) + ')';
   }
   function descargar(u, to) {
-    const g = G(), c = Object.assign({}, L.cargaDe(u));
+    const g = G(), c = Object.assign({}, L.cargaDe(u)), rt = L.rutaDe(u), tras = L.esTraslado(rt);
     let i = 0;
     for (const k in c) {
       if (!acepta(to, k)) continue;
-      const n = put(to, k, c[k]);
+      const n = tras ? ponerTraslado(to, k, c[k]) : put(to, k, c[k]);
       if (n > 0) {
         if (PK.Render.float && !g.offline) PK.Render.float(to.cx, to.cy - 0.6 * i++, '+' + Math.floor(n), k);
         g.stat('hauled', n);
@@ -927,13 +942,21 @@
     fijarCarga(u, c);
     if (u.carry > 0.5) {
       const r = L.rutaDe(u), resto = Object.keys(c), recibe = resto.some(k => acepta(to, k));
-      if (r && r.a === 'bodega') { const d = mejorBodega(resto, to.cx, to.cy); if (d && d !== to && resto.some(k => acepta(d, k) && PK.Libro.lugar(d, k) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + (recibe ? ' está lleno' : ' no recibe ' + nombresCarga(c)) + ': va a ' + d.def.name; return; } } // pk-54
+      if (r && r.a === 'bodega') { const d = tras ? bodegaParaCarga(u, G().bById.get(r.de)) : mejorBodega(resto, to.cx, to.cy); if (d && d !== to && resto.some(k => acepta(d, k) && PK.Libro.lugar(d, k) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + (recibe ? ' está lleno' : ' no recibe ' + nombresCarga(c)) + ': va a ' + d.def.name; return; } } // pk-54
       if (r && L.esTallerComodin(r.a)) { const d = tallerDestino(r, u, null, false, to.id); if (d && resto.some(k => acepta(d, k) && necesita(d, k, true) >= 1)) { u.rA = d.id; u.wait = 0.3; u.estado = to.def.name + ' está lleno: va a ' + d.def.name; return; } } // pk-57
       if (recibe) { u.estado = to.def.name + ' está lleno: espera para descargar'; u.mode = 'idle'; u.wait = 3; return; }
       dropCargo(u); // lo que ese destino no recibe (cambiaron la ruta) vuelve a la bodega
     }
     u.carry = 0; u.carryRes = null; u.carga = null; u.wait = 0.6; u.estado = 'Descargando';
     u.rDe = u.rA = null; // pk-54: el próximo viaje vuelve a elegir (el campamento con más)
+  }
+  // pk-77: lo que trae un traslado ya contaba en el tope del pueblo (salió de otra bodega): entra aunque el pueblo esté
+  // lleno o sobre el tope (como las cintas de bodega a bodega, pk-70), pero solo lo que cabe en ESTA bodega. Antes
+  // put() medía el tope del pueblo: con el pueblo sobre el tope (un premio) la carreta esperaba para siempre junto a un
+  // Almacén vacío, y con lugar en el pueblo «descargaba» en una bodega llena y la conciliación lo devolvía al origen.
+  function ponerTraslado(b, k, n) {
+    const m = Math.min(n, PK.Libro.lugar(b, k));
+    return m > 0 ? PK.Libro.poner(b, k, m, m) : 0;
   }
   // Lo que llevaba vuelve entero a la bodega (aunque esté llena: es tuyo, no una cosecha).
   function dropCargo(u) {
@@ -1032,7 +1055,7 @@
         let movido = 0;
         for (const q of lista) {
           const m = take(from, q.res, q.n);
-          const puesto = put(to, q.res, m);
+          const puesto = L.esTraslado(r) ? ponerTraslado(to, q.res, m) : put(to, q.res, m); // pk-77
           if (puesto < m) { if (L.isShop(from)) from.outb[q.res] += m - puesto; else if (L.esCampo(from)) PK.Libro.inv(from)[q.res] = (PK.Libro.inv(from)[q.res] || 0) + m - puesto; else st.res[q.res] += m - puesto; }
           if (puesto > 0) g.stat('hauled', puesto);
           movido += puesto;

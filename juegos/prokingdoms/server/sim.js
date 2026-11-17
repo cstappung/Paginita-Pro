@@ -598,7 +598,7 @@ function ciudDe(w) {
   if (!w.ciud) w.ciud = { sem, imp: {}, gid: null, gname: null };
   const c = w.ciud;
   if (c.sem !== sem) {
-    const ids = Object.keys(c.imp || {}).sort((a, b) => c.imp[b] - c.imp[a]), top = ids[0] && store.get('guilds', ids[0]);
+    const ids = Object.keys(c.imp || {}).sort((a, b) => c.imp[b] - c.imp[a]), top = ids.map(id => store.get('guilds', id)).find(Boolean); // pk-77: si el primero se disolvió, el siguiente
     if (top) {
       c.gid = top.id; c.gname = top.name;
       chatPush(top, 'Gremio', '¡Nuestro estandarte ondea en ' + D.CIUDADELA.nombre + ' de ' + w.name + ' toda esta semana! +' + Math.round(D.CIUDADELA.bono * 100) + '% de oro al venderle a los mercaderes.');
@@ -1063,12 +1063,7 @@ function tickCamps() {
       c.ini = c.arrive; c.lado = ladoDe(w, c.k, c.fromSlot); c.et = 0;
       push(tgt, { type: 'siege_start', cid: c.id, k: c.k, from: c.fromName, fin: c.ini + c.plan.total * 1000, text: 'Las tropas de ' + c.fromName + ' llegaron a tu frontera: empieza el asedio.' });
     }
-    if (c.plan && c.ref && !c.ref.ok && t >= c.ref.llega && c.ref.llega < c.ini + c.plan.total * 1000) { // G4: llegaron los refuerzos
-      const juntas = Object.assign({}, c.units);
-      for (const u in c.ref.units) juntas[u] = (juntas[u] || 0) + c.ref.units[u];
-      const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT)), m: D.asedioOficio(juntas, (c.plan.parts.walls || 0) > 0), torre: juntas.torreAsedio > 0 });
-      if (n) { c.plan = n; c.powerT += c.ref.power; c.units = juntas; c.ref.ok = true; c.et = -1; }
-    }
+    aplicarRefuerzo(c, t); // G4: llegaron los refuerzos
     if (c.plan && t < c.ini + c.plan.total * 1000) { // en curso: la lista del mundo cambia cuando empieza una etapa
       const n = c.plan.etapas.filter(e => (t - c.ini) / 1000 >= e.t0).length;
       if (n !== c.et) { c.et = n; w.asv = (w.asv || 0) + 1; store.set('camps', c.id, c); store.touch('worlds'); store.touch('players'); }
@@ -1107,18 +1102,29 @@ function tickCamps() {
 // retira; el defensor hace una salida (una vez, en las dos primeras etapas) o rinde la parcela. Cada una vuelve a
 // calcular el plan desde este instante (D.asedioReplan) y la lista del mundo cambia. Lo que no vale da error, sin
 // sospecha: son botones que el reloj puede dejar viejos.
+// G4: los refuerzos que ya llegaron entran al plan desde el momento en que llegaron. pk-77: también antes de cada
+// decisión (asedio()): si no, una retirada tomada después de su llegada y antes del tick quedaba debajo de ellos
+// y el plan rearmado por los refuerzos la borraba.
+function aplicarRefuerzo(c, t) {
+  if (!(c.plan && c.ref && !c.ref.ok && t >= c.ref.llega && c.ref.llega < c.ini + c.plan.total * 1000)) return;
+  const juntas = Object.assign({}, c.units);
+  for (const u in c.ref.units) juntas[u] = (juntas[u] || 0) + c.ref.units[u];
+  const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT)), m: D.asedioOficio(juntas, (c.plan.parts.walls || 0) > 0), torre: juntas.torreAsedio > 0 });
+  if (n) { c.plan = n; c.powerT += c.ref.power; c.units = juntas; c.ref.ok = true; c.et = -1; }
+}
 function asedio(p, b) {
   const c = store.get('camps', String(b.id || '')), t = now(), A = D.ASEDIO;
   if (!c || !c.plan || (c.from !== p.id && c.to !== p.id)) throw new GameError('Ese asedio no es tuyo o ya terminó.');
   const seg = (t - c.ini) / 1000, soyAtk = c.from === p.id, cuenta = soyAtk ? 'accA' : 'accD';
   if (seg >= c.plan.total) throw new GameError('El asedio ya terminó.');
+  aplicarRefuerzo(c, t); // pk-77
   if ((c[cuenta] || 0) >= A.maxAcc) throw new GameError('Ya tomaste todas las decisiones de este asedio.');
   const w = store.get('worlds', c.world), tipo = String(b.accion || '');
   let ch = null, out = { ok: true };
   if (soyAtk && tipo === 'tactica') {
     if (c.tacCambio) throw new GameError('Ya cambiaste de táctica en este asedio.');
     const tac = A.tacticas[b.tactica] ? b.tactica : null;
-    ch = { tipo, tactica: tac }; c.tacCambio = true;
+    ch = { tipo, tactica: tac };
   } else if (soyAtk && tipo === 'retirada') ch = { tipo };
   else if (soyAtk && tipo === 'refuerzo') {
     if (c.ref) throw new GameError('Ya mandaste refuerzos a este asedio.');
@@ -1128,14 +1134,16 @@ function asedio(p, b) {
     out.llega = c.ref.llega;
   } else if (!soyAtk && tipo === 'salida') {
     if (c.salida) throw new GameError('Tu guarnición ya salió en este asedio.');
-    ch = { tipo }; c.salida = true;
-    if (p.snap) p.snap.army = Math.max(0, p.snap.army * (1 - A.salida.cuesta));
+    ch = { tipo };
   } else if (!soyAtk && tipo === 'rendir') ch = { tipo };
   else throw new GameError('Esa decisión no vale aquí.');
   if (ch) {
     const n = D.asedioReplan(c.plan, seg, ch);
     if (!n) throw new GameError('Ya no se puede: el asedio pasó de esa etapa.');
     c.plan = n;
+    // pk-77: lo que cuesta la decisión, solo si valió (antes la salida cobraba el 5 % y quedaba gastada aunque fallara)
+    if (tipo === 'tactica') c.tacCambio = true;
+    if (tipo === 'salida') { c.salida = true; if (p.snap) p.snap.army = Math.max(0, p.snap.army * (1 - A.salida.cuesta)); }
   }
   c[cuenta] = (c[cuenta] || 0) + 1;
   store.set('camps', c.id, c);

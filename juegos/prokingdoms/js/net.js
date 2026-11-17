@@ -289,7 +289,7 @@
         // un jugador real lanzó una campaña contra tu parcela (llega también si no estabas)
         case 'under_attack': {
           seenIncoming.add(it.cid);
-          const left = (it.arrive - Date.now()) / 1000;
+          const left = (aLocal(it.arrive) - Date.now()) / 1000; // pk-77: la hora de llegada es del servidor
           const text = '¡' + it.from + ' (jugador) marcha contra una parcela de tu frontera con una fuerza de aprox. ' + U.fmt(it.power) + '!' + (left > 0 ? ' Llega en ' + U.fmtTime(left) + '.' : '');
           PK.Social.log(text, 'bad');
           g.logNews(text, 'bad');

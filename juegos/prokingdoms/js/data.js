@@ -828,7 +828,9 @@
   // ch: { tipo: 'tactica', tactica } | { tipo: 'refuerzo', atk } | { tipo: 'salida' } | { tipo: 'retirada' } | { tipo: 'rendir' }
   D.asedioReplan = function (plan, t, ch) {
     const A = D.ASEDIO;
-    if (!plan || !plan.res || !ch || t >= plan.total || t < 0) return null;
+    // pk-77: un plan cortado por una retirada o una rendición ya terminó: rearmarlo (otra decisión del mismo segundo,
+    // o unos refuerzos que el servidor aplicaba tarde) lo volvía a un asedio entero y la parcela caía igual
+    if (!plan || !plan.res || !ch || plan.fin || t >= plan.total || t < 0) return null;
     const es = plan.etapas;
     let si = es.length - 1;
     for (let j = 0; j < es.length; j++) if (t < es[j].t0 + es[j].dur) { si = j; break; }
@@ -888,7 +890,11 @@
   // real del atacante viajan recién cuando empieza la última etapa. Mientras tanto las dos barras bajan parejas.
   // semV: semilla del dibujo, distinta de la que decide el plan (con la del plan se podría recalcular todo).
   D.asedioVista = function (plan, t, semV) {
-    const es = plan.etapas.filter(e => t >= e.t0), todo = es.length >= plan.etapas.length;
+    // pk-77: el final viaja cuando empieza el estandarte (la última etapa de un asedio entero) o cuando terminó. Antes
+    // bastaba con «empezaron todas las etapas del plan»: un ataque que se quiebra en la frontera tiene un plan de una
+    // sola etapa, y desde el segundo 0 viajaban el perdedor, las bajas y la fuerza real (y la falta de «parcial»).
+    const todo = t >= plan.total || plan.etapas.some(e => e.id === 'estandarte' && t >= e.t0);
+    const es = plan.etapas.filter(e => t >= e.t0).map(e => (todo || !e.rota ? e : Object.assign({}, e, { rota: false })));
     if (!es.length) es.push(plan.etapas[0]);
     const ult = es[es.length - 1];
     const v = { v: 2, semilla: semV || 1, def: plan.def, parts: plan.parts, etapas: es, n: es.length, total: ult.t0 + ult.dur, acc: plan.acc || [], tac: plan.tac };
