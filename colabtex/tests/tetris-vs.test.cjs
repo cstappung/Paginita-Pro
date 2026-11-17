@@ -15,7 +15,7 @@ const TV=require('../../juegos/club/tetris/vs.js');
    propio ritmo, anotando pulsaciones con temblor y teclas mantenidas. */
 function juega({dif='facil',cuenta='uidRobot',sal=7,ritmo=6,pensar=14,tope=200000,apunta=false}){
  const g=TV.grabadora({cuenta,sal,dif});const s=g.s;
- const cabeza=TV.crearBot('dificil',sal^0x55),azar=TM.rng(sal*7919+1);
+ const cabeza=TV.crearBot('dificil',sal^0x55,1),azar=TM.rng(sal*7919+1);
  const reg=TM.registroTeclas(0);let n=0;
  const pulsa=(a,k)=>{const t=k*TM.PASO+(azar()*2-1)*3;reg.baja(a+(++n),t,'');reg.sube(a+n,t+40+azar()*100);};
  const varía=x=>Math.max(1,Math.round(x*(0.6+azar()*1.2)));
@@ -126,18 +126,17 @@ test('VS Bots: los bots son deterministas y cada dificultad juega a su ritmo',()
  assert.ok(pps.facil<pps.medio&&pps.medio<pps.dificil,JSON.stringify(pps));
 });
 
-test('VS Bots: las pruebas v:1 (récords de antes) se rehacen con los bots de entonces',async()=>{
- const f=require('./fixtures/tetris-vs-v1.json');
- for(const dif of ['facil','medio']){
-  const {dato,prueba}=f[dif];
-  assert.equal(prueba.v,1);
+test('VS Bots: las pruebas v:1 y v:2 (récords de antes) se rehacen con los bots de entonces',async()=>{
+ for(const v of [1,2])for(const dif of ['facil','medio']){
+  const {dato,prueba}=require('./fixtures/tetris-vs-v'+v+'.json')[dif];
+  assert.equal(prueba.v,v);
   const r=TV.rehace(prueba);
   assert.equal(r.error,undefined,dif);
   assert.equal(r.derrotados,3);
   assert.equal(Math.max(1,Math.round(r.tiempo)),dato.tiempo);
   assert.equal(await VT.verifica(dato,prueba,{uid:'uidRobot'}),null,dif);
-  /* La misma prueba leída como v:2 es otra partida (otros bots): no cuadra. */
-  assert.ok(await VT.verifica(dato,{...copia(prueba),v:2}));
+  /* La misma prueba leída como v:3 es otra partida (otros bots): no cuadra. */
+  assert.ok(await VT.verifica(dato,{...copia(prueba),v:3}));
  }
  /* Los modos de un solo pozo siguen en v:1. */
  assert.match(await VT.verifica({categoria:'club-tetris-sprint',puntos:40,tiempo:9000,partida:'x'},{v:2,m:'sprint',u:'yo',a:1,n:10,e:'C'}),/versión/);
@@ -161,10 +160,10 @@ test('VS Bots: el objetivo que eliges viaja en la prueba y se rehace igual',asyn
 });
 
 test('VS Bots: los bots arman Tetris y atacan, no solo hacen simples',()=>{
- for(const dif of ['medio','dificil']){
+ for(const dif of ['medio','dificil'])for(const yo of [1,3]){
   const tipos=[0,0,0,0,0];let atq=0,t=0;
   for(let sal=1;sal<=2;sal++){
-   const s=TM.crear({semilla:sal*999,nivel:1,subeCada:30000,soloTiempo:true}),b=TV.crearBot(dif,sal);
+   const s=TM.crear({semilla:sal*999,nivel:1,subeCada:30000,soloTiempo:true}),b=TV.crearBot(dif,sal,yo);
    for(let k=0;k<12000&&!s.fin;k++){TV.pasoBot(b,s);TM.avanza(s,10);for(const e of s.eventos)if(e.e==='fija'){tipos[e.n]++;atq+=e.atq;}s.eventos.length=0;s.salida=0;t+=10;}
   }
   assert.ok(tipos[4]>=3,dif+' hace Tetris: '+tipos.join('/'));
@@ -174,7 +173,7 @@ test('VS Bots: los bots arman Tetris y atacan, no solo hacen simples',()=>{
 });
 
 test('VS Bots: cada pozo tiene un objetivo vivo, los bots lo cambian y los KO se anotan',()=>{
- const m=TV.mundo('x',11,'medio'),yo=TV.crearBot('medio',99);
+ const m=TV.mundo('x',11,'medio'),yo=TV.crearBot('medio',99,1);
  assert.equal(m.objetivo[0],1,'empiezas apuntando al primero');
  const vistos=new Set();let cambios=0,golpes=0;
  for(let k=0;k<40000&&m.vivos().length>1;k++){
@@ -194,4 +193,47 @@ test('VS Bots: cada pozo tiene un objetivo vivo, los bots lo cambian y los KO se
  assert.equal(n.objetivo[0],2);
  assert.equal(TV.actua(n,'objetivo'),true);
  assert.equal(n.objetivo[0],3);
+});
+
+/* Una batalla de bots (el pozo 0 lo juega un bot v2 que cambia de objetivo
+   cada tanto, como una persona), contando a quién apunta cada uno y por qué. */
+function batalla(dif,sal){
+ const m=TV.mundo('pers',sal,dif),yo=TV.crearBotV2(dif,sal*31);
+ const motivos=[{},{},{},{}];let pasos=0,todos=0;
+ for(let k=0;k<60000&&m.vivos().length>1;k++){
+  if(m.fuera[0]<0)TV.pasoBotV2(yo,m.pozos[0]);
+  if(k%1700===900)TV.actua(m,'apunta'+(1+(k+sal)%3));
+  m.paso();m.pozos[0].eventos.length=0;
+  for(const c of m.cambios)if(c.motivo)motivos[c.de][c.motivo]=(motivos[c.de][c.motivo]||0)+1;
+  m.cambios.length=0;m.ataques.length=0;m.caidas.length=0;m.kos.length=0;
+  if(m.fuera.every(f=>f<0)){pasos++;const o=[1,2,3].map(i=>m.objetivo[i]);if(o[0]===o[1]&&o[1]===o[2])todos++;}
+ }
+ return {m,motivos,pasos,todos};
+}
+test('VS Bots: cada bot razona distinto (Cazador, Carroñero, Rencoroso) y no se amontonan',()=>{
+ assert.deepEqual(TV.PERSONAS.slice(1).map(p=>p.rol),['Cazador','Carroñero','Rencoroso']);
+ const suma=[{},{},{},{}];let pasos=0,todos=0;
+ for(let sal=1;sal<=6;sal++){
+  const r=batalla('medio',sal*101);
+  pasos+=r.pasos;todos+=r.todos;
+  for(let i=1;i<=3;i++)for(const k in r.motivos[i])suma[i][k]=(suma[i][k]||0)+r.motivos[i][k];
+ }
+ const top=o=>Object.entries(o).filter(([k])=>k!=='corazonada').sort((a,b)=>b[1]-a[1])[0]?.[0];
+ assert.ok(['amenaza','lider'].includes(top(suma[1])),'Píxel caza al fuerte: '+JSON.stringify(suma[1]));
+ assert.equal(top(suma[2]),'debil','Turbo remata al débil: '+JSON.stringify(suma[2]));
+ assert.ok(['devuelve','rencor'].includes(top(suma[3])),'Glitch se venga: '+JSON.stringify(suma[3]));
+ assert.ok(todos/pasos<0.05,'los tres sobre el mismo pozo: '+(100*todos/pasos).toFixed(1)+'%');
+});
+test('VS Bots: el ánimo se mueve con la partida (estrés, enojo, confianza)',()=>{
+ const {m}=batalla('dificil',7);
+ const a=[1,2,3].map(i=>m.animo(i));
+ for(const x of a)for(const k of ['estres','enojo','confianza'])assert.ok(x[k]>=0&&x[k]<=1000,k);
+ /* Glitch se enoja más con los golpes que Píxel (más «sangre»). */
+ assert.ok(TV.PERSONAS[3].sangre>TV.PERSONAS[1].sangre);
+ const n=TV.mundo('z',3,'medio');
+ for(let k=0;k<400;k++)n.paso();
+ const antes=n.animo(3).enojo;
+ n.objetivo[0]=3;n.pozos[0].salida=4;n.paso();
+ assert.ok(n.animo(3).enojo>antes,'un golpe lo enoja');
+ assert.ok(n.rencor[3][0]>0,'y lo recuerda');
 });

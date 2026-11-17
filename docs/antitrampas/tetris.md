@@ -217,7 +217,11 @@ anotan si cambiaron algo (apuntar al que ya era tu objetivo, o a uno caído,
 no se anota y, si aparece, rechaza). Las pruebas `v: 1` de los récords ya
 guardados se siguen rehaciendo con los bots de entonces (`mundoV1` y
 compañía, intactos en `vs.js`); `colabtex/tests/fixtures/tetris-vs-v1.json`
-son dos partidas v1 reales que lo comprueban. Los modos de un solo pozo
+son dos partidas v1 reales que lo comprueban. Desde la versión 3 (cada
+bot con su personalidad y su ánimo) las partidas nuevas son `v: 3`, con
+las mismas letras; las `v: 2` se rehacen con `mundoV2`
+(`tests/fixtures/tetris-vs-v2.json`). `TV.VERSIONES` dice cuáles acepta
+`rehace`, y el verificador solo acepta esas en VS Bots. Los modos de un solo pozo
 siguen en `v: 1` y no aceptan `v: 2`. Tocar un rival es una pulsación
 más para la capa anti-bot, con origen `T` (puntero). El verificador (`TV.rehace`) vuelve a jugar a los cuatro
 pozos y exige que el jugador siga en pie y los tres bots estén fuera en el
