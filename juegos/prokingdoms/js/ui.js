@@ -230,6 +230,7 @@
     mbtn('guild', 'Gremio', () => PK.Social.openGuild(), null, 'guild');
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
     const lb = mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
+    mbtn(Sp.belt('W', 'E', 0, 3).c.toDataURL(), 'Cintas', () => PK.Input.abrirCintas(), 'K', 'cintas'); // pk-63: su propio menú
     logiDot = el('span', { class: 'badge' }); lb.append(logiDot); // pk-41: carretas sin ruta
     mbtn('book', 'Consejo', () => PK.Consejo.open(), null, 'consejo');
     mbtn('crown', 'Reinos', () => UI.openRealms(), null, 'realms');
@@ -253,7 +254,8 @@
     tip = el('div', { id: 'tip' });
     evEl = el('div', { id: 'event' });
     qsEl = el('div', { id: 'qstrip' });
-    hud.append(bar, menu, panel, mmWrap, qsEl, toastBox, tip, evEl);
+    cintaBar = el('div', { id: 'cintabar', class: 'frame', role: 'toolbar', 'aria-label': 'Construir cintas' });
+    hud.append(bar, menu, panel, mmWrap, qsEl, toastBox, tip, evEl, cintaBar);
     // Altura real del cartel del evento (--evh), para que los avisos se pongan al lado y no debajo de él: crece o se
     // achica según el evento (opciones, píldora) y una distancia fija lo tapaba o quedaba corta.
     const medirEv = () => { const h = evEl.style.display === 'none' ? 0 : evEl.getBoundingClientRect().height; hud.style.setProperty('--evh', h ? Math.ceil(h + 6) + 'px' : '0px'); };
@@ -302,6 +304,7 @@
     market: (g, st) => st.era >= 2 || g.countAll('market') > 0,
     guild: (g, st) => g.countAll('guild') > 0 || (st.guild && st.guild.joined) || (PK.Net.online && st.era >= 2),
     terr: (g, st) => st.era >= 2 || !!st.flags.verTerr,
+    cintas: (g, st) => st.era >= D.CINTA.niv[0].era || !!(st.logi && st.logi.red && Object.keys(st.logi.red.t).length),
     logi: (g, st) => g.countAll('cartwright') > 0 || g.buildings.some(b => b.owner === 'p' && b.def.recipe) || !!(st.logi && st.logi.roads.length),
     realms: (g, st) => !!PK.Net.online || D.BOTS.some(b => st.flags['seen_' + b.slot]),
     heroes: (g, st) => g.countAll('tavern') > 0 || !!(st.heroes && st.heroes.lista.length),
@@ -322,7 +325,7 @@
   // ---------- U1 (Fase 6): menú agrupado ----------
   // Cinco grupos con submenú, más Opciones. Un grupo se ve si se ve alguno de sus botones, y brilla si alguno es nuevo.
   const GRUPOS = [
-    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'terr', 'consejo', 'galeon', 'aspectos'] },
+    { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'cintas', 'terr', 'consejo', 'galeon', 'aspectos'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
     { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
     { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms', 'regata'] },
@@ -632,7 +635,7 @@
     const g = G(), sel = g.sel;
     let key = sel ? sel.type + ':' + (sel.ids ? sel.ids.join(',') : sel.id) : 'none';
     if (g.placing) { const gh = PK.Render.ghost; key = 'placing:' + (g.placing.move !== undefined ? 'mv' + g.placing.move + ':' : '') + g.placing.type + (g.placing.armed && gh ? ':' + gh.x + ',' + gh.y + (gh.ok ? '+' : '-') : ''); }
-    if (PK.Logi.tool) { const I = PK.Input, pc = I.planCinta; key = 'tool:' + PK.Logi.tool + ':' + (I.roadStart ? I.roadStart.join(',') : '') + ':' + (pc ? pc.tiles.length + '/' + pc.malas.length : '') + ':' + (PK.Logi.cintaNivel || 1) + ':' + (I.planCopia ? I.planCopia.en + '/' + I.planCopia.malas.length : '') + ':' + I.moldeRot; }
+    if (PK.Logi.tool) { const I = PK.Input, pc = I.planCinta; key = 'tool:' + PK.Logi.tool + ':' + (I.roadStart ? I.roadStart.join(',') : '') + ':' + (pc ? pc.tiles.length + '/' + pc.malas.length : '') + ':' + (PK.Logi.cintaNivel || 1) + (PK.Logi.cintaNodo || '') + ':' + (I.planCopia ? I.planCopia.en + '/' + I.planCopia.malas.length : '') + ':' + I.moldeRot; }
     if (PK.Def.tool) key = 'def:' + PK.Def.tool + (PK.Def.start ? PK.Def.start.join(',') : '') + S().def.walls.length + S().def.gates.length;
     if (PK.Terr.mode) key = 'terr';
     if (!force && key === lastPanelKey && sel && sel.type === 'units' && !g.placing) { updateUnitsLive(); return; }
@@ -641,6 +644,7 @@
     // U4: en el celular, pasado el tutorial, el panel sin nada elegido queda plegado (su cabecera dice «¿Qué hago ahora?»)
     if (key === 'none' && key !== lastPanelKey && UI.plegarPanel && !UI.tutoActivo()) UI.plegarPanel();
     lastPanelKey = key;
+    barraCintas();
     panel.innerHTML = '';
     fillPanel(g, sel);
     if (snap) restoreScroll(panel, snap); else panel.scrollTop = 0; // otra cosa elegida: desde arriba
@@ -684,6 +688,7 @@
       }
       if (PK.Logi.tool === 'cinta' || PK.Logi.tool === 'paso') { panel.append(cintaToolPanel()); return; }
       if (PK.Logi.tool === 'copiar') { panel.append(copiaToolPanel()); return; }
+      if (PK.Cintas.HERR_PIEZA[PK.Logi.tool]) { panel.append(cintaPiezaPanel()); return; }
       panel.append(el('div', { class: 'p-help' }, el('h3', null, 'Trazar camino'),
         el('p', { class: 'small' }, 'Toca dónde empieza y dónde termina. Puedes seguir encadenando tramos. Cada casilla cuesta '),
         UI.costEl(D.ROAD.cost),
@@ -806,14 +811,81 @@
           UI.btn('Quitar varios…', () => { G().sel = null; PK.Despeje.empezar('quitar'); }, { small: true, title: 'Marca una zona y quita todas las murallas, puertas y caminos que tenga' }),
           UI.btn('Murallas', () => UI.openBarracks('defense'), { small: true })))));
   }
+  // ---------- Menú de construcción de cintas (pk-63, pedido del dueño) ----------
+  // Una barra propia arriba, mientras trazas o editas cintas (PK.Render.modoCintas: también con una pieza elegida):
+  // las herramientas con su dibujo, el nivel con el que se traza o se mejora, «Ver flujo» y cerrar. El panel de abajo
+  // sigue explicando la herramienta elegida y su costo.
+  let cintaBar = null, cintaBarKey = '';
+  const ICO = {};
+  const icoCinta = (k, f) => ICO[k] || (ICO[k] = f().c.toDataURL());
+  function barraCintas() {
+    if (!cintaBar) return;
+    const L = PK.Logi, Ci = PK.Cintas, on = !!(PK.Render.modoCintas && PK.Render.modoCintas() && S() && Ci.desbloqueado());
+    const n = Math.min(L.cintaNivel || Ci.maxNivel(), Ci.maxNivel()), key = on ? [L.tool, L.cintaNodo, n, Ci.maxNivel(), Ci.verFlujo, UI.isTouch()].join('|') : '';
+    document.getElementById('hud').classList.toggle('cintas-on', on);
+    if (key === cintaBarKey) return;
+    cintaBarKey = key; cintaBar.innerHTML = '';
+    if (!on) return;
+    const I = PK.Input, tool = L.tool;
+    const herr = (id, nodo, label, ico, title) => {
+      const sel = tool === id && (!nodo || (L.cintaNodo || 'v') === nodo) || (id === 'cmolde' && tool === 'copiar');
+      return el('button', { type: 'button', class: 'cb-herr' + (sel ? ' sel' : ''), title, 'aria-label': label, 'aria-pressed': sel ? 'true' : 'false', onclick: () => {
+        if (id === 'cnodo') L.cintaNodo = nodo;
+        if (tool !== id || id === 'cnodo') { I.cancelTool(); G().sel = null; L.tool = id; if (id === 'cnodo') L.cintaNodo = nodo; }
+        UI.refreshPanel(true);
+      } }, typeof ico === 'string' && ico.startsWith('data:') ? el('img', { src: ico, alt: '' }) : el('span', { class: 'cb-glifo' }, ico), el('span', { class: 'cb-txt' }, label));
+    };
+    const nn = n || 1, mask = 15;
+    cintaBar.append(
+      el('div', { class: 'cb-grupo' },
+        herr('cinta', null, 'Cinta', icoCinta('c' + nn, () => Sp.belt('W', 'E', 0, nn)), 'Trazar cinta: toca dónde empieza y dónde termina'),
+        herr('paso', null, 'Paso', icoCinta('p' + nn, () => Sp.beltRampa('E', true, 0, nn)), 'Paso elevado: por debajo pasan carretas, carromatos y caminos'),
+        herr('cnodo', 'u', 'Unidor', icoCinta('u' + nn, () => Sp.beltNodo('u', mask, 0, 0, nn)), 'Unidor: junta varias cintas en una (toca una pieza)'),
+        herr('cnodo', 'v', 'Divisor', icoCinta('v' + nn, () => Sp.beltNodo('v', mask, 0, 0, nn)), 'Divisor: reparte por turnos hacia adelante y los costados (toca una pieza)'),
+        herr('cnodo', 's', 'Clasif.', icoCinta('s' + nn, () => Sp.beltNodo('s', mask, 0, 0, nn)), 'Clasificador: cada recurso por su lado (toca una pieza)')),
+      el('div', { class: 'cb-grupo' },
+        herr('csubir', null, 'Mejorar', '⇧', 'Mejorar un tramo entero al nivel elegido (toca una pieza)'),
+        herr('cgirar', null, 'Girar', '↻', 'Girar una pieza (toca una pieza)'),
+        herr('cmolde', null, 'Copiar', '⧉', 'Copiar una red: toca una pieza de la red y después dónde va la copia'),
+        herr('cquitar', null, 'Quitar', '✕', 'Quitar una pieza (vuelve la mitad del material)')),
+      el('div', { class: 'cb-grupo cb-niv', title: 'Nivel con el que trazas y mejoras' },
+        D.CINTA.niv.slice(0, D.CINTA.maxFase).map((v, i) => {
+          const k = i + 1, ok = k <= Ci.maxNivel();
+          return el('button', { type: 'button', class: 'cb-n' + (k === nn ? ' sel' : ''), disabled: !ok, title: ok ? v.name + ': ' + Ci.porMin(k) + ' por minuto' : 'Se habilita en la Era ' + U.roman(v.era), onclick: () => { L.cintaNivel = k; L.cintaNivelElegido = true; UI.refreshPanel(true); } }, el('span', { class: 'cinta-muestra n' + k }), U.roman(k));
+        })),
+      el('div', { class: 'cb-grupo' },
+        el('button', { type: 'button', class: 'cb-herr' + (Ci.verFlujo ? ' sel' : ''), title: 'Ver flujo: gris vacía, verde corre, amarillo a tope, rojo atascada', onclick: () => { Ci.verFlujo = !Ci.verFlujo; UI.refreshPanel(true); } }, el('span', { class: 'cb-glifo' }, '◐'), el('span', { class: 'cb-txt' }, 'Flujo')),
+        el('button', { type: 'button', class: 'cb-herr cb-x', title: 'Cerrar el menú de cintas (Esc)', 'aria-label': 'Cerrar', onclick: () => { G().sel = null; I.cancelTool(); } }, el('span', { class: 'cb-glifo' }, '✓'), el('span', { class: 'cb-txt' }, 'Listo'))));
+  }
+  UI.barraCintas = barraCintas;
+  // El panel de las herramientas que se usan tocando una pieza
+  function cintaPiezaPanel() {
+    const L = PK.Logi, Ci = PK.Cintas, t = L.tool, n = Math.min(L.cintaNivel || Ci.maxNivel(), Ci.maxNivel());
+    const p = L.cintaNodo || 'v';
+    const tit = { cnodo: 'Poner ' + (D.CINTA.nodoNombre[p] || '').toLowerCase(), csubir: 'Mejorar tramos a nivel ' + U.roman(n), cgirar: 'Girar piezas', cquitar: 'Quitar piezas', cmolde: 'Copiar una red' }[t];
+    const txt = {
+      cnodo: { u: 'Toca una pieza a la que lleguen varias cintas: las junta por turnos en una sola salida.', v: 'Toca una pieza: reparte por turnos hacia adelante y a los costados que tengan cinta o edificio.', s: 'Toca una pieza: cada recurso sale por el lado que elijas (en el panel del clasificador). Lo que no tiene lado, sigue adelante.' }[p] + ' Cuesta ',
+      csubir: 'Toca una pieza: se mejora todo su tramo (hasta un edificio, un final o un nodo). ' + NIVTXT(n),
+      cgirar: 'Toca una pieza para girarla un cuarto de vuelta. Lo que llevaba vuelve al pueblo.',
+      cquitar: 'Toca una pieza para quitarla: vuelve la mitad de su material y lo que llevaba.',
+      cmolde: 'Toca una pieza de la red que quieres copiar; después eliges dónde va la copia.',
+    }[t];
+    const box = el('div', { class: 'p-help' }, el('h3', null, tit), el('p', { class: 'small' }, txt));
+    if (t === 'cnodo') box.append(UI.costEl(D.CINTA.nodos[p] || {}));
+    box.append(el('div', { class: 'row' },
+      t === 'cquitar' ? UI.btn('Quitar una zona…', () => { PK.Input.cancelTool(); PK.Despeje.empezar('quitar'); }, { small: true, title: 'Marca una zona: quita cintas, murallas y caminos' }) : '',
+      UI.btn('Terminar', () => PK.Input.cancelTool(), { small: true })));
+    return box;
+  }
+
   // ---------- Red de cintas (pk-58) ----------
   // Elegir nivel con fichas: I, II, III (los que tu era habilita).
   function nivelesCinta(onPick, actual, desde) {
     const Ci = PK.Cintas, max = Ci.maxNivel();
     return el('div', { class: 'rt-chips' }, D.CINTA.niv.slice(0, D.CINTA.maxFase).map((v, i) => {
       const n = i + 1, ok = n <= max && n > (desde || 0);
-      return el('button', { type: 'button', class: 'rt-chip' + (n === actual ? ' sel' : ''), disabled: !ok, title: n > max ? 'Se habilita en la Era ' + U.roman(v.era) : v.rate * 60 + ' por minuto', onclick: () => onPick(n) },
-        el('span', { class: 'cinta-muestra n' + n }), U.roman(n) + ' · ' + v.rate * 60 + '/min');
+      return el('button', { type: 'button', class: 'rt-chip' + (n === actual ? ' sel' : ''), disabled: !ok, title: n > max ? 'Se habilita en la Era ' + U.roman(v.era) : Ci.porMin(n) + ' por minuto', onclick: () => onPick(n) },
+        el('span', { class: 'cinta-muestra n' + n }), U.roman(n) + ' · ' + Ci.porMin(n) + '/min');
     }));
   }
   function cintaToolPanel() {
@@ -822,21 +894,18 @@
     box.append(el('p', { class: 'small' }, paso
       ? 'Toca la entrada y después la salida, en la misma fila o columna (a 2..' + D.CINTA.pasoMax + ' casillas). La cinta pasa por arriba: por debajo cruzan carretas, carromatos, caminos y otras cintas.'
       : I.roadStart ? 'Toca dónde termina. Si terminas en un edificio, la cinta le entrega; si cruzas en recto una cinta de través, ahí va un cruce (no se mezclan).'
-        : 'Toca dónde empieza: junto a un edificio (o sobre él) para que saque de ahí, en el final de otra cinta para seguirla, o en medio de una cinta para sacar una rama (pone un divisor). Si terminas sobre una cinta que ya recibe de otra, ahí va un unidor. Las carretas no cruzan cintas: déjales paso o usa un paso elevado; los aldeanos caminan por encima.'));
-    box.append(el('div', { class: 'small' }, el('b', null, 'Nivel: ')), nivelesCinta(k => { L.cintaNivel = k; UI.refreshPanel(true); }, n));
-    box.append(el('p', { class: 'small muted' }, NIVTXT(n) + ' Cada casilla cuesta '), UI.costEl(Ci.costoSubir(0, n)));
+        : 'Toca dónde empieza: sobre un edificio para que saque de ahí, en el final de otra cinta para seguirla, o en medio de una para sacar una rama (pone un divisor). Las carretas no cruzan cintas (usa un paso elevado); los aldeanos caminan por encima.'));
+    // pk-63: el nivel se elige en la barra del menú de cintas
+    box.append(el('p', { class: 'small muted' }, 'Nivel ' + U.roman(n) + ' · ' + NIVTXT(n) + ' Cada casilla cuesta '), UI.costEl(Ci.costoSubir(0, n)));
     if (paso) box.append(el('p', { class: 'small muted' }, 'El paso elevado suma '), UI.costEl(D.CINTA.paso));
     if (!paso && p && p.tiles.length) {
       const c = Ci.costoPlan(p, n), ok = G().canAfford(c);
       box.append(el('p', { class: 'small ' + (p.malas.length ? 'warn-t' : '') }, p.malas.length ? 'Ahí no se puede: ' + p.malas[0].why + '.' : p.tiles.length + ' casillas' + (p.tiles.some(t => t.cruce) ? ', con cruce' : '') + (p.unir !== null && p.unir !== undefined ? ', con unidor' : '') + (p.dividir !== null && p.dividir !== undefined ? ', con divisor' : '') + (p.bI ? ' · sale de ' + p.bI.def.name : '') + (p.bF ? ' · entrega a ' + p.bF.def.name : '') + ':'), p.malas.length ? '' : UI.costEl(c), !p.malas.length && !ok ? el('p', { class: 'small warn-t' }, 'No te alcanza.') : '');
     }
-    box.append(el('div', { class: 'row' },
-      UI.btn(paso ? 'Trazar cinta' : 'Paso elevado', () => { L.tool = paso ? 'cinta' : 'paso'; I.roadStart = null; I.planCinta = null; PK.Render.beltGhost = null; UI.refreshPanel(true); }, { small: true }),
-      botonFlujo(),
-      UI.btn('Terminar', () => I.cancelTool(), { small: true })));
+    box.append(el('div', { class: 'row' }, I.roadStart ? UI.btn('Empezar en otro lado', () => { I.roadStart = null; I.planCinta = null; PK.Render.beltGhost = null; UI.refreshPanel(true); }, { small: true }) : '', UI.btn('Terminar', () => I.cancelTool(), { small: true })));
     return box;
   }
-  const NIVTXT = n => D.CINTA.niv[n - 1].name + ': ' + D.CINTA.niv[n - 1].rate * 60 + ' por minuto.';
+  const NIVTXT = n => D.CINTA.niv[n - 1].name + ': ' + PK.Cintas.porMin(n) + ' por minuto (paquetes de ' + (D.CINTA.pila || 1) + ').';
   // C2 (pk-59): «Ver flujo» pinta cada pieza según cuánto la usan
   // pk-60 (C3): copiar una red armada y estamparla en otro lado
   function copiaToolPanel() {
@@ -890,13 +959,13 @@
     const Ci = PK.Cintas, pz = Ci.pieza(k), g = G(), cs = Ci.carrilesEn(k), diag = Ci.diagnostico(k) || [];
     const box = el('div', { class: 'p-help' }, el('h3', null, Ci.nombre(pz)));
     const v = D.CINTA.niv[pz.n - 1], bono = 1 + (g.bono ? g.bono('belt') : 0);
-    box.append(el('p', { class: 'small' }, 'Hasta ' + Math.round(v.rate * 60 * bono) + ' por minuto' + (pz.pm !== undefined ? ' · pasan aprox. ' + pz.pm + ' por minuto' : '') + '.'));
+    box.append(el('p', { class: 'small' }, 'Hasta ' + Math.round(PK.Cintas.porMin(pz.n) * bono) + ' por minuto' + (pz.pm !== undefined ? ' · pasan aprox. ' + pz.pm + ' por minuto' : '') + '.'));
     if (pz.p === 'k') box.append(el('p', { class: 'small muted' }, 'Las dos cintas se cruzan sin tocarse: la de través pasa por debajo.'));
     if (pz.p === 'e' || pz.p === 'x') box.append(el('p', { class: 'small muted' }, 'Por debajo pasan carretas, carromatos, caminos y otras cintas.'));
     if (PK.Cintas.NODO[pz.p] && cs[0]) box.append(nodoBox(k, pz, cs[0]));
     // qué lleva
     const lleva = {};
-    for (const arr of [pz.i, pz.j]) if (arr) for (const [r] of arr) lleva[r] = (lleva[r] || 0) + 1;
+    for (const arr of [pz.i, pz.j]) if (arr) for (const it of arr) lleva[it[0]] = (lleva[it[0]] || 0) + (it[2] || 1);
     const ks = Object.keys(lleva);
     if (ks.length) box.append(el('p', { class: 'small' }, 'Lleva: ', ks.map(r => el('span', { class: 'amt' }, UI.resIcon(r), lleva[r] + ' '))));
     // bocas y diagnóstico
@@ -919,7 +988,7 @@
     const max = Ci.maxNivel(), tramo = Ci.tramo(k);
     if (pz.n < D.CINTA.maxFase) {
       const sig = pz.n + 1, c1 = Ci.costoSubirLista([k].concat(pz.p === 'e' ? [pz.hasta] : pz.p === 'x' ? [pz.desde] : []), sig), ct = Ci.costoSubirLista(tramo, sig);
-      box.append(el('div', { class: 'small' }, el('b', null, 'Mejorar a nivel ' + U.roman(sig) + ' '), el('span', { class: 'muted' }, '(' + D.CINTA.niv[sig - 1].rate * 60 + '/min)')));
+      box.append(el('div', { class: 'small' }, el('b', null, 'Mejorar a nivel ' + U.roman(sig) + ' '), el('span', { class: 'muted' }, '(' + PK.Cintas.porMin(sig) + '/min)')));
       if (sig > max) box.append(el('p', { class: 'small muted' }, 'Se habilita en la Era ' + U.roman(D.CINTA.niv[sig - 1].era) + '.'));
       else box.append(el('div', { class: 'row' }, UI.btn('Esta pieza', () => { Ci.subir([k].concat(pz.p === 'e' ? [pz.hasta] : pz.p === 'x' ? [pz.desde] : []), sig); UI.refreshPanel(true); }, { small: true, cls: 'gold', disabled: !g.canAfford(c1) }), UI.costEl(c1)),
         tramo.length > 1 ? el('div', { class: 'row' }, UI.btn('Todo el tramo (' + tramo.length + ')', () => { Ci.subir(tramo, sig); UI.refreshPanel(true); }, { small: true, cls: 'gold', disabled: !g.canAfford(ct) }), UI.costEl(ct)) : '');
