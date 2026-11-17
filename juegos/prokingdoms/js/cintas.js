@@ -262,10 +262,9 @@
     return s;
   }
   Ci.aceptaAbajo = k => { rearmarSiHace(); const c = (porK.get(k) || [])[0]; return c ? aceptaAbajo(c) : new Set(); };
-  // cuánto puede dar de eso (una bodega, sin bajar de la reserva)
+  // cuánto puede dar de eso (lo que hay en sus estantes; pk-73: sin mirar la reserva de los talleres)
   function hayDe(b, r) {
-    if (PK.Libro.esCampo(b)) return PK.Libro.inv(b)[r] || 0;
-    return Math.min(PK.Libro.inv(b)[r] || 0, (S().res[r] || 0) - reserva(r));
+    return PK.Libro.inv(b)[r] || 0;
   }
   // qué puede salir por esa boca: lo que hace el taller, lo que junta el campamento, lo elegido en la bodega
   function opcionesFuente(c) {
@@ -278,9 +277,10 @@
   function disponible(b, r) {
     if (L().isShop(b)) return ((b.outb && b.outb[r]) || 0) >= 1;
     if (PK.Libro.esCampo(b)) return (PK.Libro.inv(b)[r] || 0) >= 1;
-    // pk-72 (pedido del dueño): de los estantes de esa bodega (cada una tiene su inventario), sin bajar la reserva del
-    // pueblo. pk-71 la había hecho sacar del pueblo entero: se volvió atrás.
-    return (PK.Libro.inv(b)[r] || 0) >= 1 && (S().res[r] || 0) - 1 >= reserva(r);
+    // pk-72 (pedido del dueño): de los estantes de esa bodega (cada una tiene su inventario). pk-71 la había hecho
+    // sacar del pueblo entero: se volvió atrás. pk-73 (pedido del dueño): sin mirar la reserva de los talleres, porque
+    // el taller ya se para solo cuando el pueblo está bajo la reserva; la cinta no tiene que frenar además.
+    return (PK.Libro.inv(b)[r] || 0) >= 1;
   }
   Ci.puedeSacar = (b, r) => disponible(b, r);
   // pk-72: por qué una boca no saca ese recurso, en palabras (null si sale). Para el panel de la bodega y de la pieza.
@@ -290,15 +290,8 @@
     if (!aceptaAbajo(c).has(r)) return 'adelante nadie recibe ' + nom + ' (la cinta no llega a un taller que lo use ni a una bodega)';
     if (L().isShop(b) || PK.Libro.esCampo(b)) return disponible(b, r) ? null : b.def.name + ' no tiene ' + nom + ' para dar';
     if ((PK.Libro.inv(b)[r] || 0) < 1) return b.def.name + ' no tiene ' + nom + ' en sus estantes (lo guardan otras bodegas)';
-    const rv = reserva(r), hay = S().res[r] || 0;
-    if (hay - 1 < rv) return 'el pueblo tiene ' + U.fmt(Math.floor(hay)) + ' de ' + nom + ' y la reserva de los talleres pide ' + U.fmt(Math.ceil(rv)) + ' (' + Math.round((S().auto.reserve || 0) * 100) + '% de lo que caben): bájala en Aldeanos';
     return null;
   };
-  // la reserva de los talleres (como las carretas): una bodega no se vacía por debajo de lo que guarda el Capataz
-  function reserva(r) {
-    const st = S(), rv = st.auto ? st.auto.reserve || 0 : 0;
-    return rv * G().cap(r);
-  }
 
   // ---------- Simulación en vivo ----------
   // Cada pieza acepta un ítem cada 1 / ritmo segundos (c.lib): así una de nivel más bajo deja pasar solo su ritmo y
@@ -445,7 +438,7 @@
       if (!opc.length) continue;
       let presu = NIV(c.pz.n).rate * PILA() * k0 * dt;
       const quedan = {};
-      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r)));
+      for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.inv(b)[r] || 0;
       for (let pasada = 0; pasada < 3 && presu > 0.01; pasada++) {
         const vivos = opc.filter(r => quedan[r] > 0.01);
         if (!vivos.length) break;
