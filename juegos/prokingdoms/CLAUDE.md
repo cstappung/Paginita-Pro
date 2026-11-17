@@ -117,7 +117,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `PLAN-LOGISTICA.md` L3 changes this (stock per building with `S.res` as the town total).
 - **Full storage makes gatherers wait** (`G.isFull`, `u.fullWait`) instead of stripping nodes.
 - **The workshop reserve** (`G.reservaDe`): a held workshop does not produce at all («En reserva»). Carts recheck
-  `reserveOf` **at pickup**, offline belts respect it, and «Producir igual» is always toggled through
+  `reserveOf` **at pickup** (belts do not: pk-73), and «Producir igual» is always toggled through
   `G.setSinReserva(b, v)` (sends the buffer back). A workshop with no supply (`L.supplied`) takes no workers.
 - **The upgrade queue is the player's:** the Maestro mayor and «Mejoras en serie» (`A.SERIE_TIPOS` whitelist) start
   upgrades directly (`A.mejorarYa`), never enqueue, and never spend what the first queued item lacks
@@ -604,8 +604,10 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   delivering it to a store passes that much over the town cap (`Lb.poner(b, r, n, extra)`), because it already
   counted there. Before, with the town full or over the cap (rewards enter over it) the belt filled with 3 packets
   and stopped forever. Offline the same through `deBod`.
-- **A store port draws from that building's shelves** (`Libro.inv(b)`, and never below the town reserve). pk-71 made
-  it draw from the whole town; the owner wants each store's own inventory, so pk-72 reverted it.
+- **A store port draws from that building's shelves** (`Libro.inv(b)`). pk-71 made it draw from the whole town; the
+  owner wants each store's own inventory, so pk-72 reverted it. **It ignores the workshop reserve** (pk-73, owner's
+  call): a held workshop already stops producing, and a belt that also stopped below the reserve (15% of the cap)
+  left ingots stuck in the Centro Urbano with nothing jammed.
 - **Divisors and sorters only send to a branch whose downstream receives the item** (pk-72, owner's report: «saca
   solo un par»). `salir` skips lane outs without it in `aceptaAbajo(o.c)` when there is more than one out. Before, a
   divisor dealt items in turns: stone went into the sawmill's branch, sat at its tip and jammed everything behind it,
@@ -615,7 +617,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   output says no (or a sorter has no output for it), the packet goes back to `S.res` and the lane shows «Volvió al
   pueblo: …». Jams used to be permanent, and saves with a blind divisor stayed full with the port unable to emit.
 - **`Ci.porQueNoSale(c, r)`** says in words why a port does not emit a resource (nobody downstream, not on these
-  shelves, or the town is under the workshop reserve, with the numbers); the store-port picker lists it per pick.
+  shelves); the store-port picker lists it per pick.
 - **A port emits only what someone downstream receives** (`aceptaAbajo`, memo per `armado`; a sorter passes its
   filter and everything through `'*'`). Otherwise the source lane shows «No sale nada: adelante nadie recibe …»; a
   belt still jams (red) only with old cargo. The store-port picker shows how much this building holds of each

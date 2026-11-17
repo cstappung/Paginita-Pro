@@ -1695,7 +1695,9 @@ test('pk-72: un divisor no manda a una rama lo que nadie de esa rama recibe, y l
     // el panel dice por qué no sale cada cosa
     assert.match(Ci.porQueNoSale(boca, 'gold'), /adelante nadie recibe oro/);
     assert.equal(Ci.porQueNoSale(boca, 'wood'), null);
+    // pk-73 (pedido del dueño): la reserva de los talleres no frena la cinta (el taller ya se para solo)
     G.state.auto.reserve = 0.5; G.state.res.wood = 100;
-    assert.match(Ci.porQueNoSale(boca, 'wood'), /reserva de los talleres pide 50\.0K|reserva de los talleres pide 50K|reserva de los talleres pide/);
+    assert.equal(Ci.porQueNoSale(boca, 'wood'), null);
+    assert.ok(Ci.puedeSacar(boca.src, 'wood'), 'bajo la reserva la boca igual saca');
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
