@@ -23,6 +23,7 @@ function carga(files) {
 }
 const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
+const PILA = D.CINTA.pila || 1; // pk-67: cada ítem de cinta es un paquete de hasta PILA unidades
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
 const TODO = FUENTES.map(([, s]) => s).join('\n');
@@ -1262,7 +1263,7 @@ test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, c
   G.stat = () => {}; G.cap = () => 1000; L.bufCap = () => 100000;
   const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
   const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
-  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 1000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} }), mina = mk(3, 'mining', 21, 50, { inv: { stone: 50, gold: 50 } });
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 1000 * PILA } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} }), mina = mk(3, 'mining', 21, 50, { inv: { stone: 50 * PILA, gold: 50 * PILA } });
   G.buildings = [saw, forja, mina]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
   W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
   G.state = Object.assign({}, st0 || {}, { era: 4, res: { planks: 0, stone: 0, gold: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
@@ -1277,7 +1278,7 @@ test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, c
     assert.ok(Ci.alimenta(forja) && L.supplied(forja));
     for (let i = 0; i < 1200; i++) Ci.update(0.1); // 2 minutos
     const n1 = forja.inb.planks || 0;
-    assert.ok(n1 >= 100 && n1 <= 121, 'el nivel I frena todo a 60/min (llegaron ' + n1 + ')');
+    assert.ok(n1 >= 100 * PILA && n1 <= 121 * PILA, 'el nivel I frena todo a 60/min (llegaron ' + n1 + ')');
     const dg = Ci.diagnostico(W.idx(24, 41))[0];
     assert.equal(dg.min.k, W.idx(26, 41), 'el diagnóstico encuentra la pieza lenta');
     // al subirla, rinde como las demás
@@ -1333,7 +1334,7 @@ test('pk-58: red de cintas — cuello de botella, atasco, cruce, paso elevado, c
     forja.inb = {}; saw.outb.planks = 1000;
     t[W.idx(28, 41)].n = 1; Ci.cambio();
     Ci.offline(60);
-    assert.equal(forja.inb.planks, 60, 'sin conexión: 60 por minuto con una pieza de nivel I');
+    assert.equal(forja.inb.planks, 60 * PILA, 'sin conexión: 60 por minuto con una pieza de nivel I');
     // conversión de las cintas de antes: nivel III, con lo que llevaban
     G.state.logi.red = null; W.belt.fill(-1);
     G.state.logi.belts = [{ id: 1, a: 1, b: 2, res: null, path: [[23, 41], [24, 41], [25, 41]], items: [{ p: 1.5, r: 'planks' }] }];
@@ -1385,12 +1386,12 @@ test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión',
     Ci.ponerFiltro(W.idx(65, 40), 0, 'stone'); Ci.ponerFiltro(W.idx(65, 40), 1, 'gold');
     for (let i = 0; i < 1200; i++) Ci.update(0.1); // 2 minutos
     const a = fa.inb.planks || 0, b = fb.inb.planks || 0;
-    assert.ok(a > 120 && b > 120 && Math.abs(a - b) <= 20, 'el divisor reparte por turnos (' + a + ' / ' + b + ')');
+    assert.ok(a > 120 * PILA && b > 120 * PILA && Math.abs(a - b) <= 20 * PILA, 'el divisor reparte por turnos (' + a + ' / ' + b + ')');
     const c = fc.inb.planks || 0;
-    assert.ok(c >= 300 && c <= 361, 'el unidor junta las dos hasta su nivel III (' + c + ')');
-    assert.ok(Math.abs((s1.outb.planks) - (s2.outb.planks)) <= 20, 'toma por turnos de las dos (' + s1.outb.planks + ' / ' + s2.outb.planks + ')');
-    assert.ok((can.inb.stone || 0) > 100 && !can.inb.gold, 'la piedra va a la cantería (' + can.inb.stone + ')');
-    assert.ok((cop.inb.gold || 0) > 100 && !cop.inb.stone, 'el oro a los copistas (' + cop.inb.gold + ')');
+    assert.ok(c >= 300 * PILA && c <= 361 * PILA, 'el unidor junta las dos hasta su nivel III (' + c + ')');
+    assert.ok(Math.abs((s1.outb.planks) - (s2.outb.planks)) <= 20 * PILA, 'toma por turnos de las dos (' + s1.outb.planks + ' / ' + s2.outb.planks + ')');
+    assert.ok((can.inb.stone || 0) > 100 * PILA && !can.inb.gold, 'la piedra va a la cantería (' + can.inb.stone + ')');
+    assert.ok((cop.inb.gold || 0) > 100 * PILA && !cop.inb.stone, 'el oro a los copistas (' + cop.inb.gold + ')');
     // sin «lo que sobre» y sin salida para el oro: se atasca
     Ci.ponerFiltro(W.idx(65, 40), 1, '');
     for (let i = 0; i < 100; i++) Ci.update(0.1);
@@ -1402,10 +1403,10 @@ test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión',
     for (const ks in t) t[ks].i = [];
     fa.inb = {}; fb.inb = {}; fc.inb = {}; can.inb = {}; cop.inb = {};
     Ci.offline(60);
-    assert.equal(fa.inb.planks + fb.inb.planks, 180, 'sin conexión: 180 por el divisor de nivel III');
+    assert.equal(fa.inb.planks + fb.inb.planks, 180 * PILA, 'sin conexión: 180 por el divisor de nivel III');
     assert.equal(fa.inb.planks, fb.inb.planks);
-    assert.ok(fc.inb.planks <= 180 && fc.inb.planks >= 170, 'el unidor de nivel III deja pasar 180 (' + fc.inb.planks + ')');
-    assert.ok(can.inb.stone >= 80 && cop.inb.gold >= 80 && !can.inb.gold && !cop.inb.stone, 'clasificado sin conexión');
+    assert.ok(fc.inb.planks <= 180 * PILA && fc.inb.planks >= 170 * PILA, 'el unidor de nivel III deja pasar 180 (' + fc.inb.planks + ')');
+    assert.ok(can.inb.stone >= 80 * PILA && cop.inb.gold >= 80 * PILA && !can.inb.gold && !cop.inb.stone, 'clasificado sin conexión');
     // tramo: un divisor corta el tramo
     assert.ok(!Ci.tramo(W.idx(24, 41)).includes(W.idx(26, 42)));
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
@@ -1418,7 +1419,7 @@ test('pk-60: cintas de nivel IV y V (Fase C3) y copiar una red', () => {
   G.stat = () => {}; G.cap = () => 1e9; L.bufCap = () => 100000;
   const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
   const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
-  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 5000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 5000 * PILA } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
   G.buildings = [saw, forja]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
   W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
   G.state = Object.assign({}, st0 || {}, { era: 6, res: { planks: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
@@ -1431,17 +1432,17 @@ test('pk-60: cintas de nivel IV y V (Fase C3) y copiar una red', () => {
     Ci.init(G.state);
     for (let i = 0; i < 1200; i++) Ci.update(0.1);
     const v = forja.inb.planks || 0;
-    assert.ok(v >= 900 && v <= 961, 'el nivel V lleva 480/min (' + v + ' en 2 min)');
+    assert.ok(v >= 900 * PILA && v <= 961 * PILA, 'el nivel V lleva 480/min (' + v + ' en 2 min)');
     // una pieza de nivel IV en medio frena a 300
     forja.inb = {}; for (const k in t) t[k].i = [];
     t[W.idx(26, 41)].n = 4; Ci.cambio();
     for (let i = 0; i < 1200; i++) Ci.update(0.1);
     const iv = forja.inb.planks || 0;
-    assert.ok(iv >= 560 && iv <= 601, 'el nivel IV frena a 300/min (' + iv + ')');
+    assert.ok(iv >= 560 * PILA && iv <= 601 * PILA, 'el nivel IV frena a 300/min (' + iv + ')');
     forja.inb = {}; for (const k in t) t[k].i = [];
     t[W.idx(26, 41)].n = 5; Ci.cambio();
     Ci.offline(60);
-    assert.equal(forja.inb.planks, 480, 'sin conexión: 480 por minuto');
+    assert.equal(forja.inb.planks, 480 * PILA, 'sin conexión: 480 por minuto');
     // copiar: una red con un clasificador y un paso elevado
     for (const k in t) delete t[k];
     W.belt.fill(-1);
@@ -1526,4 +1527,57 @@ test('pk-62: de cada mazmorra queda la entrada (1 casilla que se pisa), las muda
   for (const k of Object.keys(D.POI).filter(k => D.POI[k].dungeon)) assert.match(pent, new RegExp('\\n    ' + k + '\\(p\\) \\{'), k + ' tiene entrada');
   assert.match(JS('render.js'), /R\.poiVisible = function/);
   assert.match(JS('game.js'), /W\.subAt\.get\(i\)/);
+});
+
+test('pk-67: paquetes de 4, varias cintas desde un mismo edificio, menú de cintas, bocas y modo transparente', () => {
+  const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
+  const buf0 = L.bufCap, pay0 = G.pay;
+  G.pay = () => true; G.stat = () => {}; G.cap = () => 1e9;
+  let cupo = 100000; L.bufCap = () => cupo;
+  const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
+  const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 1000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
+  G.buildings = [saw, forja]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
+  W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
+  G.state = Object.assign({}, st0 || {}, { era: 6, res: { planks: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
+  const t = G.state.logi.red.t, libre0 = Ci.libre, owner0 = W.ownerAt;
+  try {
+    assert.equal(D.CINTA.pila, 4, 'cada ítem lleva hasta 4');
+    assert.equal(Ci.porMin(1), 240); assert.equal(Ci.porMin(5), 1920);
+    // del aserradero a la herrería: los ítems van de a 4
+    for (let x = 23; x <= 30; x++) t[W.idx(x, 41)] = { p: 'c', d: 0, n: 3, i: [] };
+    Ci.init(G.state);
+    for (let i = 0; i < 40; i++) Ci.update(0.1);
+    const its = Object.values(t).flatMap(pz => pz.i);
+    assert.ok(its.length && its.every(it => it[2] === 4), 'paquetes de 4');
+    assert.equal(Ci.enCinta('planks'), its.length * 4, 'lo que va arriba se cuenta por unidades');
+    // una entrega que no cabe entera: lo que sobra espera en la punta
+    for (let i = 0; i < 200; i++) Ci.update(0.1);
+    cupo = (forja.inb.planks || 0) + 2;
+    for (let i = 0; i < 30; i++) Ci.update(0.1);
+    assert.equal(forja.inb.planks, cupo, 'entra justo lo que cabe');
+    const punta = Ci.carrilesEn(W.idx(30, 41))[0].pz.i[0];
+    assert.ok(punta && punta[2] === 2, 'en la punta quedan 2 de ese paquete (' + (punta && punta[2]) + ')');
+    // quitar una pieza devuelve el paquete entero
+    const antes = G.state.res.planks || 0, lleva = (t[W.idx(30, 41)].i || []).reduce((a, it) => a + (it[2] || 1), 0);
+    Ci.quitar(W.idx(30, 41), true);
+    assert.equal(G.state.res.planks, antes + lleva);
+    // varias cintas desde el mismo edificio: al tocar el aserradero, el plan sale por un borde libre
+    Ci.libre = (x, y) => W.inb(x, y) && W.bAt[W.idx(x, y)] < 0 && !t[W.idx(x, y)];
+    W.ownerAt = () => 'p';
+    const p2 = Ci.plan(21, 41, 30, 41);
+    assert.ok(p2 && !p2.malas.length, 'la segunda no choca con la primera (' + (p2 && p2.malas[0] && p2.malas[0].why) + ')');
+    assert.ok(!(p2.tiles[0].x === 23 && p2.tiles[0].y === 41), 'no empieza sobre la cinta que ya sale');
+    Ci.trazar(p2, 3);
+    Ci.rearmar();
+    assert.ok(Ci.carriles().filter(c => c.src === saw).length >= 2, 'el aserradero tiene dos bocas de salida');
+    // el menú de cintas y el dibujo
+    for (const h of ['cnodo', 'csubir', 'cgirar', 'cquitar', 'cmolde']) assert.ok(Ci.HERR_PIEZA[h] && Ci.HERR[h], h);
+    assert.ok(Ci.HERR.cinta && Ci.HERR.paso && Ci.HERR.copiar);
+    assert.match(JS('sprites.js'), /S\.beltBoca = function \(d, entrada, n\)/);
+    assert.match(JS('render.js'), /R\.modoCintas = function/);
+    assert.match(JS('render.js'), /PK\.Cintas\.bocas\(R, Sp, seen\)/);
+    assert.match(JS('ui.js'), /'cintas', \(g, st\) =>|cintas: \(g, st\) =>/);
+    assert.match(JS('input.js'), /k === 'k'/);
+  } finally { Ci.libre = libre0; W.ownerAt = owner0; G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.stat = stat0; G.pay = pay0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });

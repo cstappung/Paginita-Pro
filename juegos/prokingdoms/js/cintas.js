@@ -22,6 +22,10 @@
   const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
   const OPP = d => (d + 2) % 4;
   const NIV = n => D.CINTA.niv[n - 1];
+  // pk-67: un ítem lleva hasta PILA unidades ([recurso, posición, cantidad]; sin cantidad, 1: partidas de antes)
+  const PILA = () => D.CINTA.pila || 1;
+  const cantDe = it => it[2] || 1;
+  Ci.porMin = n => NIV(n).rate * 60 * PILA(); // unidades por minuto de un nivel (sin el bono del árbol)
   Ci.DIRS = DIRS;
   Ci.NOM_DIR = ['E', 'S', 'W', 'N'];
   // Cintas reforzadas (árbol): más rápidas todas. Una vez por instante del juego: G.bono mira la estación y se pedía
@@ -84,6 +88,9 @@
   // el unidor recibe de hasta tres, los demás de uno. sig/dst: la primera salida a un carril o a un edificio.
   const NODO = { u: 1, v: 1, s: 1 };
   Ci.NODO = NODO;
+  // pk-67: las herramientas del menú de cintas (PK.Logi.tool) que se usan tocando una pieza, y todas las del menú
+  Ci.HERR_PIEZA = { cnodo: 1, csubir: 1, cgirar: 1, cquitar: 1, cmolde: 1 };
+  Ci.HERR = Object.assign({ cinta: 1, paso: 1, copiar: 1 }, Ci.HERR_PIEZA);
   let carriles = [], porK = new Map(), orden = [], clave = '';
   Ci.version = 0;
   function rearmarSiHace() {
@@ -200,34 +207,42 @@
     if (L().isShop(b)) return L().bufCap(b) - ((b.inb && b.inb[r]) || 0);
     return G().cap(r) - (S().res[r] || 0);
   }
-  // 'ok', 'lleno' o 'no' (no lo usa)
-  function entregar(b, r) {
+  // cuántas unidades entregó (puede ser parte del paquete, si no hay lugar para todo), o 'no' (no lo usa)
+  function entregar(b, r, cant) {
     if (!recibe(b, r)) return 'no';
-    if (lugarEn(b, r) < 1) return 'lleno';
-    if (L().isShop(b)) { if (!b.inb) b.inb = {}; b.inb[r] = (b.inb[r] || 0) + 1; }
-    else if (PK.Libro.poner(b, r, 1) < 1) return 'lleno';
-    G().stat('belted', 1);
-    return 'ok';
+    let m = Math.min(cant, Math.floor(lugarEn(b, r)));
+    if (m < 1) return 0;
+    if (L().isShop(b)) { if (!b.inb) b.inb = {}; b.inb[r] = (b.inb[r] || 0) + m; }
+    else m = PK.Libro.poner(b, r, m);
+    if (m > 0) G().stat('belted', m);
+    return Math.max(0, m);
   }
-  // Lo que da una boca de salida, por turnos (pz.rr). null: nada por ahora.
+  // Lo que da una boca de salida, por turnos (pz.rr): [recurso, cantidad] (un paquete de hasta PILA). null: nada.
   function sacar(c) {
     const b = c.src, pz = c.pz;
     if (L().isShop(b)) {
       const out = L().output(b);
       if (!b.outb) b.outb = {};
-      if ((b.outb[out] || 0) >= 1) { b.outb[out] -= 1; return out; }
+      const n = Math.min(PILA(), Math.floor(b.outb[out] || 0));
+      if (n >= 1) { b.outb[out] -= n; return [out, n]; }
       return null;
     }
     const lista = opcionesFuente(c);
     for (let i = 0; i < lista.length; i++) {
       const j = ((pz.rr || 0) + i) % lista.length, r = lista[j];
       if (!disponible(b, r)) continue;
-      if (PK.Libro.esCampo(b)) { if (PK.Libro.sacarCampo(b, r, 1) < 1) continue; }
-      else if (PK.Libro.sacar(b, r, 1) < 1) continue;
+      const quiere = Math.min(PILA(), Math.floor(hayDe(b, r)));
+      const n = PK.Libro.esCampo(b) ? PK.Libro.sacarCampo(b, r, quiere) : PK.Libro.sacar(b, r, quiere);
+      if (n < 1) continue;
       pz.rr = j + 1;
-      return r;
+      return [r, n];
     }
     return null;
+  }
+  // cuánto puede dar de eso (una bodega, sin bajar de la reserva)
+  function hayDe(b, r) {
+    if (PK.Libro.esCampo(b)) return PK.Libro.inv(b)[r] || 0;
+    return Math.min(PK.Libro.inv(b)[r] || 0, (S().res[r] || 0) - reserva(r));
   }
   // qué puede salir por esa boca: lo que hace el taller, lo que junta el campamento, lo elegido en la bodega
   function opcionesFuente(c) {
@@ -288,7 +303,8 @@
     }
   };
   // Pasa el ítem del final a una de las salidas. true si salió.
-  function salir(c, r) {
+  function salir(c, it0) {
+    const r = it0[0], cant = cantDe(it0);
     if (!c.outs.length) { if (!c.motivo || c.motivo === SIN) c.motivo = SIN; return false; }
     let elig = c.outs;
     if (c.pz.p === 's') {
@@ -303,13 +319,15 @@
       if (o.c) {
         if (!hayLugarDesde(o.c, c)) continue;
         const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
-        dest.push([r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim)]);
+        dest.push([r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
         o.c.lib = credito(o.c) + cada(o.c);
+        c.pz.flujo = (c.pz.flujo || 0) + cant;
         if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
       } else {
-        const e = entregar(o.b, r);
+        const e = entregar(o.b, r, cant);
         if (e === 'no') { noUsa = noUsa || o.b; continue; }
-        if (e === 'lleno') { lleno = lleno || o.b; continue; }
+        if (e > 0) c.pz.flujo = (c.pz.flujo || 0) + e;
+        if (e < cant) { it0[2] = cant - e; lleno = lleno || o.b; continue; } // lo que no entró espera en la punta
       }
       c.rr = (ini + i + 1) % n; c.motivo = null; c.atasco = false;
       return true;
@@ -325,12 +343,12 @@
     const sp = vel(c) * dt;
     for (let i = 0; i < it.length; i++) it[i][1] = Math.min(it[i][1] + sp, i === 0 ? Infinity : it[i - 1][1] - JUNTOS);
     if (it.length && it[0][1] >= c.len) {
-      if (salir(c, it[0][0])) { it.shift(); c.pz.flujo = (c.pz.flujo || 0) + 1; }
+      if (salir(c, it[0])) it.shift();
       else it[0][1] = c.len;
     }
     for (let i = 1; i < it.length; i++) if (it[i][1] > it[i - 1][1] - JUNTOS) it[i][1] = it[i - 1][1] - JUNTOS;
     // boca de salida: saca a su ritmo
-    if (c.src && hayLugar(c)) { const r = sacar(c); if (r) { it.push([r, detras(it)]); c.lib = credito(c) + cada(c); } }
+    if (c.src && hayLugar(c)) { const s2 = sacar(c); if (s2) { it.push([s2[0], detras(it), s2[1]]); c.lib = credito(c) + cada(c); } }
   }
   // Ítems por minuto que pasan (medido cada 10 s; pz.flujo cuenta los que salen de la pieza)
   let medT = 0;
@@ -368,7 +386,7 @@
       if (!c.src) continue;
       const b = c.src, a = accDe(c), opc = opcionesFuente(c).filter(r => disponible(b, r));
       if (!opc.length || opc.some(r => !a.has(r))) continue;
-      let presu = NIV(c.pz.n).rate * k0 * dt;
+      let presu = NIV(c.pz.n).rate * PILA() * k0 * dt;
       const quedan = {};
       for (const r of opc) quedan[r] = L().isShop(b) ? b.outb[r] || 0 : PK.Libro.esCampo(b) ? PK.Libro.inv(b)[r] || 0 : Math.max(0, Math.min(PK.Libro.inv(b)[r] || 0, (st.res[r] || 0) - reserva(r)));
       for (let pasada = 0; pasada < 3 && presu > 0.01; pasada++) {
@@ -382,7 +400,7 @@
     for (let i = orden.length - 1; i >= 0; i--) {
       const c = orden[i], f = flujo.get(c);
       if (!f) continue;
-      const cap = NIV(c.pz.n).rate * k0 * dt, tot = Object.values(f).reduce((a, b) => a + b, 0), esc = tot > cap ? cap / tot : 1;
+      const cap = NIV(c.pz.n).rate * PILA() * k0 * dt, tot = Object.values(f).reduce((a, b) => a + b, 0), esc = tot > cap ? cap / tot : 1;
       for (const r in f) {
         const n = f[r] * esc;
         const elig = c.outs.filter(o => pasaFiltro(c, o, r) && (o.b ? recibe(o.b, r) : accDe(o.c).has(r)));
@@ -456,15 +474,18 @@
     if (mejor) { mejor.bI = bI; mejor.bF = bF; }
     return mejor;
   };
+  // pk-67 (pedido del dueño): primero un borde libre, así de un edificio salen (o le llegan) varias cintas; antes
+  // tomaba el borde más cercano aunque ya tuviera una cinta y la segunda chocaba con la primera
   function bordeHacia(b, hacia) {
-    let best = null, bd = Infinity;
+    let best = null, bd = Infinity, ocup = null, od = Infinity;
     for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) {
       const borde = (x === b.x - 1 || x === b.x + b.w) !== (y === b.y - 1 || y === b.y + b.h); // sin esquinas
-      if (!borde || !(Ci.libre(x, y) || Ci.piezaEn(x, y))) continue;
+      if (!borde) continue;
       const d = U.dist(x + 0.5, y + 0.5, hacia[0], hacia[1]);
-      if (d < bd) { bd = d; best = [x, y]; }
+      if (Ci.libre(x, y)) { if (d < bd) { bd = d; best = [x, y]; } }
+      else if (Ci.piezaEn(x, y) && d < od) { od = d; ocup = [x, y]; }
     }
-    return best;
+    return best || ocup;
   }
   function haciaEdificio(t, b) {
     if (t[0] < b.x) return 0; if (t[0] >= b.x + b.w) return 2; if (t[1] < b.y) return 1; return 3;
@@ -678,7 +699,7 @@
     return true;
   };
   function devolverItems(pz) { // la carga nunca se pierde: vuelve al pueblo
-    for (const arr of [pz.i, pz.j]) if (arr) for (const [r] of arr) S().res[r] = (S().res[r] || 0) + 1;
+    for (const arr of [pz.i, pz.j]) if (arr) for (const it of arr) S().res[it[0]] = (S().res[it[0]] || 0) + cantDe(it);
     pz.i = []; if (pz.j) pz.j = [];
   }
   Ci.quitar = function (k, sinDevolver) {
@@ -712,7 +733,7 @@
     const st = S();
     if (!st || !st.logi || !st.logi.red) return 0;
     let n = 0;
-    for (const ks in red().t) { const pz = red().t[ks]; for (const arr of [pz.i, pz.j]) if (arr) for (const it of arr) if (it[0] === r) n++; }
+    for (const ks in red().t) { const pz = red().t[ks]; for (const arr of [pz.i, pz.j]) if (arr) for (const it of arr) if (it[0] === r) n += cantDe(it); }
     return n;
   };
   // ¿Le llega algo a este taller por cinta?
@@ -816,9 +837,9 @@
   // pk-60 (C3): lo que no cambia entre cuadros se arma una vez por rearmar: posición en pantalla, qué sprite (por
   // fase de la animación) y, por carril, los tres puntos por donde pasan sus ítems. Con 1.000 piezas de nivel V el
   // dibujo bajaba los cuadros a la mitad en un celular: armaba la clave del sprite y arreglos nuevos por pieza e ítem.
-  let dib = [], dibArmado = -1;
+  let dib = [], dibArmado = -1, bocasL = [];
   function armarDib(R, Sp) {
-    dibArmado = armado; dib = [];
+    dibArmado = armado; dib = []; bocasL = [];
     const t = red().t;
     for (const ks in t) {
       const k = +ks, pz = t[ks], [x, y] = xyOf(k), [px, py] = R.iso(x, y), cs = porK.get(k) || [];
@@ -841,8 +862,28 @@
       c.pts = [x + 0.5 - DIRS[inD][0] * 0.5, y + 0.5 - DIRS[inD][1] * 0.5, x + 0.5, y + 0.5, x + 0.5 + DIRS[d][0] * 0.5, y + 0.5 + DIRS[d][1] * 0.5];
       const [px, py] = R.iso(x, y);
       c.px = px; c.py = py;
+      // pk-67: las bocas (tolva donde entrega, compuerta donde saca), con la profundidad para ordenarlas con el edificio
+      const boca = (b, bd, ent) => {
+        const atras = bd >= 2; // el edificio queda detrás de la cinta: la boca va delante de su pared
+        bocasL.push({ k: c.k, x, y, b, bd, ent, n: c.pz.n, px, py, d: atras ? Math.max(x + y + 0.55, b.x + b.y + (b.w + b.h) / 2 + 0.02) : x + y + 0.4 });
+      };
+      for (const o of c.outs) if (o.b) boca(o.b, o.d, true);
+      if (c.src) boca(c.src, OPP(c.inD), false);
     }
   }
+  // pk-67: las bocas, como ítems del dibujo ordenado por profundidad
+  Ci.bocas = function (R, Sp, seen) {
+    const st = S(), out = [];
+    if (!st || !st.logi || !st.logi.red) return out;
+    rearmarSiHace();
+    if (dibArmado !== armado) armarDib(R, Sp);
+    for (const e of bocasL) {
+      if (!seen(e.x, e.y)) continue;
+      const spr = Sp.beltBoca(e.bd, e.ent, e.n);
+      out.push({ d: e.d, k: 'puente', o: { k: e.k }, spr, x: Math.round(e.px - spr.ox), y: Math.round(e.py - spr.oy) });
+    }
+    return out;
+  };
   Ci.dibujar = function (ctx, vis, R, Sp) {
     const st = S();
     if (!st || !st.logi || !st.logi.red) return;
@@ -896,7 +937,7 @@
   // máximo de su nivel: es normal), rojo solo lo que hay que arreglar: atascada o frenada por una pieza de menos nivel.
   Ci.verFlujo = false;
   function estado(c) {
-    const it = itemsDe(c) || [], cap = NIV(c.pz.n).rate * 60 * K(), lleno = it.length >= Math.floor(c.len / JUNTOS) && it.length > 1;
+    const it = itemsDe(c) || [], cap = NIV(c.pz.n).rate * 60 * PILA() * K(), lleno = it.length >= Math.floor(c.len / JUNTOS) && it.length > 1;
     if (c.atasco || (lleno && c.sig && c.sig.pz.n < c.pz.n)) return 3;
     if (lleno || (c.pz.pm || 0) >= cap * 0.8) return 2;
     return (c.pz.pm || 0) > 0 || it.length ? 1 : 0;

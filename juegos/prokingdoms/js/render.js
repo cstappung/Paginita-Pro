@@ -536,6 +536,7 @@
       } });
     }
     if (PK.Cintas) for (const it of PK.Cintas.elevados(R, Sp, seen)) list.push(it); // pk-58: tableros de los pasos elevados
+    if (PK.Cintas) for (const it of PK.Cintas.bocas(R, Sp, seen)) list.push(it); // pk-67: tolvas y compuertas en los edificios
     // lobos
     for (const w of PK.Life.wolves) {
       if (!seen(w.x, w.y)) continue;
@@ -612,7 +613,10 @@
     // capa plana: granjas y marcas de selección
     for (const [a, ax, ay] of aprons) ctx.drawImage(a.c, ax, ay);
     flats.sort((a, b) => a.d - b.d);
+    const mc = R.modoCintas(); // pk-67: trazando o editando cintas, lo demás se ve transparente y las cintas, encima
+    if (mc) ctx.globalAlpha = TRANSP.building;
     for (const f of flats) drawBuilding(ctx, f);
+    ctx.globalAlpha = 1;
     if (sel && sel.type === 'building') {
       const b = g.bById.get(sel.id);
       if (b) diamond(ctx, b.x, b.y, b.w, b.h, 'rgba(255,255,255,0.85)');
@@ -627,6 +631,7 @@
     list.sort((a, b) => a.d - b.d);
     R.drawn = flats.concat(list);
     for (const it of list) {
+      if (mc) ctx.globalAlpha = TRANSP[it.k] || 1;
       if (it.k === 'building') drawBuilding(ctx, it);
       else if (it.spr.k) {
         // sprites al doble de píxeles (aldeanos): nítidos si caben enteros, suavizados solo al alejar la cámara
@@ -637,6 +642,12 @@
       }
       else ctx.drawImage(it.spr.c, it.x, it.y);
       if (it.after) it.after(ctx);
+    }
+    if (mc) { // pk-67: las cintas destacadas sobre todo (con un velo sobre lo demás)
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(14,18,32,0.3)'; ctx.fillRect(vx0, vy0, vw, vh);
+      drawBelts(ctx, vis);
+      for (const it of list) if (it.k === 'puente') { ctx.drawImage(it.spr.c, it.x, it.y); if (it.after) it.after(ctx); }
     }
 
     if (g.enMar()) bruma(ctx, vx0, vy0, vw, vh, g); // los bancos de bruma del archipiélago, que los faros despejan
@@ -896,6 +907,14 @@
   }
   // ---------- Cintas ----------
   // pk-58: las dibuja js/cintas.js (piezas por nivel, cruces, rampas e ítems)
+  // pk-67 (pedido del dueño): mientras trazas o editas cintas (una herramienta de cintas o una pieza elegida), los
+  // edificios, árboles y murallas se ven transparentes y la red se dibuja otra vez encima, sin nada que la tape.
+  const TRANSP = { building: 0.28, node: 0.35, wall: 0.35, poi: 0.4, cap: 0.4, unit: 0.6, wolf: 0.6, troop: 0.6 };
+  R.modoCintas = function () {
+    const L = PK.Logi, g = G();
+    if (L && (L.tool === 'cinta' || L.tool === 'paso' || L.tool === 'copiar' || (PK.Cintas && PK.Cintas.HERR && PK.Cintas.HERR[L.tool]))) return true;
+    return !!(g && g.sel && g.sel.type === 'belt');
+  };
   function drawBelts(ctx, vis) { if (PK.Cintas) PK.Cintas.dibujar(ctx, vis, R, Sp); }
 
   // pk-43: lo abierto del Gran Portón (0 a 4). Se abre si una unidad tuya está a menos de 2,5 casillas del paso y se

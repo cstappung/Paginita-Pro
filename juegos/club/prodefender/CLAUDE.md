@@ -427,6 +427,30 @@ op code 6 in `prueba.js` (`Grabadora.pinchos`).
   `VERSIONES = [4, 5]`, the version travels in the saved run and the proof), so no
   half-played run was thrown away and old records still verify.
 
+## Engine version 6 (Nov 17 2026): slower bosses, new towers in kingdoms 18–20
+
+- **Bosses at half the v5 speed** (owner: «tienen mucha vida y no son lo suficientemente
+  lentos»): `JEFE.vel6` 1/10 of their base speed, same x20 HP. `esbirros6` 20 keeps the
+  minions per stretch of path as in v5 (they live twice as long). `jefeVel`/`jefeEsbirros`
+  in engine.js pick by `this.ve`. A boss round now lasts ~650–1000 s of game time (v5:
+  330–770 s); the bot used to cut rounds at 900 s, now `RONDA_MAX` 2400.
+- **Towers per version**: `L.v6` in levels.js (on top of `v5`, `PD.nivel`). Biblioteca,
+  Estelar and Tiempo (owner: «muy difíciles con las torres actuales») swap towers the bot
+  never upgraded: Biblioteca −Segador −Cañón Gélido −Obelisco +Voltaico +Alquimista +Colmena;
+  Estelar −Géiser +Colmena; Tiempo −Faro −Cañón Gélido +Voltaico +Alquimista. Still no
+  Desintegrador anywhere, no Dragon in Tiempo. Measured as in «Fourth era» (`--ayuda 100
+  --vida 0.15`, `sin jefes`, rounds 61–100, old engine via `--motor`): Biblioteca ~71k → ~52k
+  (seed 1), Tiempo ~84k → ~34k. Estelar could not be measured this way: its bot plays a few
+  deep satellites, and any extra tower in its rotation (Colmena, Obelisco, Alquimista, even
+  Huertos) spread its gold and lost more; taking out the Sierras lost the tanks (49k → 80k).
+  So Estelar only lost the unused, ground-only Géiser.
+  `PD.towersFor(li, ve)` / `PD.heroesOf(li, ve)` take the game's version: prueba.js checks
+  placements with `st.ve`, the shop uses `game.ve` (a resumed v5 run keeps its old shop).
+- v5 runs and records replay identically (scripted 30-round games in 8 kingdoms hashed equal
+  on the old and new engine); `VERSIONES = [4, 5, 6]`, tags `pd-14`.
+- The bot placed Huertos and Tótems even where the kingdom does not sell them (Estelar and
+  Tiempo had farms in every measurement before this); fixed with `this.vende`.
+
 ## Determinism — do not break it
 
 - The engine's randomness is `this.rnd()` (mulberry32 seeded per `Game`).

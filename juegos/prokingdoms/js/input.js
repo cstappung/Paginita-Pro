@@ -333,6 +333,13 @@
     } else if (L.tool === 'copiar' && I.molde && !PK.UI.isTouch()) { // pk-60 (C3): la copia sigue al ratón
       const [tx, ty] = r.screenToTile(sx, sy);
       copiaEn(Math.floor(tx), Math.floor(ty));
+    } else if (PK.Cintas.HERR_PIEZA[L.tool]) { // pk-67: las herramientas del menú de cintas marcan la pieza (o el tramo) que tocarías
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
+      if (Ci.piezaEn(x, y)) {
+        const k = W.idx(x, y), m = L.tool === 'cmolde' ? Ci.molde(k) : null;
+        const ks = L.tool === 'csubir' ? Ci.tramo(k) : m ? m.piezas.map(p => W.idx(x + p.dx, y + p.dy)) : [k];
+        r.beltGhost = ks.map(kk => ({ x: kk % W.W, y: (kk / W.W) | 0, mala: L.tool === 'cquitar' }));
+      }
     } else if ((L.tool === 'cinta' || L.tool === 'paso') && I.roadStart) { // pk-58: el plan de la cinta o del paso
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
       if (L.tool === 'cinta') { const p = Ci.plan(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p ? p.tiles.concat(p.extra || []) : null; I.planCinta = p; }
@@ -395,6 +402,40 @@
     if (n) { PK.UI.toast('Copia puesta: ' + n + ' piezas.', 'good'); copiaEn(p.en[0], p.en[1]); }
     PK.UI.refreshPanel(true);
   };
+  // pk-67: menú de construcción de cintas. Herramientas que se usan tocando una pieza: poner un nodo (unidor, divisor o
+  // clasificador), mejorar el tramo al nivel elegido, girar, quitar, o elegir la red que se copia.
+  I.abrirCintas = function (tool) {
+    const Ci = PK.Cintas;
+    if (!Ci.desbloqueado()) { PK.UI.toast(Ci.lockText(), 'warn'); return; }
+    I.cancelTool();
+    G().sel = null;
+    PK.Logi.tool = tool || 'cinta';
+    if (!PK.Logi.cintaNivelElegido) PK.Logi.cintaNivel = Ci.maxNivel(); // el mejor de tu era, hasta que elijas otro
+    PK.UI.refreshPanel(true);
+  };
+  I.usarEnPieza = function (sx, sy) {
+    const L = PK.Logi, Ci = PK.Cintas, r = R(), [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty);
+    if (!W.inb(x, y)) return;
+    const pz = Ci.piezaEn(x, y), k = W.idx(x, y), toast = PK.UI.toast;
+    if (!pz) { toast('Toca una pieza de cinta.', 'info'); return; }
+    const t = L.tool;
+    if (t === 'cnodo') {
+      const p = L.cintaNodo || 'v', nom = D.CINTA.nodoNombre[p];
+      if (pz.p === p) toast('Esa pieza ya es un ' + nom.toLowerCase() + '.', 'info');
+      else if (!(pz.p === 'c' || Ci.NODO[pz.p])) toast('Un ' + nom.toLowerCase() + ' va sobre una cinta común (no en un cruce ni en un paso elevado).', 'warn');
+      else if (Ci.convertir(k, p)) { toast(nom + ' puesto.' + (p === 's' ? ' Elige qué sale por cada lado en su panel.' : ''), 'good'); if (p === 's') { G().sel = { type: 'belt', id: k }; L.tool = null; } }
+    } else if (t === 'csubir') {
+      const n = L.cintaNivel || 1, ks = Ci.tramo(k);
+      if (!ks.some(kk => Ci.pieza(kk).n < n)) toast('Ese tramo ya es nivel ' + U.roman(n) + ' o más.', 'info');
+      else { const m = Ci.subir(ks, n); if (m) toast(m + (m === 1 ? ' pieza mejorada' : ' piezas mejoradas') + ' a nivel ' + U.roman(n) + '.', 'good'); }
+    } else if (t === 'cgirar') {
+      if (!Ci.girar(k)) toast('Un paso elevado no se gira: quítalo y ponlo de nuevo.', 'warn');
+    } else if (t === 'cquitar') {
+      if (Ci.quitar(k)) toast('Pieza quitada: vuelve la mitad del material y lo que llevaba.', 'info');
+    } else if (t === 'cmolde') { I.startCopia(k); return; }
+    r.beltGhost = null;
+    PK.UI.refreshPanel(true);
+  };
   function toolClick(sx, sy) {
     const L = PK.Logi, r = R();
     if (L.tool === 'road') {
@@ -429,6 +470,7 @@
       I.estamparCopia();
       return;
     }
+    if (PK.Cintas.HERR_PIEZA[L.tool]) { I.usarEnPieza(sx, sy); return; } // pk-67: menú de cintas
     if (L.tool === 'cinta') { // pk-58: dos toques (inicio y fin); se encadenan tramos
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
       if (!W.inb(x, y)) return;
@@ -650,6 +692,7 @@
     else if (k === 'r' && PK.Logi.tool === 'copiar') I.girarCopia(); // pk-60
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
+    else if (k === 'k') { if (PK.Cintas.HERR[PK.Logi.tool]) I.cancelTool(); else I.abrirCintas(); } // pk-67: menú de cintas
     else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido
     else if (k === 'm') PK.UI.toast(PK.Sfx.toggle() ? 'Sonido activado.' : 'Sonido silenciado.', 'info');
     else if (k === 'delete' && g.sel && g.sel.type === 'building') { const b = g.bById.get(g.sel.id); if (b) PK.UI.confirmDemolish(b); }
