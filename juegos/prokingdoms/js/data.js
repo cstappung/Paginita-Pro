@@ -925,8 +925,10 @@
       { name: 'Cinta reforzada', rate: 5, vel: 2.6, era: 5, cost: { steel: 1, machinery: 1 } },
       { name: 'Cinta de engranajes', rate: 8, vel: 3.2, era: 6, cost: { machinery: 2, gems: 1 } },
     ],
-    // pk-67 (pedido del dueño): cada ítem de la cinta es un paquete de hasta `pila` unidades (4 veces lo que llevaba)
-    pila: 4,
+    // pk-67 (pedido del dueño): cada ítem de la cinta es un paquete de hasta `pila` unidades (4 veces lo que llevaba).
+    // pk-74 (pedido del dueño: «se saturan fácil»): 16, otra vez ×4. Se sube el paquete y no el ritmo: más ítems por
+    // casilla se pisarían en pantalla y costarían más cuadros en el celular.
+    pila: 16,
     maxFase: 5, cruce: { planks: 4, ingots: 2 }, paso: { planks: 10, ingots: 4, stone: 20 }, pasoMax: 5, alto: 10,
     // C2 (pk-59): piezas que unen, reparten y separan. Cuestan además del nivel de la pieza.
     nodos: { u: { planks: 6, ingots: 2 }, v: { planks: 6, ingots: 2 }, s: { ingots: 4, tools: 2, books: 1 } },

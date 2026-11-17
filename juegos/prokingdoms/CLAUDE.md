@@ -595,7 +595,8 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
   The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
   options) feeds the sorter panel's short list.
-- **Packets (pk-67, owner's request: 4× capacity):** an item is `[res, q, cant]`, up to `D.CINTA.pila` (4) units;
+- **Packets (pk-67, owner's request: 4× capacity; pk-74 another 4×, «se saturan fácil»):** an item is `[res, q, cant]`,
+  up to `D.CINTA.pila` (16) units. Raise the packet, not `rate`: more items per tile overlap on screen and cost frames;
   no `cant` means 1 (old saves). Same items on screen, so the phone cost does not change. `sacar` takes up to a packet,
   `entregar(b, r, cant)` returns how many fit and the rest waits at the lane's tip (`it0[2]`), `pz.flujo`/`pz.pm`,
   `Ci.enCinta`, `devolverItems` and the offline budget count units. Show rates with `Ci.porMin(n)`, never

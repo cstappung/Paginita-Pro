@@ -1363,11 +1363,11 @@ test('pk-59: divisor, unidor y clasificador (Fase C2), en vivo y sin conexión',
   const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [], inb: {}, outb: {} }, extra || {}); };
   const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
   // divisor: aserradero (x 20..22, y 40..42) → (23..25, 41) → divisor en (26,41) → herrería A adelante (27..28, 41..42) y B abajo (26..27, 42..43)? B a la derecha del divisor (abajo en y)
-  const saw = mk(1, 'sawmill', 20, 40, { outb: { planks: 5000 } }), fa = mk(2, 'forge', 27, 40), fb = mk(3, 'forge', 25, 43);
+  const saw = mk(1, 'sawmill', 20, 40, { outb: { planks: 1250 * PILA } }), fa = mk(2, 'forge', 27, 40), fb = mk(3, 'forge', 25, 43);
   // unidor: dos aserraderos en (40..42, 40..42) y (40..42, 46..48) que se juntan en (46,44) hacia la herrería C (47..48, 44..45)
-  const s1 = mk(4, 'sawmill', 40, 40, { outb: { planks: 5000 } }), s2 = mk(5, 'sawmill', 40, 46, { outb: { planks: 5000 } }), fc = mk(6, 'forge', 47, 44);
+  const s1 = mk(4, 'sawmill', 40, 40, { outb: { planks: 1250 * PILA } }), s2 = mk(5, 'sawmill', 40, 46, { outb: { planks: 1250 * PILA } }), fc = mk(6, 'forge', 47, 44);
   // clasificador: campamento minero (60..61, 40..41) con piedra y oro → (62..64, 40) → clasificador (65,40): piedra adelante a la cantería (66..67, 40..41), oro abajo a los copistas (65..66, 41..42)? abajo = (65,41)
-  const mina = mk(7, 'mining', 60, 40, { inv: { stone: 3000, gold: 3000 } }), can = mk(8, 'masonry', 66, 39), cop = mk(9, 'scriptorium', 65, 41);
+  const mina = mk(7, 'mining', 60, 40, { inv: { stone: 750 * PILA, gold: 750 * PILA } }), can = mk(8, 'masonry', 66, 39), cop = mk(9, 'scriptorium', 65, 41);
   const todos = [saw, fa, fb, s1, s2, fc, mina, can, cop];
   G.buildings = todos; G.bById = new Map(todos.map(b => [b.id, b]));
   W.bAt.fill(-1); W.belt.fill(-1); todos.forEach(poner);
@@ -1539,35 +1539,35 @@ test('pk-62: de cada mazmorra queda la entrada (1 casilla que se pisa), las muda
   assert.match(JS('game.js'), /W\.subAt\.get\(i\)/);
 });
 
-test('pk-67: paquetes de 4, varias cintas desde un mismo edificio, menú de cintas, bocas y modo transparente', () => {
+test('pk-67: paquetes (de 16 desde pk-74), varias cintas desde un mismo edificio, menú de cintas, bocas y modo transparente', () => {
   const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
   const buf0 = L.bufCap, pay0 = G.pay;
   G.pay = () => true; G.stat = () => {}; G.cap = () => 1e9;
   let cupo = 100000; L.bufCap = () => cupo;
   const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
   const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
-  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 1000 } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
+  const saw = mk(1, 'sawmill', 20, 40, { inb: {}, outb: { planks: 250 * PILA } }), forja = mk(2, 'forge', 31, 41, { inb: {}, outb: {} });
   G.buildings = [saw, forja]; G.bById = new Map(G.buildings.map(b => [b.id, b]));
   W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
   G.state = Object.assign({}, st0 || {}, { era: 6, res: { planks: 0 }, flags: {}, auto: {}, logi: { belts: [], rutas: [], red: { v: 1, t: {} } } });
   const t = G.state.logi.red.t, libre0 = Ci.libre, owner0 = W.ownerAt;
   try {
-    assert.equal(D.CINTA.pila, 4, 'cada ítem lleva hasta 4');
-    assert.equal(Ci.porMin(1), 240); assert.equal(Ci.porMin(5), 1920);
+    assert.equal(D.CINTA.pila, 16, 'cada ítem lleva hasta 16 (pk-74)');
+    assert.equal(Ci.porMin(1), 960); assert.equal(Ci.porMin(5), 7680);
     // del aserradero a la herrería: los ítems van de a 4
     for (let x = 23; x <= 30; x++) t[W.idx(x, 41)] = { p: 'c', d: 0, n: 3, i: [] };
     Ci.init(G.state);
     for (let i = 0; i < 40; i++) Ci.update(0.1);
     const its = Object.values(t).flatMap(pz => pz.i);
-    assert.ok(its.length && its.every(it => it[2] === 4), 'paquetes de 4');
-    assert.equal(Ci.enCinta('planks'), its.length * 4, 'lo que va arriba se cuenta por unidades');
+    assert.ok(its.length && its.every(it => it[2] === PILA), 'paquetes de ' + PILA);
+    assert.equal(Ci.enCinta('planks'), its.length * PILA, 'lo que va arriba se cuenta por unidades');
     // una entrega que no cabe entera: lo que sobra espera en la punta
     for (let i = 0; i < 200; i++) Ci.update(0.1);
     cupo = (forja.inb.planks || 0) + 2;
     for (let i = 0; i < 30; i++) Ci.update(0.1);
     assert.equal(forja.inb.planks, cupo, 'entra justo lo que cabe');
     const punta = Ci.carrilesEn(W.idx(30, 41))[0].pz.i[0];
-    assert.ok(punta && punta[2] === 2, 'en la punta quedan 2 de ese paquete (' + (punta && punta[2]) + ')');
+    assert.ok(punta && punta[2] === PILA - 2, 'en la punta quedan ' + (PILA - 2) + ' de ese paquete (' + (punta && punta[2]) + ')');
     // quitar una pieza devuelve el paquete entero
     const antes = G.state.res.planks || 0, lleva = (t[W.idx(30, 41)].i || []).reduce((a, it) => a + (it[2] || 1), 0);
     Ci.quitar(W.idx(30, 41), true);
@@ -1630,7 +1630,7 @@ test('pk-70: de bodega a bodega la cinta entrega aunque el pueblo esté lleno o 
   G.stat = () => {}; G.cap = () => 500; G.capDe = () => 1000;
   const mk = (id, type, x, y, extra) => { const def = D.BUILD[type]; return Object.assign({ id, type, owner: 'p', done: true, lvl: 1, def, x, y, w: def.w, h: def.h, cx: x + def.w / 2, cy: y + def.h / 2, workers: [] }, extra || {}); };
   const poner = b => { for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) W.bAt[W.idx(b.x + i, b.y + j)] = b.id; };
-  const a = mk(1, 'warehouse', 20, 40, { inv: { wood: 400, stone: 400, gold: 400, iron: 0 } }), b = mk(2, 'warehouse', 30, 40, { inv: {} });
+  const a = mk(1, 'warehouse', 20, 40, { inv: { wood: 100 * PILA, stone: 100 * PILA, gold: 100 * PILA, iron: 0 } }), b = mk(2, 'warehouse', 30, 40, { inv: {} });
   G.buildings = [a, b]; G.bById = new Map(G.buildings.map(o => [o.id, o]));
   W.bAt.fill(-1); W.belt.fill(-1); G.buildings.forEach(poner);
   // el pueblo, muy por encima del tope (un premio): 800 de cada uno con tope 500
