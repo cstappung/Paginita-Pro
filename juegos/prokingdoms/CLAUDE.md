@@ -604,11 +604,18 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   delivering it to a store passes that much over the town cap (`Lb.poner(b, r, n, extra)`), because it already
   counted there. Before, with the town full or over the cap (rewards enter over it) the belt filled with 3 packets
   and stopped forever. Offline the same through `deBod`.
-- **A store port draws from the whole town (pk-71, owner's report «saca solo un par de lo que elegí»):**
-  `disponible`/`hayDe` look at `S.res` minus the workshop reserve, not at that building's shelves; `Lb.sacar` takes
-  from it first and the reconciliation takes the rest from the other stores. Villagers drop each resource at the
-  nearest store, so the Centro Urbano used to hold two of the six picks. (Carts between stores, pk-68, still move
-  shelves.)
+- **A store port draws from that building's shelves** (`Libro.inv(b)`, and never below the town reserve). pk-71 made
+  it draw from the whole town; the owner wants each store's own inventory, so pk-72 reverted it.
+- **Divisors and sorters only send to a branch whose downstream receives the item** (pk-72, owner's report: «saca
+  solo un par»). `salir` skips lane outs without it in `aceptaAbajo(o.c)` when there is more than one out. Before, a
+  divisor dealt items in turns: stone went into the sawmill's branch, sat at its tip and jammed everything behind it,
+  so only the resources every workshop used kept flowing. If no out receives it: «Atascada: ninguna salida de aquí
+  recibe …».
+- **Cargo nobody can ever receive returns to the town** (pk-72, `devolver` in `salir`): at a lane's tip, if every
+  output says no (or a sorter has no output for it), the packet goes back to `S.res` and the lane shows «Volvió al
+  pueblo: …». Jams used to be permanent, and saves with a blind divisor stayed full with the port unable to emit.
+- **`Ci.porQueNoSale(c, r)`** says in words why a port does not emit a resource (nobody downstream, not on these
+  shelves, or the town is under the workshop reserve, with the numbers); the store-port picker lists it per pick.
 - **A port emits only what someone downstream receives** (`aceptaAbajo`, memo per `armado`; a sorter passes its
   filter and everything through `'*'`). Otherwise the source lane shows «No sale nada: adelante nadie recibe …»; a
   belt still jams (red) only with old cargo. The store-port picker shows how much this building holds of each
