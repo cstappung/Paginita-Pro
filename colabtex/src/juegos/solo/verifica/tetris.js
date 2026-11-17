@@ -7,7 +7,8 @@
    se rehace con el mismo motor (TM.rehace) y se compara con lo declarado:
    puntos, tiempo y, en Sprint, que de verdad se hicieron las 40 líneas.
    En VS Bots (vs.js) se rehacen también los tres bots, que juegan con su
-   propia semilla, y tiene que salir que los tres quedaron fuera.
+   propia semilla, y tiene que salir que los tres quedaron fuera (prueba
+   `v:2` desde noviembre de 2026; las `v:1` con los bots de antes).
    Después, los límites de lo que una mano puede hacer, con margen: un
    falso positivo (rechazarle el récord a alguien honesto) es peor que
    dejar pasar una trampa rara. */
@@ -143,8 +144,11 @@ export function verifica(dato, prueba, ctx) {
   const modo = modoDe(dato && dato.categoria);
   if (!modo) return 'La categoría no es de Tetris Club.';
   if (!prueba || typeof prueba !== 'object') return 'La partida llegó sin prueba.';
-  if (prueba.v !== 1) return 'La prueba no es de esta versión del juego (recarga la página).';
   const bots = modo.startsWith('bots-') ? modo.slice(5) : null;
+  /* VS Bots va por la versión 2 (bots que arman Tetris, fallan y eligen
+     objetivo); las pruebas `v:1` de los récords de antes se rehacen con los
+     bots de entonces (vs.js guarda los dos). */
+  if (prueba.v !== 1 && !(bots && prueba.v === TV.PRUEBA_V)) return 'La prueba no es de esta versión del juego (recarga la página).';
   if (prueba.m !== (bots ? 'bots' : modo)) return 'La prueba es de otro modo de juego.';
   /* Si la página dice quién juega, la prueba tiene que ser de esa cuenta
      (la semilla sale de ella: no se puede cambiar sin cambiar la partida). */

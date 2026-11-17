@@ -592,6 +592,20 @@
         tono({ f: 210, f1: 1900, glide: 0.16, dur: 0.22, vol: 0.045 + Math.min(8, n || 1) * 0.006, tipo: "sawtooth", corte: 700, corte1: 6500, q: 6, eco: 0.45 });
         ruido({ dur: 0.15, vol: 0.035, tipo: "highpass", f: 2500, f1: 7000, eco: 0.3 });
       }),
+      /* Fijas a quién atacas: un clic metálico y un pitido que sube, como
+         una mira que engancha. */
+      fijado: seguro(() => {
+        const t = ahora();
+        chasquido(t, 0.01, 0.05, null, 7000);
+        tono({ t: t + 0.01, f: hz(88), f1: hz(95), glide: 0.05, dur: 0.07, vol: 0.035, tipo: "square", corte: 4200 });
+      }),
+      /* Alguien te pone en la mira: dos pitidos agudos, sin la sirena de
+         cuando ya viene la basura. */
+      teApuntan: seguro(() => {
+        const t = ahora();
+        tono({ t, f: hz(91), dur: 0.05, vol: 0.03, tipo: "square", corte: 3600 });
+        tono({ t: t + 0.09, f: hz(91), dur: 0.05, vol: 0.03, tipo: "square", corte: 3600 });
+      }),
       latido: seguro(k => {
         const t = ahora(), v = Math.max(0.2, Math.min(1, k || 0.5));
         tono({ t, f: 64, f1: 40, glide: 0.1, dur: 0.13, vol: 0.2 * v });
@@ -643,5 +657,38 @@
     };
   }
 
-  return { crearEfectos, crearSonido, cartelCuenta, pintaPieza, sprite, altura };
+  /* Un ataque que viaja: un proyectil del color de quien lo manda, del
+     elemento `de` al elemento `a` (sus centros), con dos ecos detrás. Va
+     por el DOM con WAAPI (lo mueve el compositor) y se borra al llegar;
+     `alLlegar` corre cuando toca el blanco (aunque no haya animación). La
+     clase `clase` pone el aspecto (cada página tiene la suya). Lo usan la
+     sala y VS Bots. */
+  function misil(de, a, op) {
+    const fin = () => { if (op.alLlegar) op.alLlegar(); };
+    const DURA = op.dura || 520;
+    if (!de || !a || reducido() || document.hidden) return void setTimeout(fin, 80);
+    const r0 = de.getBoundingClientRect(), r1 = a.getBoundingClientRect();
+    if (!r0.width || !r1.width) return void setTimeout(fin, 80);
+    const x0 = r0.left + r0.width / 2, y0 = r0.top + r0.height * 0.35, x1 = r1.left + r1.width / 2, y1 = r1.top + r1.height * 0.5;
+    const mx = (x0 + x1) / 2, my = Math.min(y0, y1) - 60 - Math.min(120, Math.abs(x1 - x0) * 0.25);
+    const tam = Math.min(2.2, 1 + (op.n || 1) * 0.12);
+    for (let i = 0; i < 3; i++) {
+      const b = document.createElement("i");
+      b.className = op.clase;
+      b.style.setProperty("--c", op.color || "#ff4a3a");
+      document.body.appendChild(b);
+      const k = tam * (1 - i * 0.28);
+      try {
+        const an = b.animate([
+          { transform: `translate(${x0}px,${y0}px) scale(${k * 0.4})`, opacity: 0 },
+          { transform: `translate(${mx}px,${my}px) scale(${k})`, opacity: 1 - i * 0.3, offset: 0.5 },
+          { transform: `translate(${x1}px,${y1}px) scale(${k * 1.3})`, opacity: 1 - i * 0.3 }
+        ], { duration: DURA, delay: i * 45, easing: "cubic-bezier(.45,0,.75,.6)", fill: "both" });
+        an.onfinish = an.oncancel = () => b.remove();
+      } catch (e) { b.remove(); }
+    }
+    setTimeout(fin, DURA + 60);
+  }
+
+  return { crearEfectos, crearSonido, cartelCuenta, pintaPieza, sprite, altura, misil };
 });

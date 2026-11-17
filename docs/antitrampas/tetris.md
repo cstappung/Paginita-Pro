@@ -206,8 +206,20 @@ racha; el top 1 del sprint (Piavote) tiene el 84 % de intervalos en 0 ms.
 La prueba es la misma, con `m: "bots"` y `d: <dificultad>`. La partida es
 el jugador contra tres bots que juegan dentro del mismo mundo determinista
 (`juegos/club/tetris/vs.js`): sus decisiones salen de un generador sembrado
-desde la semilla de la partida y de pesos enteros, y a quién cae cada
-ataque también. El verificador (`TV.rehace`) vuelve a jugar a los cuatro
+desde la semilla de la partida y de pesos enteros, y a quién apunta cada
+bot también.
+
+**Versiones.** Desde noviembre de 2026 las partidas nuevas son `v: 2`: bots
+que arman Tetris, se equivocan y eligen objetivo, y el jugador elige el
+suyo. Eso añade cuatro letras a `e`: `O` (la tecla de objetivo: el
+siguiente vivo) y `P`/`Q`/`R` (tocar al bot 1/2/3). Como las demás, solo se
+anotan si cambiaron algo (apuntar al que ya era tu objetivo, o a uno caído,
+no se anota y, si aparece, rechaza). Las pruebas `v: 1` de los récords ya
+guardados se siguen rehaciendo con los bots de entonces (`mundoV1` y
+compañía, intactos en `vs.js`); `colabtex/tests/fixtures/tetris-vs-v1.json`
+son dos partidas v1 reales que lo comprueban. Los modos de un solo pozo
+siguen en `v: 1` y no aceptan `v: 2`. Tocar un rival es una pulsación
+más para la capa anti-bot, con origen `T` (puntero). El verificador (`TV.rehace`) vuelve a jugar a los cuatro
 pozos y exige que el jugador siga en pie y los tres bots estén fuera en el
 último paso; luego aplica los mismos límites de mano y capa anti-bot que a
 los demás modos sobre las jugadas del jugador. Tope: 30 min de partida.
