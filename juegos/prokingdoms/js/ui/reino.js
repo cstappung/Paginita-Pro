@@ -84,6 +84,7 @@
         el('li', null, 'Una conquista es un asedio de tres etapas que dura unos minutos y se ve en el mapa: la frontera (la milicia y las parcelas vecinas), las defensas (torres y murallas) y el estandarte (la guarnición). La parcela se va tiñendo con tu avance y solo cambia de dueño cuando cae el estandarte.'),
         el('li', null, 'Conquistar una parcela de otro reino es caro a propósito: la campaña se paga aunque pierdas. Si ganas traes botín y pierdes del 12% al 30% de las tropas (menos cuanto más fuerte vayas); si pierdes, del 70% al 80%.'),
         el('li', null, 'Defender es fácil: la defensa cuenta x1,5 en casa y +25% por cada parcela propia alrededor. Las torres y el Centro Urbano cercanos suman mucho.'),
+        el('li', null, 'Una de cada cuatro parcelas es una comarca (en el mapa de territorio se ve su ícono): ' + Object.keys(D.COMARCAS).map(c => D.COMARCAS[c].icono + ' ' + D.COMARCAS[c].nombre).join(', ') + '. Toca la parcela para ver qué da. El Fuerte fronterizo defiende todo lo que tenga a 2 parcelas.'),
         el('li', null, 'El corazón de cada reino (las parcelas junto a su Centro Urbano) nunca se puede conquistar. Lo que había en una parcela perdida se desarma y se devuelve completo.'),
         el('li', null, 'Los reinos muy avanzados no pueden atacar a los nuevos: hace falta estar a menos de 2 eras y que el otro tenga al menos la mitad de tu poder.')));
       if (tr.camps.length) {
@@ -145,6 +146,8 @@
       const T = PK.Terr, g = G(), st = S(), owner = W.ownerOfParcel(k), slot = W.terr[k] - 1;
       const [cx, cy] = T.center(k);
       if (W.terrCommon[k]) { add(el('p', null, 'Zona común: es de todos y nunca tendrá dueño. Cualquiera puede recolectar aquí.')); return; }
+      const cm = T.comarca(k); // G5
+      if (cm) add(el('div', { class: 'comarca' }, el('b', null, cm.icono + ' Comarca: ' + cm.nombre), el('span', { class: 'small' }, ' · ' + cm.txt + ' Conquistarla da un 50 % más de botín.')));
       if (!owner) {
         const why = T.canClaim(k);
         add(el('p', null, 'Tierra libre.'), el('div', { class: 'row' }, el('b', null, 'Reclamar: '), UI.costEl(T.claimCost())),
@@ -176,7 +179,7 @@
       const tacSel = el('select', { id: 'cq-tac', title: 'Se puede cambiar una vez durante el asedio' }, el('option', { value: '' }, 'Sin táctica: ritmo normal'), Object.keys(TA).map(t => el('option', { value: t }, TA[t].nombre + ': ' + TA[t].txt)));
       add(el('div', { class: 'row' }, pk.box),
         el('div', { class: 'row' }, el('b', null, 'Táctica: '), tacSel),
-        el('p', { class: 'small' }, 'Cada tropa tiene su oficio: jinetes y caballeros rinden más en la frontera; catapultas y ballesteros contra las defensas (los arqueros, menos); lanceros, monjes y clérigos en el estandarte. Durante el asedio puedes cambiar de táctica, mandar refuerzos o retirarte.'),
+        el('p', { class: 'small' }, 'Cada tropa tiene su oficio: jinetes y caballeros rinden más en la frontera; catapultas, ballesteros, arietes (si hay murallas) y torres de asedio contra las defensas (los arqueros, menos); lanceros, monjes y clérigos en el estandarte. Durante el asedio puedes cambiar de táctica, mandar refuerzos o retirarte.'),
         el('div', { class: 'row' }, UI.btn('Lanzar campaña', () => { if (T.attack(k, pk.read(), tacSel.value || null)) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' }), UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(cx, cy); }, { small: true })));
     });
   };

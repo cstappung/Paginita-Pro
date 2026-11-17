@@ -970,6 +970,8 @@
           poly(quad(x0 + 0.4, y0 + 0.4, x0 + PS - 0.4, y0 + PS - 0.4)); ctx.stroke(); ctx.setLineDash([]);
         }
         if (o && W.isCore(k, W.terr[k] - 1)) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; poly(quad(x0 + 2, y0 + 2, x0 + PS - 2, y0 + PS - 2)); ctx.fill(); }
+        const cm = W.rasgoDe && D.COMARCAS[W.rasgoDe(k)]; // G5: la comarca, con su ícono en el centro
+        if (cm) { const [ix, iy] = R.iso(x0 + PS / 2, y0 + PS / 2); ctx.save(); ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(20,14,8,0.55)'; ctx.beginPath(); ctx.arc(ix, iy, 13, 0, 6.3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(cm.icono, ix, iy + 1); ctx.restore(); }
       }
       if (!o) continue;
       // borde hacia afuera, un poco hacia adentro para que dos reinos vecinos se vean los dos

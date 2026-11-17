@@ -277,12 +277,27 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > a publicar las reglas se juega igual, pero las rondas no entran en la
 > clasificación y no pagan monedas.
 
+> **Ajedrez Club (16 de noviembre de 2026):** `club-ajedrez-bot1` a
+> `club-ajedrez-bot4` (una victoria contra el bot de cada nivel: puntos = 1,
+> compite el tiempo) y `club-ajedrez-puzles` (las estrellas de los puzles,
+> con tope de 600) son categorías nuevas de `soloRanks` y `soloPruebas`, y
+> `ajedrezclub` un juego nuevo de `clubJugadas`. No usa `users/<uid>/club`.
+> Hasta volver a publicar las reglas se juega igual, pero las partidas no
+> entran en la clasificación y no pagan monedas.
+
 > **Pro BoxHead en el Solo Club (9 de noviembre de 2026):**
 > `club-boxhead-(patio|sotano|cruce|fortaleza|laberinto)` (el nivel más alto
 > al que se llegó en ese mapa) son categorías nuevas de `soloRanks` y
 > `soloPruebas`, y `boxhead` un juego nuevo de `clubJugadas`. Hasta volver a
 > publicar las reglas se juega igual, pero las partidas no entran en la
 > clasificación y no pagan monedas.
+>
+> **Corrección (16 de noviembre de 2026):** la regla de `clubJugadas` decía
+> `boxhead`, pero el cliente escribe `clubJugadas/<uid>/boxheadclub` (la
+> clave del Club, `claveClub("boxhead")`, la misma que paga `monedas.js`).
+> La escritura se rechazaba con `PERMISSION_DENIED` y ninguna partida de
+> Pro BoxHead en el Solo Club pagaba monedas. Ahora la lista dice
+> `boxheadclub`. Hay que volver a publicar las reglas.
 
 > **PRO PACMAN (20 de octubre de 2026):** `club-propac-puntos` (el puntaje
 > de la partida, con tope de 10 000 000) es una categoría nueva de

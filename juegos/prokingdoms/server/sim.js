@@ -235,7 +235,7 @@ function cleanBuildings(p, list, era) {
 const buildingLevels = list => list.reduce((s, b) => s + (b[3] ? b[4] : 0), 0);
 function towerDefense(list) {
   let d = 0;
-  for (const [type, , , done, lvl] of list) if (done && (type === 'tower' || type === 'tc')) d += D.BSTATS[type](lvl).defense || 0;
+  for (const [type, , , done, lvl] of list) if (done && (type === 'tower' || type === 'tc' || type === 'fuerte')) d += D.BSTATS[type](lvl).defense || 0;
   return d;
 }
 
@@ -966,12 +966,12 @@ function parcelDefense(w, k, tgt, slot) {
   const towers = [];
   for (const b of tgt.buildings || []) {
     const [type, x, y, done, lvl] = b, def = D.BUILD[type];
-    if (!def || !done || (type !== 'tower' && type !== 'tc')) continue;
-    towers.push([x + def.w / 2, y + def.h / 2, D.BSTATS[type](lvl || 1).defense || 0]);
+    if (!def || !done || (type !== 'tower' && type !== 'tc' && type !== 'fuerte')) continue;
+    towers.push([x + def.w / 2, y + def.h / 2, D.BSTATS[type](lvl || 1).defense || 0, type === 'fuerte' ? D.FUERTE_RADIO : 9]);
   }
   const s = tgt.snap || {};
   return D.parcelDefenseParts({ era: s.era || 1, px: k % W.PW, py: Math.floor(k / W.PW), towers, army: s.army || 0, walls: s.walls || 0, around: W.parcelNeighbors(k).filter(n => w.terr[n] === slot + 1).length,
-    mult: ((s.walled || []).includes(k) ? s.wallMult || 1 : 1) * (s.terrMult || 1) });
+    mult: ((s.walled || []).includes(k) ? s.wallMult || 1 : 1) * (s.terrMult || 1) * ((D.COMARCAS[W.rasgoDe(k)] || {}).defensa || 1) }); // G5: un Cerro
 }
 // G3 (plan de guerra): al llegar, la campaña no se resuelve: empieza un asedio. El plan (D.asedioPlan, el mismo
 // del modo local) se calcula con la defensa de ese momento y queda guardado en la campaña, así que un reinicio a
@@ -1015,7 +1015,7 @@ function tickCamps() {
     if (c.plan && c.ref && !c.ref.ok && t >= c.ref.llega && c.ref.llega < c.ini + c.plan.total * 1000) { // G4: llegaron los refuerzos
       const juntas = Object.assign({}, c.units);
       for (const u in c.ref.units) juntas[u] = (juntas[u] || 0) + c.ref.units[u];
-      const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT)), m: D.asedioOficio(juntas) });
+      const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT)), m: D.asedioOficio(juntas, (c.plan.parts.walls || 0) > 0), torre: juntas.torreAsedio > 0 });
       if (n) { c.plan = n; c.powerT += c.ref.power; c.units = juntas; c.ref.ok = true; c.et = -1; }
     }
     if (c.plan && t < c.ini + c.plan.total * 1000) { // en curso: la lista del mundo cambia cuando empieza una etapa

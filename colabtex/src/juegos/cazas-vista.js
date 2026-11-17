@@ -32,7 +32,7 @@ const fmt = n => Math.round(n || 0).toLocaleString("es-CL");
 
 const TOP = 5;
 /* La ruta del juego de una categoría (`#solo/<juego>`). */
-const RUTA = { tetrisclub: "tetris", typeraceclub: "typerace", boxheadclub: "boxhead" };
+const RUTA = { tetrisclub: "tetris", typeraceclub: "typerace", boxheadclub: "boxhead", ajedrezclub: "ajedrez" };
 export const rutaDeCategoria = c => { const j = juegoDeCategoria(c); return j ? "#solo/" + (RUTA[j] || j) : "#"; };
 const CLAVE_RES = "jg.cz.res", CLAVE_BUSCADO = "jg.cz.buscado";
 const lee = (st, k) => { try { return st.getItem(k); } catch (e) { return null; } };

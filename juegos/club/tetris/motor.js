@@ -94,7 +94,7 @@
       p: null, lineas: 0, puntos: 0, nivel: op.nivel || 1, nivelBase: op.nivel || 1, combo: -1, b2b: false,
       fin: false, acum: 0, suelo: 0, resets: 0, blando: false, giro: false, tiempo: 0,
       entrante: [], salida: 0, recibidas: 0, eventos: [], piezas: 0, rb: rng(semilla ^ 0x9e3779b9),
-      subeCada: op.subeCada || 0
+      subeCada: op.subeCada || 0, soloTiempo: !!op.soloTiempo
     };
     for (let i = 0; i < 5; i++) s.cola.push(s.sig());
     nace(s);
@@ -239,7 +239,10 @@
   function recibe(s, n) { if (n > 0 && !s.fin) { s.entrante.push(n); s.recibidas += n; } }
   const pendiente = s => s.entrante.reduce((a, b) => a + b, 0);
   function subeNivel(s) {
-    const porLineas = s.nivelBase + Math.floor(s.lineas / 10);
+    /* `soloTiempo` (VS Bots, vs.js): el nivel sube solo con el reloj. Si
+       subiera también con las líneas, el bot que más limpia se aceleraba
+       su propia gravedad y se mataba solo. */
+    const porLineas = s.soloTiempo ? s.nivelBase : s.nivelBase + Math.floor(s.lineas / 10);
     const porTiempo = s.subeCada ? s.nivelBase + Math.floor(s.tiempo / s.subeCada) : 0;
     const n = Math.min(20, Math.max(porLineas, porTiempo));
     if (n > s.nivel) { s.nivel = n; s.eventos.push({ e: "nivel", n }); }

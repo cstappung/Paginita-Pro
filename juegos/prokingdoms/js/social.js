@@ -539,7 +539,7 @@
   // Defensa: cada Torre y el Centro Urbano aportan según su nivel; las tropas en casa suman su fuerza.
   Soc.defense = function () {
     let d = 0;
-    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'bateria')) d += G().bst(b).defense || 0;
+    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'bateria' || b.type === 'fuerte')) d += G().bst(b).defense || 0;
     return Math.round(d * (1 + 0.2 * G().lvl('walls')) + Soc.power(S().war.army));
   };
   Soc.barracksLvl = () => G().buildings.reduce((m, b) => (b.owner === 'p' && b.done && b.type === 'barracks' ? Math.max(m, b.lvl) : m), 0);

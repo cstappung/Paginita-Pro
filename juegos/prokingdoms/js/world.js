@@ -844,6 +844,21 @@
     const h = W.homeParcel(slot), P = W.PW;
     return Math.max(Math.abs((k % P) - (h % P)), Math.abs(Math.floor(k / P) - Math.floor(h / P))) <= D.TERR.core;
   };
+  // G5 (pk-62): el rasgo de una parcela (clave de D.COMARCAS) o null. Sembrado con su propio rng: no mueve el mapa
+  // ni depende de quién sea el dueño, así que el servidor y todos los navegadores ven las mismas comarcas.
+  let rasgos = null;
+  W.rasgoDe = function (k) {
+    if (!rasgos) {
+      const r = U.rng(D.SEED + 6151), ids = Object.keys(D.COMARCAS), N = W.PW * W.PW;
+      rasgos = new Array(N).fill(null);
+      for (let i = 0; i < N; i++) {
+        const sale = r() < 1 / D.COMARCA_CADA, cual = ids[Math.floor(r() * ids.length)]; // siempre dos tiradas por parcela
+        if (!sale || W.terrCommon[i] || D.REALM_SLOTS.some((s, slot) => W.isCore(i, slot))) continue;
+        rasgos[i] = cual;
+      }
+    }
+    return rasgos[k] || null;
+  };
   W.parcelNeighbors = function (k) {
     const P = W.PW, x = k % P, y = Math.floor(k / P), out = [];
     if (x > 0) out.push(k - 1);

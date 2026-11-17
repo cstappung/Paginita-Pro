@@ -68,8 +68,8 @@ export const SOLOS = [
     modos: ["Clásico", "Portales", "Ruinas", "Zen"] },
   { id: "tetrisclub", tipo: "club", nombre: "Tetris Club", genero: "Reflejos", icono: "▤", alta: "2026-09-28",
     ruta: "#solo/tetris", reglas: "tetrisclub", popular: "club-tetris", ranking: true,
-    lema: "Maratón, Sprint de 40 líneas y Ultra de dos minutos.",
-    modos: ["Maratón", "Sprint 40", "Ultra 2 min"] },
+    lema: "Maratón, Sprint de 40 líneas, Ultra de dos minutos y VS Bots: tú contra tres bots.",
+    modos: ["Maratón", "Sprint 40", "Ultra 2 min", "VS Bots"] },
   { id: "sortem", tipo: "club", nombre: "sortEm", genero: "Puzzle", icono: "↔", alta: "2026-09-29",
     ruta: "#solo/sortem", reglas: "sortem", popular: "club-sortem", ranking: true,
     lema: "Mueve y fusiona los bloques hasta ordenarlos del 1 al 10 o al 20, contra el reloj.",
@@ -177,6 +177,10 @@ export const SOLOS = [
     url: "juegos/mkw/web/navegador/index.html", ruta: "#solo/mkw", reglas: "mkw",   // (dentro de Juegos, como BT3: su programa y su menú de inicio salen del Worker de amigos)
     lema: "Grand Prix, Contrarreloj, VS y Batalla con Retro Rewind; o en este PC con 2 a 4 mandos. Y desde su menú, las salas con tus amigos.",
     modos: ["Grand Prix", "Contrarreloj", "VS", "Batalla", "Pantalla dividida"] },
+  { id: "ajedrezclub", tipo: "club", juego: "ajedrez", nombre: "Ajedrez Club", genero: "Tablero", icono: "♞", alta: "2026-11-16",
+    ruta: "#solo/ajedrez", reglas: "ajedrezclub", popular: "club-ajedrez", ranking: true,
+    lema: "Ajedrez para jugar solo: gánale a cuatro bots, de Novato a Maestro, en el menor tiempo, y resuelve 60 puzles de mate y táctica por estrellas.",
+    modos: ["4 bots: un top por tiempo", "60 puzles: 1 a 3 estrellas"] },
   { id: "typeraceclub", tipo: "club", nombre: "Type Race", genero: "Teclado", icono: "⌨", alta: "2026-10-27",
     ruta: "#solo/typerace", reglas: "typerace", popular: "club-typerace", ranking: true,
     lema: "Escribe contra el reloj, como en Monkeytype: palabras al azar, refranes o cuentos, en español o en inglés. Las palabras en inglés clasifican.",
@@ -197,7 +201,9 @@ export const GENERO = {
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la
    ofrece al lado de «Abrir sala», y al invitado como salida cuando el
    juego le pide cuenta. */
-export const practicaDe = juego => SOLOS.find(s => s.tipo === "bots" && s.juego === juego) || null;
+/* Un juego del club puede ser la práctica de una sala si nombra su `juego`
+   (Ajedrez Club, con bots y puzles, para la sala de ajedrez). */
+export const practicaDe = juego => SOLOS.find(s => (s.tipo === "bots" || s.tipo === "club") && s.juego === juego) || null;
 
 const DIA = 86400000;
 /* Días desde una fecha `AAAA-MM-DD` (mediodía, para que el huso no la
@@ -247,7 +253,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos), { beta = fals
 export const COLOR_SOLO = {
   desafios: "#3ccf6e", prokingdoms: "#e8b84a",
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", typeraceclub: "#e2b714", boxheadclub: "#c9733a", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", integral: "#2c5aa8", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", trigon: "#f6d23c", typeraceclub: "#e2b714", ajedrezclub: "#e3b44f", boxheadclub: "#c9733a", protiles: "#ff5a36", pokelike: "#e3350d", metrorush: "#ff6a3d", tulonesclub: "#63b8ee", heroclub: "#ffb21e", prodefender: "#ffcf4d", propac: "#ffe14d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC

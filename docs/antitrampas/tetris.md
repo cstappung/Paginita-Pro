@@ -2,7 +2,9 @@
 
 Categorías: `club-tetris-maraton` (puntos), `club-tetris-sprint` (40
 líneas, compite el tiempo; `puntos` fijo en 40) y `club-tetris-ultra`
-(puntos en dos minutos). Verificador:
+(puntos en dos minutos), más `club-tetris-bots-(facil|medio|dificil)`
+(VS Bots: compite el tiempo en dejar fuera a los tres bots; `puntos` fijo
+en 3). Verificador:
 `colabtex/src/juegos/solo/verifica/tetris.js` (`PRUEBA = 1`). Pruebas:
 `colabtex/tests/antitrampas-tetris.test.cjs`.
 
@@ -198,3 +200,17 @@ con más del 30 % de intervalos en 0 ms (sobre 100 o más). No se juzga si el
 reloj del navegador es grueso (`grano` ≥ 8 ms, Firefox con
 resistFingerprinting). En la base, ninguna partida humana tiene una sola
 racha; el top 1 del sprint (Piavote) tiene el 84 % de intervalos en 0 ms.
+
+## VS Bots
+
+La prueba es la misma, con `m: "bots"` y `d: <dificultad>`. La partida es
+el jugador contra tres bots que juegan dentro del mismo mundo determinista
+(`juegos/club/tetris/vs.js`): sus decisiones salen de un generador sembrado
+desde la semilla de la partida y de pesos enteros, y a quién cae cada
+ataque también. El verificador (`TV.rehace`) vuelve a jugar a los cuatro
+pozos y exige que el jugador siga en pie y los tres bots estén fuera en el
+último paso; luego aplica los mismos límites de mano y capa anti-bot que a
+los demás modos sobre las jugadas del jugador. Tope: 30 min de partida.
+`sospecha` (filas sin prueba): `puntos` distinto de 3, o un tiempo por
+debajo de 20 / 30 / 40 s (Fácil / Medio / Difícil). Pruebas:
+`colabtex/tests/tetris-vs.test.cjs`.

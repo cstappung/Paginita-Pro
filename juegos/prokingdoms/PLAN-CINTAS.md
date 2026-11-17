@@ -13,7 +13,8 @@
 - **Decisiones del dueño:** respondidas el 16 de noviembre de 2026 (sección 9). Mandan sobre cualquier otra parte
   del plan. Con ellas, el **paso elevado pasa a la Fase C1** (las carretas no cruzan cintas) y se suma el **cruce**
   (pedido del dueño: dos cintas que se cruzan sin tocarse, «como un paso a nivel»).
-- **Avance:** C1 hecha en `pk-58`; C2 hecha en `pk-59`.
+- **Avance:** C1 hecha en `pk-58`; C2 en `pk-59`; C3 en `pk-60`. El plan está completo; quedan solo las ideas
+  opcionales de la sección 7.
 
 ---
 
@@ -234,6 +235,23 @@ por una pieza de menos nivel); llena porque adelante se llevan menos es amarillo
 
 **Criterios de aceptación:** dos cintas se cruzan sin tocarse; una red de nivel V mueve 480/min sin bajar los cuadros
 por segundo en el celular (medido con `tools/rendimiento.js`).
+
+**Cómo quedó (pk-60):**
+
+- Niveles IV (300/min, Era V) y V (480/min, Era VI). El nivel V daba 5/s y no 8: los ítems avanzan 0,32 casillas
+  por tick y el siguiente esperaba 0,34. Ahora entra detrás, en negativo, a la distancia justa.
+- «Copiar esta red» en el panel de una pieza: copia todo lo unido (con filtros, bocas y pasos elevados), se gira de a
+  90° y se paga como nuevo. Con el ratón sigue al cursor; con el dedo, un toque la ubica y otro la pone.
+- Rendimiento (celular simulado con la CPU ×4, sin GPU, zoom 1): sin cintas 28–29 cuadros/s; 156 piezas de nivel V
+  llenas, 24; 1.056 piezas llenas (unos 3.200 ítems), 16–17. Como referencia, 300 aldeanos en pantalla dan 19,7. Se
+  bajó el dibujo de esa red de 17 a 11 ms y la simulación de 5,3 a 4 ms (bono del árbol una vez por tick, sprites
+  y posiciones armados al rearmar, ítems sin arreglos nuevos). El criterio «sin bajar los cuadros» no se cumple del
+  todo con redes enormes sin GPU; con una red normal la baja es chica.
+- Piloto: aprende a usarlas (campamento → bodega, sube tramos) y `?sincintas` las apaga para comparar.
+- Ritmo (`?timelapse`, Era IV en minutos de juego; una corrida varía ±15 min entre mapas): con cintas 176 y 112, sin
+  cintas 154, 121 y 175. Las cintas no adelantan las eras. **Ninguna corrida llegó a la Era V** (unos 430 min): al
+  piloto le faltan la Universidad y la Acería, que piden mármol, y nunca junta mármol ni hierro (no pone campamentos
+  en esos nodos). No es por las cintas; queda para revisar aparte (en `pk-47` llegaba a la Era V en 307 min).
 
 ---
 

@@ -216,7 +216,7 @@
   // ---------- Las figuras ----------
   function cara(dx, dy) { return { flip: dx - dy < 0, back: dx + dy < 0 }; }
   function sprite(fig, col, modo, cuadro, c) {
-    if (fig.tipo === 'catapult') return Sp.cart(col, 'stone', c.flip, cuadro % 4, modo === 'walk');
+    if (fig.tipo === 'catapult' || (D.ARMY[fig.tipo] || {}).maquina) return Sp.cart(col, fig.tipo === 'catapult' ? 'stone' : 'wood', c.flip, cuadro % 4, modo === 'walk'); // G5: las máquinas van sobre ruedas
     return Sp.troop(fig.tipo, col, modo, cuadro, c.flip, c.back, modo === 'work' ? ARMA[fig.tipo] || null : null, fig.i);
   }
   function item(fig, col, modo, cuadro, c, salto, id) {

@@ -24,7 +24,10 @@
   const NIV = n => D.CINTA.niv[n - 1];
   Ci.DIRS = DIRS;
   Ci.NOM_DIR = ['E', 'S', 'W', 'N'];
-  const K = () => 1 + (G().bono ? G().bono('belt') : 0); // Cintas reforzadas (árbol): más rápidas todas
+  // Cintas reforzadas (árbol): más rápidas todas. Una vez por instante del juego: G.bono mira la estación y se pedía
+  // miles de veces por tick (velocidad y ritmo de cada carril), un tercio del tiempo de la red grande (pk-60).
+  let kT = -1, kV = 1;
+  const K = () => { const g = G(), t = g.time; if (t !== kT || t === undefined) { kT = t; kV = 1 + (g.bono ? g.bono('belt') : 0); } return kV; };
 
   // ---------- Datos ----------
   const red = () => S().logi.red;
@@ -99,7 +102,9 @@
     return b && b.owner === 'p' && b.done ? b : null;
   }
   const nuevo = (k, pz, l, d, len) => ({ k, pz, l, d, len, outs: [], ent: [], src: null, sig: null, dst: null, motivo: null });
+  let armado = 0; // sube con cada rearmar (el dibujo arma su lista de nuevo)
   function rearmar() {
+    armado++;
     carriles = []; porK = new Map();
     const t = red().t;
     for (const ks in t) {
@@ -255,7 +260,11 @@
   // daba 2,5/s
   let pasoDt = 0.1;
   const credito = c => Math.max(c.lib || 0, -pasoDt);
-  function hayLugar(c) { const it = itemsDe(c); return (c.lib || 0) <= 0 && (!it.length || it[it.length - 1][1] >= JUNTOS); }
+  // pk-60: el último puede estar hasta un tick antes de dejar lugar: el nuevo entra detrás, en negativo (fuera de la
+  // pieza), a JUNTOS justo. Esperar al tick siguiente dejaba el nivel V (3,2 casillas/s, 0,32 por tick) en 5/s y no 8.
+  const tolera = c => vel(c) * pasoDt + 1e-9;
+  function hayLugar(c) { const it = itemsDe(c); return (c.lib || 0) <= 0 && (!it.length || it[it.length - 1][1] >= JUNTOS - tolera(c)); }
+  const detras = it => (it.length ? Math.min(0, it[it.length - 1][1] - JUNTOS) : 0);
   // el unidor toma por turnos: si al que le toca tiene algo listo, los demás esperan
   function listo(l, dest) { const it = itemsDe(l); return it.length > 0 && it[0][1] >= l.len - 1e-6 && l.outs.some(o => o.c === dest); }
   function hayLugarDesde(dest, src) {
@@ -294,7 +303,7 @@
       if (o.c) {
         if (!hayLugarDesde(o.c, c)) continue;
         const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
-        dest.push([r, Math.max(0, Math.min(itemsDe(c)[0][1] - c.len, lim))]);
+        dest.push([r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim)]);
         o.c.lib = credito(o.c) + cada(o.c);
         if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
       } else {
@@ -319,9 +328,9 @@
       if (salir(c, it[0][0])) { it.shift(); c.pz.flujo = (c.pz.flujo || 0) + 1; }
       else it[0][1] = c.len;
     }
-    for (let i = 1; i < it.length; i++) if (it[i][1] > it[i - 1][1] - JUNTOS) it[i][1] = Math.max(0, it[i - 1][1] - JUNTOS);
+    for (let i = 1; i < it.length; i++) if (it[i][1] > it[i - 1][1] - JUNTOS) it[i][1] = it[i - 1][1] - JUNTOS;
     // boca de salida: saca a su ritmo
-    if (c.src && hayLugar(c)) { const r = sacar(c); if (r) { it.push([r, 0]); c.lib = credito(c) + cada(c); } }
+    if (c.src && hayLugar(c)) { const r = sacar(c); if (r) { it.push([r, detras(it)]); c.lib = credito(c) + cada(c); } }
   }
   // Ítems por minuto que pasan (medido cada 10 s; pz.flujo cuenta los que salen de la pieza)
   let medT = 0;
@@ -552,6 +561,78 @@
     return true;
   };
 
+  // ---------- Copiar (C3) ----------
+  // Un molde es la red conectada a una pieza (vecinas que se tocan y los dos extremos de cada paso elevado), en
+  // casillas relativas a esa pieza. Se estampa en otro lado, girado de a 90°, y se paga como nuevo (sin lo que lleva).
+  const MOLDE_MAX = 400;
+  Ci.molde = function (k0) {
+    const t = red().t;
+    if (!t[k0]) return null;
+    const [x0, y0] = xyOf(k0), vistos = new Set([k0]), cola = [k0], piezas = [];
+    while (cola.length && vistos.size <= MOLDE_MAX) {
+      const k = cola.shift(), pz = t[k], [x, y] = xyOf(k);
+      const m = { dx: x - x0, dy: y - y0, p: pz.p, d: pz.d, n: pz.n };
+      if (pz.f) m.f = pz.f.slice();
+      if (pz.f2) m.f2 = Object.assign({}, pz.f2);
+      if (pz.p === 'e') { const [hx, hy] = xyOf(pz.hasta); m.hasta = [hx - x0, hy - y0]; m.lp = pz.lp; }
+      if (pz.p === 'x') { const [hx, hy] = xyOf(pz.desde); m.desde = [hx - x0, hy - y0]; }
+      piezas.push(m);
+      const vec = DIRS.map(([a, b]) => (W.inb(x + a, y + b) ? kOf(x + a, y + b) : -1));
+      if (pz.p === 'e') vec.push(pz.hasta);
+      if (pz.p === 'x') vec.push(pz.desde);
+      for (const v of vec) if (v >= 0 && t[v] && !vistos.has(v)) { vistos.add(v); cola.push(v); }
+    }
+    return { piezas: piezas.slice(0, MOLDE_MAX), corto: vistos.size > MOLDE_MAX };
+  };
+  const rotar = ([dx, dy], r) => { for (let i = 0; i < r; i++) [dx, dy] = [-dy, dx]; return [dx, dy]; };
+  Ci.costoMolde = function (molde) {
+    const c = {};
+    for (const m of molde.piezas) suma(c, costoPieza(m));
+    return c;
+  };
+  // dónde quedaría el molde con su pieza de origen en (x, y), girado rot cuartos de vuelta (a la derecha)
+  Ci.planCopia = function (molde, x, y, rot) {
+    rot = ((rot || 0) % 4 + 4) % 4;
+    const tiles = [], malas = [], piezas = [];
+    for (const m of molde.piezas) {
+      const [dx, dy] = rotar([m.dx, m.dy], rot), tx = x + dx, ty = y + dy, d = (m.d + rot) % 4;
+      const pz = { p: m.p, d, n: m.n };
+      if (m.f) pz.f = m.f.slice();
+      if (m.f2) { pz.f2 = {}; for (const q in m.f2) pz.f2[(+q + rot) % 4] = m.f2[q]; }
+      if (m.hasta) { const [a, b] = rotar(m.hasta, rot); pz.hasta = [x + a, y + b]; pz.lp = m.lp; }
+      if (m.desde) { const [a, b] = rotar(m.desde, rot); pz.desde = [x + a, y + b]; }
+      let why = W.inb(tx, ty) ? (Ci.libre(tx, ty) ? null : Ci.porQue(tx, ty)) : 'fuera del mapa';
+      if (!why && pz.hasta) for (let i = 1; i < pz.lp; i++) { const a = tx + DIRS[d][0] * i, b = ty + DIRS[d][1] * i; if (!W.inb(a, b) || W.ownerAt(a, b) !== 'p') { why = 'todo el paso tiene que quedar en tu tierra'; break; } }
+      const ti = { x: tx, y: ty, d, mala: !!why, cruce: m.p === 'k' };
+      tiles.push(ti); piezas.push([tx, ty, pz]);
+      if (why) malas.push({ x: tx, y: ty, why });
+    }
+    return { tiles, malas, piezas, costo: Ci.costoMolde(molde), rot };
+  };
+  Ci.estampar = function (plan) {
+    if (!Ci.desbloqueado()) { toast(Ci.lockText(), 'warn'); return 0; }
+    if (!plan || !plan.piezas.length) return 0;
+    if (plan.malas.length) { const m = plan.malas[0]; toast('Ahí no se puede: ' + m.why + '.', 'warn'); return 0; }
+    const alto = plan.piezas.reduce((a, [, , pz]) => Math.max(a, pz.n), 0);
+    if (alto > Ci.maxNivel()) { toast('Ese molde tiene piezas de nivel ' + U.roman(alto) + ': se habilita en la Era ' + U.roman(NIV(alto).era) + '.', 'warn'); return 0; }
+    if (!G().pay(plan.costo)) { toast('Faltan recursos para copiarla.', 'warn'); return 0; }
+    const t = red().t;
+    for (const [x, y, m] of plan.piezas) {
+      const k = kOf(x, y), pz = { p: m.p, d: m.d, n: m.n, i: [] };
+      if (m.p === 'k') pz.j = [];
+      if (m.f) pz.f = m.f;
+      if (m.f2) pz.f2 = m.f2;
+      if (m.hasta) { pz.hasta = kOf(m.hasta[0], m.hasta[1]); pz.lp = m.lp; }
+      if (m.desde) pz.desde = kOf(m.desde[0], m.desde[1]);
+      t[k] = pz;
+      marcar(k, pz);
+    }
+    cambio();
+    if (PK.Sfx) PK.Sfx.play('build');
+    G().stat('belts', 1);
+    return plan.piezas.length;
+  };
+
   // ---------- Mejorar, girar, quitar ----------
   Ci.subir = function (ks, n) {
     const t = red().t, lista = ks.filter(k => t[k] && t[k].n < n);
@@ -732,43 +813,85 @@
   // ---------- Dibujo ----------
   // Llamado desde render.js (capa del suelo): piezas, rampas, ítems. El tablero del paso elevado va en la lista
   // ordenada (Ci.elevados) para que lo que pasa por debajo quede debajo.
-  Ci.dibujar = function (ctx, vis, R, Sp) {
-    const st = S();
-    if (!st || !st.logi || !st.logi.red) return;
-    rearmarSiHace();
-    const fase = Math.floor(performance.now() / 110) % 4, t = red().t;
+  // pk-60 (C3): lo que no cambia entre cuadros se arma una vez por rearmar: posición en pantalla, qué sprite (por
+  // fase de la animación) y, por carril, los tres puntos por donde pasan sus ítems. Con 1.000 piezas de nivel V el
+  // dibujo bajaba los cuadros a la mitad en un celular: armaba la clave del sprite y arreglos nuevos por pieza e ítem.
+  let dib = [], dibArmado = -1;
+  function armarDib(R, Sp) {
+    dibArmado = armado; dib = [];
+    const t = red().t;
     for (const ks in t) {
-      const k = +ks, pz = t[ks], [x, y] = xyOf(k), [px, py] = R.iso(x, y);
-      if (!vis(px - 16, py, 32, 16) || !W.fog[k]) continue;
-      const cs = porK.get(k) || [];
-      let spr;
-      if (pz.p === 'k') spr = Sp.beltCruce(pz.d % 2, fase, pz.n);
+      const k = +ks, pz = t[ks], [x, y] = xyOf(k), [px, py] = R.iso(x, y), cs = porK.get(k) || [];
+      let elegir;
+      if (pz.p === 'k') elegir = f => Sp.beltCruce(pz.d % 2, f, pz.n);
       else if (NODO[pz.p]) { // C2: bandas hacia cada lado conectado
         const c = cs[0];
         let mask = 1 << pz.d;
         if (c) { for (const o of c.outs) mask |= 1 << o.d; for (const e of c.ent) mask |= 1 << OPP(e.d); if (c.src) mask |= 1 << OPP(c.inD); }
-        spr = Sp.beltNodo(pz.p, mask, pz.d, fase, pz.n);
-      }
-      else if (pz.p === 'e' || pz.p === 'x') spr = Sp.beltRampa(Ci.NOM_DIR[pz.d], pz.p === 'e', fase, pz.n);
+        elegir = f => Sp.beltNodo(pz.p, mask, pz.d, f, pz.n);
+      } else if (pz.p === 'e' || pz.p === 'x') elegir = f => Sp.beltRampa(Ci.NOM_DIR[pz.d], pz.p === 'e', f, pz.n);
       else {
         const c = cs[0], inD = c && c.inD !== undefined ? c.inD : pz.d;
-        spr = Sp.belt(Ci.NOM_DIR[OPP(inD)], Ci.NOM_DIR[pz.d], fase, pz.n);
+        elegir = f => Sp.belt(Ci.NOM_DIR[OPP(inD)], Ci.NOM_DIR[pz.d], f, pz.n);
       }
-      ctx.drawImage(spr.c, px - 16, py - (spr.oy || 0));
-      if (cs.some(c => c.atasco) && Math.floor(performance.now() / 400) % 2) { ctx.fillStyle = 'rgba(230,60,40,0.45)'; diamante(ctx, R, x, y); }
-      if (Ci.verFlujo) { ctx.fillStyle = colorFlujo(cs); diamante(ctx, R, x, y); } // C2: «Ver flujo»
+      dib.push({ k, x, y, px, py, cs, elegir, spr: [null, null, null, null] });
     }
-    // ítems
+    for (const c of carriles) {
+      const [x, y] = xyOf(c.k), d = c.d < 0 ? 0 : c.d, inD = c.inD !== undefined ? c.inD : d;
+      c.pts = [x + 0.5 - DIRS[inD][0] * 0.5, y + 0.5 - DIRS[inD][1] * 0.5, x + 0.5, y + 0.5, x + 0.5 + DIRS[d][0] * 0.5, y + 0.5 + DIRS[d][1] * 0.5];
+      const [px, py] = R.iso(x, y);
+      c.px = px; c.py = py;
+    }
+  }
+  Ci.dibujar = function (ctx, vis, R, Sp) {
+    const st = S();
+    if (!st || !st.logi || !st.logi.red) return;
+    rearmarSiHace();
+    if (dibArmado !== armado) armarDib(R, Sp);
+    const ahora = performance.now(), fase = Math.floor(ahora / 110) % 4, parpadeo = Math.floor(ahora / 400) % 2;
+    for (const e of dib) {
+      if (!vis(e.px - 16, e.py, 32, 16) || !W.fog[e.k]) continue;
+      const spr = e.spr[fase] || (e.spr[fase] = e.elegir(fase));
+      ctx.drawImage(spr.c, e.px - 16, e.py - (spr.oy || 0));
+      if (parpadeo && e.cs.some(c => c.atasco)) { ctx.fillStyle = 'rgba(230,60,40,0.45)'; diamante(ctx, R, e.x, e.y); }
+      if (Ci.verFlujo) { ctx.fillStyle = colorFlujo(e.cs); diamante(ctx, R, e.x, e.y); } // C2: «Ver flujo»
+    }
+    // ítems: de la entrada al centro y del centro a la salida (así doblan en las curvas); se descarta el carril entero
+    // si su casilla no se ve, y no se crean arreglos por ítem
+    const off = W.H * 16;
+    let nI = 0;
     for (const c of carriles) {
       const it = itemsDe(c);
-      if (!it || !it.length || c.pz.p === 'e') continue;
-      for (const [r, q] of it) {
-        const [tx, ty] = posItem(c, q), [px, py] = R.iso(tx, ty);
-        if (!vis(px - 4, py - 6, 8, 8)) continue;
-        item(ctx, Sp, r, px, py - (c.pz.p === 'x' ? Math.max(0, (1 - q * 2)) * D.CINTA.alto : 0));
+      if (!it || !it.length || c.pz.p === 'e' || !c.pts) continue;
+      if (!vis(c.px - 20, c.py - 16, 40, 34) || !W.fog[c.k]) continue;
+      const p = c.pts, alto = c.pz.p === 'x';
+      for (let i = 0; i < it.length; i++) {
+        const q = it[i][1], f = q < 0 ? 0 : q > 1 ? 1 : q;
+        let tx, ty;
+        if (f < 0.5) { tx = p[0] + (p[2] - p[0]) * f * 2; ty = p[1] + (p[3] - p[1]) * f * 2; }
+        else { tx = p[2] + (p[4] - p[2]) * (f - 0.5) * 2; ty = p[3] + (p[5] - p[3]) * (f - 0.5) * 2; }
+        const px = (tx - ty) * 16 + off, py = (tx + ty) * 8; // lo mismo que R.iso, sin crear un arreglo
+        if (nI >= bufX.length) { const nx = new Float32Array(bufX.length * 2), ny = new Float32Array(bufX.length * 2); nx.set(bufX); ny.set(bufY); bufX = nx; bufY = ny; }
+        bufX[nI] = Math.round(px); bufY[nI] = Math.round(py - (alto ? Math.max(0, 1 - q * 2) * D.CINTA.alto : 0)); bufR[nI] = it[i][0]; nI++;
       }
     }
+    // todos los ítems en dos pasadas (el fondo oscuro y un trazo por recurso): con miles de ítems, dos fillRect y dos
+    // fillStyle por ítem eran casi la mitad del dibujo de la red
+    if (!nI) return;
+    ctx.fillStyle = 'rgba(20,14,10,0.9)'; ctx.beginPath();
+    for (let i = 0; i < nI; i++) ctx.rect(bufX[i] - 3, bufY[i] - 5, 6, 5);
+    ctx.fill();
+    const grupos = new Map();
+    for (let i = 0; i < nI; i++) { const g = grupos.get(bufR[i]); if (g) g.push(i); else grupos.set(bufR[i], [i]); }
+    for (const [r, idx] of grupos) {
+      ctx.fillStyle = COL[r] || (COL[r] = Sp.rgb(Sp.CARRY[r] || [200, 200, 200])); ctx.beginPath();
+      for (const i of idx) ctx.rect(bufX[i] - 2, bufY[i] - 4, 4, 3);
+      ctx.fill();
+    }
+    bufR.length = 0;
   };
+  let bufX = new Float32Array(256), bufY = new Float32Array(256);
+  const bufR = [];
   // «Ver flujo» (C2): gris vacía, verde corre con lugar, amarillo a tope (llena porque adelante se llevan menos, o casi al
   // máximo de su nivel: es normal), rojo solo lo que hay que arreglar: atascada o frenada por una pieza de menos nivel.
   Ci.verFlujo = false;
@@ -784,17 +907,11 @@
     const a = R.iso(x, y), b = R.iso(x + 1, y), c = R.iso(x + 1, y + 1), d = R.iso(x, y + 1);
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill();
   }
+  const COL = {};
   function item(ctx, Sp, r, px, py) {
-    const col = Sp.CARRY[r] || [200, 200, 200];
-    ctx.fillStyle = 'rgba(20,14,10,0.9)'; ctx.fillRect(Math.round(px) - 3, Math.round(py) - 5, 6, 5);
-    ctx.fillStyle = Sp.rgb(col); ctx.fillRect(Math.round(px) - 2, Math.round(py) - 4, 4, 3);
-  }
-  // posición de un ítem en su pieza: de la entrada al centro y del centro a la salida (así dobla en las curvas)
-  function posItem(c, q) {
-    const [x, y] = xyOf(c.k), d = c.d < 0 ? 0 : c.d, inD = c.inD !== undefined ? c.inD : d;
-    const e = [x + 0.5 - DIRS[inD][0] * 0.5, y + 0.5 - DIRS[inD][1] * 0.5], m = [x + 0.5, y + 0.5], s = [x + 0.5 + DIRS[d][0] * 0.5, y + 0.5 + DIRS[d][1] * 0.5];
-    const f = Math.max(0, Math.min(1, q));
-    return f < 0.5 ? [e[0] + (m[0] - e[0]) * f * 2, e[1] + (m[1] - e[1]) * f * 2] : [m[0] + (s[0] - m[0]) * (f - 0.5) * 2, m[1] + (s[1] - m[1]) * (f - 0.5) * 2];
+    const col = COL[r] || (COL[r] = Sp.rgb(Sp.CARRY[r] || [200, 200, 200])), x = Math.round(px), y = Math.round(py);
+    ctx.fillStyle = 'rgba(20,14,10,0.9)'; ctx.fillRect(x - 3, y - 5, 6, 5);
+    ctx.fillStyle = col; ctx.fillRect(x - 2, y - 4, 4, 3);
   }
   // El tablero de los pasos elevados, como ítems ordenados por profundidad (con lo que viaja arriba).
   Ci.elevados = function (R, Sp, seen) {

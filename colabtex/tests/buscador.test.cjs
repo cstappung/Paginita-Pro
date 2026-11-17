@@ -46,7 +46,8 @@ test('busca por apodo, género y de qué va, no solo por el nombre',()=>{
 
 test('tolera tipeos y lo que se está escribiendo',()=>{
  assert.ok(ids('tetirs').includes('tetris'));
- assert.equal(ids('ajedres')[0],'ajedrez');
+ // «ajedres» trae los dos ajedreces primero: la sala y Ajedrez Club (bots y puzles).
+ assert.deepEqual(new Set(ids('ajedres').slice(0,2)),new Set(['ajedrez','ajedrezclub']));
  assert.equal(ids('snkae')[0],'snake');
  assert.equal(ids('pokemno')[0],'pokemon');
  assert.equal(ids('metr')[0],'metrorush');

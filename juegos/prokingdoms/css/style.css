@@ -1345,3 +1345,6 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 .bt-etapas { margin-top: 4px; border-top: 1px dashed #8a6a44; padding-top: 4px; }
 .bt-et.no { opacity: 0.55; }
 .bt-et.rota b { color: #a03a24; }
+
+/* pk-62 (G5): la comarca en la ventana de la parcela */
+.comarca { margin: 4px 0 8px; padding: 6px 8px; border: 1px solid rgba(120, 90, 40, .5); border-radius: 4px; background: rgba(255, 226, 150, .28); }

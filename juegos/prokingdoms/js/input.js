@@ -330,6 +330,9 @@
     if ((L.tool === 'road' || L.tool === 'calzada') && I.roadStart) {
       const [tx, ty] = r.screenToTile(sx, sy);
       r.roadGhost = (L.tool === 'calzada' ? PK.Calzada.plan : L.roadPlan)(I.roadStart[0], I.roadStart[1], Math.floor(tx), Math.floor(ty));
+    } else if (L.tool === 'copiar' && I.molde && !PK.UI.isTouch()) { // pk-60 (C3): la copia sigue al ratón
+      const [tx, ty] = r.screenToTile(sx, sy);
+      copiaEn(Math.floor(tx), Math.floor(ty));
     } else if ((L.tool === 'cinta' || L.tool === 'paso') && I.roadStart) { // pk-58: el plan de la cinta o del paso
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
       if (L.tool === 'cinta') { const p = Ci.plan(I.roadStart[0], I.roadStart[1], x, y); r.beltGhost = p ? p.tiles.concat(p.extra || []) : null; I.planCinta = p; }
@@ -353,9 +356,43 @@
     const L = PK.Logi;
     I.flagTool = false;
     if (PK.Asedios) PK.Asedios.cancelar();
-    L.tool = null; L.beltFrom = null; I.roadStart = null; I.planCinta = null;
+    L.tool = null; L.beltFrom = null; I.roadStart = null; I.planCinta = null; I.molde = null; I.planCopia = null;
     PK.Def.cancel();
     R().roadGhost = null; R().beltGhost = null;
+    PK.UI.refreshPanel(true);
+  };
+  // pk-60 (C3): copiar una red de cintas. El fantasma muestra dónde queda; con el ratón sigue al cursor y un clic la
+  // estampa; con el dedo, el primer toque la ubica y otro en el mismo lugar (o «Estampar aquí») la pone. R la gira.
+  I.molde = null; I.moldeRot = 0; I.planCopia = null;
+  function copiaEn(x, y) {
+    if (!I.molde) return null;
+    const p = PK.Cintas.planCopia(I.molde, x, y, I.moldeRot);
+    p.en = [x, y];
+    I.planCopia = p; R().beltGhost = p.tiles;
+    PK.UI.refreshPanel();
+    return p;
+  }
+  I.startCopia = function (k) {
+    const Ci = PK.Cintas, m = Ci.molde(k);
+    if (!m || !m.piezas.length) return;
+    I.cancelTool();
+    G().sel = null;
+    PK.Logi.tool = 'copiar'; I.molde = m; I.moldeRot = 0;
+    const [x, y] = [k % W.W, (k / W.W) | 0];
+    if (PK.UI.isTouch()) copiaEn(x, y);
+    PK.UI.toast('Copiaste ' + m.piezas.length + ' piezas' + (m.corto ? ' (hasta ' + m.piezas.length + ')' : '') + '. ' + PK.UI.hint('Mueve el ratón y haz clic donde va; R la gira.', 'Toca dónde va y toca otra vez para ponerla.'), 'info');
+    PK.UI.refreshPanel(true);
+  };
+  I.girarCopia = function () {
+    I.moldeRot = (I.moldeRot + 1) % 4;
+    if (I.planCopia) copiaEn(I.planCopia.en[0], I.planCopia.en[1]);
+    PK.UI.refreshPanel(true);
+  };
+  I.estamparCopia = function () {
+    const p = I.planCopia;
+    if (!p) { PK.UI.toast('Toca dónde va la copia.', 'info'); return; }
+    const n = PK.Cintas.estampar(p);
+    if (n) { PK.UI.toast('Copia puesta: ' + n + ' piezas.', 'good'); copiaEn(p.en[0], p.en[1]); }
     PK.UI.refreshPanel(true);
   };
   function toolClick(sx, sy) {
@@ -382,6 +419,14 @@
       const tiles = Cz.plan(I.roadStart[0], I.roadStart[1], x, y);
       I.roadStart = [x, y]; r.roadGhost = null;
       Cz.construir(tiles).then(n => { if (n) PK.UI.toast('Calzada Real: ' + n + ' casillas (hoy ' + Cz.hoy() + ' de ' + Cz.tope() + ').', 'good'); PK.UI.refreshPanel(true); });
+      return;
+    }
+    if (L.tool === 'copiar') {
+      const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty);
+      if (!W.inb(x, y)) return;
+      const p = I.planCopia;
+      if (!p || p.en[0] !== x || p.en[1] !== y) { copiaEn(x, y); if (PK.UI.isTouch()) return; }
+      I.estamparCopia();
       return;
     }
     if (L.tool === 'cinta') { // pk-58: dos toques (inicio y fin); se encadenan tramos
@@ -600,6 +645,7 @@
     else if (k === 't') PK.Terr.toggle();
 
     else if (k === 'r' && g.placing && D.BUILD[g.placing.type].porton && g.placing.move === undefined) I.girarPorton(); // pk-43
+    else if (k === 'r' && PK.Logi.tool === 'copiar') I.girarCopia(); // pk-60
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
     else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido

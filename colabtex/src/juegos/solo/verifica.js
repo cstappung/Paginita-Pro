@@ -40,8 +40,9 @@ import * as hero from './verifica/hero.js';
 import * as prodefender from './verifica/prodefender.js';
 import * as propac from './verifica/propac.js';
 import * as boxhead from './verifica/boxhead.js';
+import * as ajedrez from './verifica/ajedrez.js';
 
-export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, integral, fanal, atasco, aleteo, dosmil, trigon, typerace, protiles, frontera, metrorush, pokelike, hero, prodefender, propac, boxhead};
+export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, integral, fanal, atasco, aleteo, dosmil, trigon, typerace, protiles, frontera, metrorush, pokelike, hero, prodefender, propac, boxhead, ajedrez};
 
 /* Lo que ocupa una prueba como texto, como mucho. La regla de
    `soloPruebas` pide lo mismo. */

@@ -660,6 +660,26 @@
       p.line(p.P(2.6, 2.84, 7), p.P(2.98, 2.84, 7), '#5a3c22');
       p.flag(2.9, 0.35, 0, col, 24);
     },
+    // G5 (pk-62): el Fuerte fronterizo. Un recinto de piedra con cuatro torreones y una torre del homenaje con su bandera.
+    fuerte(p, col, m, tier) {
+      p.box(0, 0, 3, 3, 0, 2, 'stone', 'stone', 'paving');
+      p.box(0.2, 0.2, 2.6, 2.6, 2, 14, 'stone', 'stone', 'paving'); // el recinto
+      const b = { x: 0.2, y: 0.2, w: 2.6, h: 2.6 };
+      p.door(b, 'L', 1.3, 0.7, 9, 2);
+      p.quad(b, 'R', 0.9, 1.0, 6, 10, '#141018'); p.quad(b, 'R', 1.7, 1.8, 6, 10, '#141018');
+      for (let i = 0; i < 6; i++) { p.box(0.2 + i * 0.47, 2.62, 0.22, 0.18, 14, 17, 'stone'); p.box(2.62, 0.2 + i * 0.47, 0.18, 0.22, 14, 17, 'stone'); } // almenas del frente
+      for (const [x, y] of [[0, 0], [2.3, 0], [0, 2.3], [2.3, 2.3]]) { // torreones
+        p.box(x, y, 0.7, 0.7, 0, 24, 'stone', 'stone', 'paving');
+        for (const [dx, dy] of [[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]]) p.box(x + dx, y + dy, 0.2, 0.2, 24, 27, 'stone');
+      }
+      const k = { x: 0.95, y: 0.95, w: 1.1, h: 1.1 }; // torre del homenaje
+      p.box(k.x, k.y, k.w, k.h, 14, tier >= 2 ? 40 : 34, 'stone');
+      const h = tier >= 2 ? 40 : 34;
+      p.quad(k, 'L', 0.45, 0.6, h - 14, h - 7, '#141018'); p.quad(k, 'R', 0.45, 0.6, h - 12, h - 5, '#141018');
+      p.quad(k, 'L', 0.15, 0.32, 16, h - 16, col); p.quad(k, 'R', 0.78, 0.95, 16, h - 16, col);
+      if (tier >= 3) { p.roof(k.x, k.y, k.w, k.h, h, 12, tier >= 4 ? 'gilt' : 'slate', 0.01, 0.08, 'x'); p.flag(1.5, 1.5, h + 12, col, 9); }
+      else { for (const [dx, dy] of [[0, 0], [0.45, 0], [0.9, 0], [0, 0.45], [0, 0.9], [0.9, 0.45], [0.45, 0.9], [0.9, 0.9]]) p.box(k.x + dx, k.y + dy, 0.2, 0.2, h, h + 3, 'stone'); p.flag(1.5, 1.5, h, col, 14); }
+    },
     tower(p, col, m, tier) {
       const b = { x: 0.08, y: 0.08, w: 0.84, h: 0.84 };
       p.box(b.x, b.y, b.w, b.h, 0, 32, 'stone');
@@ -1292,7 +1312,7 @@
   };
   const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60, swamp: 36, giants: 44, temple: 36, legend: 40 };
 
-  const BTOP = { granporton: 58, granportonv: 58, establo: 40, tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
+  const BTOP = { fuerte: 66, granporton: 58, granportonv: 58, establo: 40, tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
   // Tramos de nivel: 1-3, 4-6, 7-9, 10-12, 13-15, 16-19 y 20+ (cada era sube 2 niveles el tope).
   S.tier = lvl => (lvl >= 20 ? 6 : lvl >= 16 ? 5 : lvl >= 13 ? 4 : lvl >= 10 ? 3 : lvl >= 7 ? 2 : lvl >= 4 ? 1 : 0);
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).

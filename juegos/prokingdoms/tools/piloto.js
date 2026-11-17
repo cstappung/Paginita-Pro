@@ -123,6 +123,7 @@
   function carromatos() {
     const g = G(), L = PK.Logi, Lb = PK.Libro;
     for (const b of Lb.campos()) {
+      if (conCinta(b) && Lb.totalCampo(b) < Lb.capCampo(b) * 0.5) continue; // pk-60: lo vacía su cinta (si no da abasto, carromatos también)
       const rs = L.rutasDesde(b);
       const llevan = rs.reduce((n, r) => n + L.cartsDe(r).length, 0);
       const quiere = Lb.totalCampo(b) > Lb.capCampo(b) * 0.6 ? 2 : 1;
@@ -146,6 +147,44 @@
       }
       return; // de a uno por paso
     }
+  }
+  // pk-60 (C3): cintas como un jugador. Desde la Era III une cada campamento con la bodega más cercana que reciba lo
+  // que junta (si queda cerca y el trazo es limpio) y ese campamento deja de pedir carromatos; con lo que sobra, sube
+  // tramos al nivel más alto. Con ?sincintas no las usa (para medir el ritmo antes y después).
+  const SIN_CINTAS = /[?&]sincintas\b/.test(location.search);
+  P.cintas = 0; P.cintasSubidas = 0;
+  const conCinta = b => !!(PK.Cintas && S().logi.red && PK.Cintas.bocasDe(b).salen.length);
+  function cintas() {
+    const g = G(), Ci = PK.Cintas, L = PK.Logi, Lb = PK.Libro;
+    if (SIN_CINTAS || !Ci || !Ci.desbloqueado() || g.time < (P._cintaT || 0)) return false;
+    P._cintaT = g.time + 30;
+    P._cintaNo = P._cintaNo || {};
+    const n = Ci.maxNivel();
+    for (const b of Lb.campos()) {
+      if (conCinta(b) || (P._cintaNo[b.id] || 0) > g.time) continue;
+      const dests = g.buildings.filter(o => o.owner === 'p' && o.done && !L.isShop(o) && L.puntoCarreta(o) && (b.def.drop || []).some(k => L.acepta(o, k)) && U.dist(o.cx, o.cy, b.cx, b.cy) < 22)
+        .sort((x, y) => U.dist(x.cx, x.cy, b.cx, b.cy) - U.dist(y.cx, y.cy, b.cx, b.cy));
+      let hecho = false;
+      for (const d of dests.slice(0, 3)) {
+        const p = Ci.plan(b.x, b.y, d.x, d.y);
+        if (!p || p.malas.length || p.bF !== d || p.tiles.length > 26 || p.unir !== null && p.unir !== undefined) continue;
+        if (!g.canAfford(Ci.costoPlan(p, n))) return false; // junta para la próxima
+        if (Ci.trazar(p, n)) { P.cintas++; anota('Cinta de ' + p.tiles.length + ' casillas (nivel ' + U.roman(n) + '): ' + b.def.name + ' → ' + d.def.name + '.'); hecho = true; }
+        break;
+      }
+      if (hecho) return true;
+      P._cintaNo[b.id] = g.time + 600; // sin trazo limpio: lo vuelve a probar en 10 min
+    }
+    // subir: un tramo por vez, si le sobra el doble de lo que cuesta
+    for (const c of Ci.carriles()) {
+      if (c.pz.n >= n) continue;
+      const tr = Ci.tramo(c.k), costo = Ci.costoSubirLista(tr, n), doble = {};
+      for (const r in costo) doble[r] = costo[r] * 2;
+      if (!g.canAfford(doble)) continue;
+      const m = Ci.subir(tr, n);
+      if (m) { P.cintasSubidas += m; anota('Subió ' + m + ' piezas de cinta a nivel ' + U.roman(n) + '.'); return true; }
+    }
+    return false;
   }
   function construir() {
     const g = G(), st = S(), tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
@@ -330,7 +369,7 @@
       exploradores();
       mercado();
       carromatos();
-      campoExtra() || construir();
+      cintas() || campoExtra() || construir();
       mejorar();
       investigar();
       heroes();
@@ -339,7 +378,7 @@
       if (st.ret.welcome) g.openWelcome(true);
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

@@ -555,6 +555,21 @@ const SOLO = {
     { id: "fortaleza15", n: "Asedio", d: "Llega a la ronda 15 en la Fortaleza.", i: "🏰", m: "Mapas", s: d => cat(/^club-boxhead-fortaleza$/)(d) && d.puntos >= 15 },
     { id: "laberinto20", n: "Sin salida", d: "Llega a la ronda 20 en el Laberinto.", i: "🌀", m: "Mapas", s: d => cat(/^club-boxhead-laberinto$/)(d) && d.puntos >= 20 }
   ],
+  /* Ajedrez Club. Cuatro por ganarle a cada bot (club-ajedrez-bot<n>, una
+     fila es una victoria), dos por ganarle pensando poco, y cuatro por las
+     estrellas de los puzles (club-ajedrez-puzles; hay 60 puzles, 180 ★). */
+  ajedrezclub: [
+    { id: "b1", n: "Primer jaque mate", d: "Gánale al bot Novato.", i: "🐣", m: "Bots", s: d => cat(/^club-ajedrez-bot1$/)(d) },
+    { id: "b2", n: "Zorro cazado", d: "Gánale al bot Aficionado.", i: "🦊", m: "Bots", s: d => cat(/^club-ajedrez-bot2$/)(d) },
+    { id: "b3", n: "Búho desvelado", d: "Gánale al bot Experto.", i: "🦉", m: "Bots", s: d => cat(/^club-ajedrez-bot3$/)(d) },
+    { id: "b4", n: "Matadragones", d: "Gánale al bot Maestro.", i: "🐉", m: "Bots", s: d => cat(/^club-ajedrez-bot4$/)(d) },
+    { id: "r1", n: "Mate relámpago", d: "Gánale al Novato pensando menos de 1 minuto en total.", i: "⚡", m: "Rapidez", s: d => cat(/^club-ajedrez-bot1$/)(d) && d.tiempo < 60000 },
+    { id: "r4", n: "Dragón exprés", d: "Gánale al Maestro pensando menos de 5 minutos en total.", i: "🔥", m: "Rapidez", s: d => cat(/^club-ajedrez-bot4$/)(d) && d.tiempo < 300000 },
+    { id: "e30", n: "Ojo táctico", d: "Junta 30 estrellas en los puzles.", i: "🧩", m: "Puzles", s: d => cat(/^club-ajedrez-puzles$/)(d) && d.puntos >= 30 },
+    { id: "e60", n: "Cazador de mates", d: "Junta 60 estrellas en los puzles.", i: "🎯", m: "Puzles", s: d => cat(/^club-ajedrez-puzles$/)(d) && d.puntos >= 60 },
+    { id: "e120", n: "Visión de tablero", d: "Junta 120 estrellas en los puzles.", i: "👁️", m: "Puzles", s: d => cat(/^club-ajedrez-puzles$/)(d) && d.puntos >= 120 },
+    { id: "e180", n: "Gran maestro", d: "Saca las tres estrellas en todos los puzles.", i: "♛", m: "Puzles", s: d => cat(/^club-ajedrez-puzles$/)(d) && d.puntos >= 180 }
+  ],
   /* PRO PACMAN. Todos salen de club-propac-puntos (el récord): siete por
      puntaje y tres por lo que aguantó esa partida (tiempo de juego). Un
      nivel limpio da unos 4 000; los fantasmas y la racha, el resto. */
@@ -667,7 +682,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", boxheadclub: "club-boxhead-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", typeraceclub: "club-typerace-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
+export const SOLO_PREFIJO = { pokelike: "club-pokelike-", minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", boxheadclub: "club-boxhead-", ajedrezclub: "club-ajedrez-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", integral: "club-integral-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", typeraceclub: "club-typerace-", prodefender: "club-prodefender-", propac: "club-propac-", protiles: "club-protiles-", metrorush: "club-metrorush-", hero: "club-hero-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

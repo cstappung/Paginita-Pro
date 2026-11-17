@@ -86,15 +86,19 @@
 
   // Defensa estimada de una parcela de otro reino (o de las tuyas, para saber qué tan seguras están).
   T.defenseOf = (k, slot) => T.defenseParts(k, slot).total;
+  // G5: la comarca de una parcela (entrada de D.COMARCAS con su id) y cuántas tengo de un rasgo.
+  T.comarca = k => { const id = W.rasgoDe(k); return id ? Object.assign({ id }, D.COMARCAS[id]) : null; };
+  T.comarcasMias = id => { let n = 0; for (let k = 0; k < W.terr.length; k++) if (T.mine(k) && W.rasgoDe(k) === id) n++; return n; };
   // La misma defensa, separada por origen (tropas, torres, murallas, local, vecinas, milicia de la era).
   T.defenseParts = function (k, slot) {
     const P = W.PW, owner = D.ownerOfSlot(slot), towers = [];
-    for (const b of G().buildings) if (b.owner === owner && b.done && (b.type === 'tower' || b.type === 'tc')) towers.push([b.cx, b.cy, (D.BSTATS[b.type](b.lvl).defense || 0)]);
+    for (const b of G().buildings) if (b.owner === owner && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'fuerte')) towers.push([b.cx, b.cy, (D.BSTATS[b.type](b.lvl).defense || 0), b.type === 'fuerte' ? D.FUERTE_RADIO : 9]);
     const around = W.parcelNeighbors(k).filter(n => W.terr[n] === slot + 1).length;
-    if (slot === me()) return D.parcelDefenseParts({ era: S().era, px: k % P, py: Math.floor(k / P), towers, army: PK.Social.power(S().war.army), walls: G().lvl('walls'), around, mult: PK.Def.parcelMult(k) * (1 + G().best('dragontower', 'terrDef')) });
+    const cerro = (D.COMARCAS[W.rasgoDe(k)] || {}).defensa || 1; // G5: un Cerro se defiende mejor, sea de quien sea
+    if (slot === me()) return D.parcelDefenseParts({ era: S().era, px: k % P, py: Math.floor(k / P), towers, army: PK.Social.power(S().war.army), walls: G().lvl('walls'), around, mult: PK.Def.parcelMult(k) * (1 + G().best('dragontower', 'terrDef')) * cerro });
     const bot = T.realmOf(slot), info = T.realmInfo(slot);
-    if (bot.human) return D.parcelDefenseParts({ era: info.era, px: k % P, py: Math.floor(k / P), towers, army: bot.army || 0, walls: 0, around });
-    return D.parcelDefenseParts({ era: info.era, px: k % P, py: Math.floor(k / P), towers, army: 45 * info.era * bot.strength, walls: Math.floor(info.era / 2), around });
+    if (bot.human) return D.parcelDefenseParts({ era: info.era, px: k % P, py: Math.floor(k / P), towers, army: bot.army || 0, walls: 0, around, mult: cerro });
+    return D.parcelDefenseParts({ era: info.era, px: k % P, py: Math.floor(k / P), towers, army: 45 * info.era * bot.strength, walls: Math.floor(info.era / 2), around, mult: cerro });
   };
 
   // ---------- Resumen de batallas ----------
@@ -359,6 +363,7 @@
       if (!info.human) scheduleRevenge(c.slot, c.k);
       const loot = D.conquestLoot(info.era || st.era);
       if (plan && plan.fin === 'rendir') for (const r in loot) loot[r] = Math.round(loot[r] / 2); // G4: se rindieron, medio botín
+      if (W.rasgoDe(c.k)) for (const r in loot) loot[r] = Math.round(loot[r] * D.COMARCA_BOTIN); // G5: una comarca vale más
       G().give(loot);
       const lootTxt = Object.keys(loot).map(r => U.fmt(loot[r]) + ' ' + D.RES[r].name.toLowerCase()).join(', ');
       PK.Social.log('Conquistaste una parcela de ' + info.realm + '. Botín: ' + lootTxt + '. Perdiste el ' + Math.round(loss * 100) + '% de las tropas.' + (cause ? ' ' + cause : ''), 'good');
@@ -499,7 +504,7 @@
     for (const c of st.terr.camps.slice()) {
       if (c.phase === 'go' && !c.remote && now >= c.arrive) empezarAsedio(c, offline);
       if (c.phase === 'asedio' && !c.remote && c.ref && !c.ref.ok && now >= c.ref.llega && now < c.ini + c.plan.total * 1000) { // G4: llegaron los refuerzos
-        const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT || c.power)), m: D.asedioOficio(sumaTropas(c.units, c.ref.units)) });
+        const n = D.asedioReplan(c.plan, (c.ref.llega - c.ini) / 1000, { tipo: 'refuerzo', atk: c.ref.power * (c.plan.atkR / Math.max(1, c.powerT || c.power)), m: D.asedioOficio(sumaTropas(c.units, c.ref.units), (c.plan.parts.walls || 0) > 0), torre: (c.ref.units.torreAsedio || 0) + (c.units.torreAsedio || 0) > 0 });
         if (n) { c.plan = n; c.powerT = (c.powerT || c.power) + c.ref.power; for (const u in c.ref.units) c.units[u] = (c.units[u] || 0) + c.ref.units[u]; c.ref.ok = true; if (!offline) toast('¡Llegaron los refuerzos al asedio!', 'good'); }
       }
       if (c.phase === 'asedio' && !c.remote && now >= c.ini + c.plan.total * 1000) { const p = c.plan; finishCampaign(c, p.gano && W.terr[c.k] === c.slot + 1, p.ratio, { atk: p.atk, def: p.def, parts: p.parts }, p); }

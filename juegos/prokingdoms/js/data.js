@@ -15,7 +15,7 @@
   // Versión de protocolo: el cliente la manda en POST /api/join y el servidor rechaza otra con 426 («El servidor
   // se está actualizando»). Súbela cuando cambie algo que ven los dos lados (mapa, rutas, límites), porque
   // GitHub Pages publica al hacer merge y la Cloud Function se despliega a mano.
-  D.PROTO = 10;
+  D.PROTO = 11;
   // Lo que dice el cartel al entrar después de un reinicio (una partida guardada de otra SAVE_V). Actualízalo en
   // cada entrega que reinicie.
   D.NOVEDADES = { ver: 'pk-17', items: [
@@ -96,6 +96,9 @@
     establo: { name: 'Establo de Carromatos', w: 4, h: 3, cost: { wood: 140, stone: 30 }, time: 40, era: 1, upT: 0.8, max: e => 1 + Math.floor(e / 2), desc: 'Arma carromatos: carros grandes de bueyes que vacían los campamentos y llevan lo juntado al pueblo, dentro y fuera de tu tierra. El primero trae un carromato de regalo.' },
     granporton: { name: 'Gran Portón', w: 4, h: 2, cost: { wood: 200, stone: 120 }, time: 45, era: 1, noUp: true, porton: 'h', max: e => 1 + Math.floor(e / 3), desc: 'Paso ancho en la muralla, con dos torres: lo cruzan tus aldeanos, carretas y carromatos (los carromatos no caben por una puerta chica). Lobos, bandidos y otros reinos no pasan. Se puede poner encima de tu muralla.' },
     granportonv: { name: 'Gran Portón', w: 2, h: 4, cost: { wood: 200, stone: 120 }, time: 45, era: 1, noUp: true, porton: 'v', alias: 'granporton', max: e => 1 + Math.floor(e / 3), desc: 'Paso ancho en la muralla, con dos torres (girado).' },
+    // G5 (pk-62): el Fuerte fronterizo. Defiende como una torre alta, pero a 2 parcelas a la redonda: es lo que decide
+    // qué frontera se defiende (D.FUERTE_RADIO en D.parcelDefenseParts).
+    fuerte: { name: 'Fuerte fronterizo', w: 3, h: 3, cost: { stone: 900, wood: 500, gold: 300 }, time: 240, era: 3, upT: 1.2, max: e => 1 + Math.floor(e / 3), desc: 'Guarnición de frontera: suma mucha defensa a tus parcelas hasta 2 parcelas a la redonda. Es la segunda etapa de un asedio.' },
     tower: { name: 'Torre de Vigía', w: 1, h: 1, cost: { stone: 100, wood: 25 }, time: 30, era: 1, upT: 0.8, max: e => 2 + e * 2, desc: 'Defiende tu reino y ve muy lejos en la niebla.' },
     market: { name: 'Mercado', w: 3, h: 3, cost: { wood: 175 }, time: 45, era: 2, max: 1, desc: 'Compra y vende recursos. Con más nivel, mejores precios.' },
     sawmill: { name: 'Aserradero', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 40, era: 2, recipe: 'planks', slots: 3, desc: 'Convierte madera en tablones.' },
@@ -113,7 +116,7 @@
     workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -172,6 +175,7 @@
     builder: () => ({ builders: 1 }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
+    fuerte: L => ({ defense: Math.round(140 * (1 + 0.4 * (L - 1))), sight: 9 + L }),
     establo: L => ({ carromatos: 2 + L, carroCap: D.CARROMATO.cap + D.CARROMATO.capLvl * (L - 1), carroSpeed: 0.05 * (L - 1) }),
     granporton: () => ({}), granportonv: () => ({}),
     cartwright: L => ({ carts: 2 + 2 * L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
@@ -608,7 +612,8 @@
   D.parcelDefenseParts = function (o) {
     const cx = (o.px + 0.5) * D.PARCEL, cy = (o.py + 0.5) * D.PARCEL;
     const p = { era: 120 * Math.pow(1.7, o.era - 1), towers: 0, troops: o.army || 0, walls: 0, home: 0, around: 0 };
-    for (const t of o.towers || []) { const dist = Math.hypot(t[0] - cx, t[1] - cy); if (dist < 18) p.towers += t[2] * (dist < 9 ? 1 : 0.5); }
+    // t: [x, y, defensa, radio]. radio: hasta dónde cuenta entera (9 casillas las torres; el Fuerte, 2 parcelas); al doble, la mitad.
+    for (const t of o.towers || []) { const dist = Math.hypot(t[0] - cx, t[1] - cy), r = t[3] || 9; if (dist < r * 2) p.towers += t[2] * (dist < r ? 1 : 0.5); }
     let d = p.era + p.towers + p.troops;
     p.walls = d * 0.2 * (o.walls || 0); d += p.walls;
     p.home = d * 0.5; d += p.home;
@@ -676,6 +681,20 @@
     return null;
   };
 
+  // ---------- Comarcas (plan de guerra, G5, pk-62) ----------
+  // Una de cada cuatro parcelas (ni corazón de un reino ni zona común) tiene un rasgo sembrado (W.rasgoDe, world.js):
+  // un motivo para querer esa parcela y no la de al lado. La recolección va por Vida.recoleccion (dentro de su tope).
+  D.COMARCAS = {
+    vega: { nombre: 'Vega', icono: '🌾', txt: 'Las granjas que tengas dentro rinden un 15 % más.', granja: 0.15 },
+    bosque: { nombre: 'Bosque viejo', icono: '🌲', txt: 'La madera que se tala dentro rinde un 10 % más.', res: { wood: 0.1 } },
+    cantera: { nombre: 'Cantera vieja', icono: '⛏️', txt: 'La piedra, el oro y los minerales que se sacan dentro rinden un 10 % más.', res: { stone: 0.1, gold: 0.1, ore: 0.1, marble: 0.1, gems: 0.1 } },
+    cerro: { nombre: 'Cerro', icono: '⛰️', txt: 'Terreno alto: la parcela se defiende un 30 % mejor.', defensa: 1.3 },
+    santuario: { nombre: 'Santuario', icono: '⛩️', txt: 'Da +3 de ánimo a tu pueblo (hasta 2 santuarios).', animo: 3 },
+  };
+  D.COMARCA_CADA = 4;        // una de cada cuatro
+  D.COMARCA_BOTIN = 1.5;     // conquistar una comarca da más botín
+  D.COMARCA_SANTUARIOS = 2;
+
   // ---------- El asedio por etapas (plan de guerra, G1, pk-55) ----------
   // La campaña ya no es una tirada al llegar: es un asedio de tres etapas que dura minutos. Cada etapa es un grupo de
   // las partes de la defensa (D.parcelDefenseParts), así que la suma sigue siendo la defensa de siempre.
@@ -700,18 +719,21 @@
     asalto: { nombre: 'Asalto', vel: 0.7, bajasGana: 0.10, txt: 'Etapas un 30 % más cortas. Si ganas, pierdes 10 puntos más de tropas.' },
     cerco: { nombre: 'Cerco', vel: 1.6, bajas: -0.08, frontera: 0.9, txt: 'Etapas un 60 % más largas. Pierdes 8 puntos menos de tropas y la frontera resiste un 10 % menos.' },
   };
-  D.ASEDIO.oficio = { frontera: { rider: 1.25, knight: 1.25 }, defensas: { catapult: 2, crossbow: 1.3, archer: 0.8 }, estandarte: { spear: 1.2, monk: 1.2, cleric: 1.2 } };
+  D.ASEDIO.oficio = { frontera: { rider: 1.25, knight: 1.25 }, defensas: { catapult: 2, crossbow: 1.3, archer: 0.8, torreAsedio: 2, ariete: 3 }, estandarte: { spear: 1.2, monk: 1.2, cleric: 1.2 } };
+  D.ASEDIO.arieteSinMuros = 1;  // el ariete solo rinde ×3 si la parcela tiene murallas
+  D.ASEDIO.torreBajas = -0.05;  // con una torre de asedio en la hueste, 5 puntos menos de bajas
+  D.FUERTE_RADIO = 16;          // casillas a las que el Fuerte cuenta entero (2 parcelas); al doble, la mitad
   D.ASEDIO.maxAcc = 4;                  // decisiones por asedio y por bando
   D.ASEDIO.salida = { suma: 0.2, cuesta: 0.05 }; // la salida del defensor: +20 % de su guarnición a la etapa, y pierde el 5 %
   D.ASEDIO.retirada = [0.15, 0.5];      // bajas al retirarse: al empezar y al final
   // Cuánto rinde una hueste en cada etapa: [frontera, defensas, estandarte]. Cada tropa pesa por su fuerza.
-  D.asedioOficio = function (units) {
+  D.asedioOficio = function (units, muros) {
     let tot = 0;
     for (const u in units || {}) if (D.ARMY[u]) tot += units[u] * D.ARMY[u].power;
     return D.ASEDIO.etapas.map(id => {
       if (tot <= 0) return 1;
       let m = 0;
-      for (const u in units) if (D.ARMY[u]) m += units[u] * D.ARMY[u].power * (D.ASEDIO.oficio[id][u] || 1);
+      for (const u in units) if (D.ARMY[u]) m += units[u] * D.ARMY[u].power * (u === 'ariete' && id === 'defensas' && muros === false ? D.ASEDIO.arieteSinMuros : D.ASEDIO.oficio[id][u] || 1);
       return Math.round((m / tot) * 1000) / 1000;
     });
   };
@@ -719,7 +741,7 @@
   D.asedioPlan = function (o) {
     const R = U.rng((o.semilla || 1) + 7411), A = D.ASEDIO, tir = () => 0.85 + 0.3 * R();
     const atk = Math.max(0, o.atk || 0) * tir(), def = Math.max(1, (o.parts && o.parts.total) || 0) * tir();
-    return D.asedioDe({ atk, def, parts: o.parts, semilla: o.semilla, rnd: R, suerte: A.suerte, m: o.units ? D.asedioOficio(o.units) : null, tactica: o.tactica });
+    return D.asedioDe({ atk, def, parts: o.parts, semilla: o.semilla, rnd: R, suerte: A.suerte, m: o.units ? D.asedioOficio(o.units, ((o.parts && o.parts.walls) || 0) > 0) : null, tactica: o.tactica, torre: !!(o.units && o.units.torreAsedio > 0) });
   };
   // Las etapas que faltan, desde un punto de la batalla. b: { atk, res (resistencia de cada etapa), m (oficio), vel,
   // gano (si ya está decidido) }; i: etapa; c: defensa ya vencida; a: fuerza ya gastada; t: segundo; f0: avance de la
@@ -747,9 +769,9 @@
     }
     return { etapas, c, a, t, gano };
   }
-  const asedioBajas = (gano, ratio, rb, tac) => {
+  const asedioBajas = (gano, ratio, rb, tac, torre) => {
     const T = D.ASEDIO.tacticas[tac] || {};
-    return U.clamp(D.conquestLoss(gano, ratio, rb) + (T.bajas || 0) + (gano ? T.bajasGana || 0 : 0), 0.05, 0.9);
+    return U.clamp(D.conquestLoss(gano, ratio, rb) + (T.bajas || 0) + (gano ? T.bajasGana || 0 : 0) + (torre ? D.ASEDIO.torreBajas : 0), 0.05, 0.9);
   };
   // La línea de tiempo a partir de las fuerzas ya tiradas. La usa asedioPlan, y también sirve para armar la
   // repetición de una batalla que decidió el servidor (llegan atk y def ya tirados y las partes a escala).
@@ -771,10 +793,11 @@
     // las partes a escala, cada una con la suerte de su etapa, para el resumen (D.battleCause)
     const out = { total: Math.round(def) };
     A.etapas.forEach((id, i) => { for (const k of A.partes[id]) out[k] = Math.round(Math.max(0, parts[k] || 0) * lk[i] * esc * (i === 0 && T && T.frontera ? T.frontera : 1)); });
-    const plan = { v: 2, semilla: o.semilla || 1, atk: Math.round(o.atk), def: Math.round(def), ratio, gano: tr.gano, bajas: asedioBajas(tr.gano, ratio, rb, o.tactica), total: tr.t, gastado: tr.c, etapas: tr.etapas, parts: out,
+    const plan = { v: 2, semilla: o.semilla || 1, atk: Math.round(o.atk), def: Math.round(def), ratio, gano: tr.gano, bajas: asedioBajas(tr.gano, ratio, rb, o.tactica, o.torre), total: tr.t, gastado: tr.c, etapas: tr.etapas, parts: out,
       // lo que hace falta para volver a calcular (D.asedioReplan); nunca viaja a los jugadores antes del final
       res, rb, atkR: o.atk, acc: [] };
     if (m) plan.m = m;
+    if (o.torre) plan.torre = true;
     if (o.tactica && T) plan.tac = o.tactica;
     return plan;
   };
@@ -802,7 +825,7 @@
     let atkR = plan.atkR, vel = (A.tacticas[plan.tac] || {}).vel || 1, tac = plan.tac;
     let c0i = 0;
     for (let j = 0; j < i; j++) c0i += n.res[j];
-    if (ch.tipo === 'refuerzo') { atkR += Math.max(0, ch.atk || 0); if (ch.m && plan.m) n.m = ch.m; } // m: el oficio de la hueste ya con los refuerzos
+    if (ch.tipo === 'refuerzo') { atkR += Math.max(0, ch.atk || 0); if (ch.m && plan.m) n.m = ch.m; if (ch.torre) n.torre = true; } // m: el oficio de la hueste ya con los refuerzos
     else if (ch.tipo === 'salida') { if (i > 1) return null; n.res[i] += A.salida.suma * ((plan.parts && plan.parts.troops) || 0); }
     else if (ch.tipo === 'tactica') {
       const T = A.tacticas[ch.tactica];
@@ -816,7 +839,7 @@
     const def = n.res.reduce((s, v) => s + v, 0), m = n.m;
     const ratio = atkR / Math.max(1, m ? n.res.reduce((s, v, j) => s + v / (m[j] || 1), 0) : def);
     n.atkR = atkR; n.atk = Math.round(atkR); n.def = Math.round(def); n.ratio = ratio; n.gano = tr.gano; n.tac = tac;
-    n.bajas = asedioBajas(tr.gano, ratio, plan.rb, tac); n.total = tr.t; n.gastado = tr.c; n.etapas = hecho.concat(tr.etapas);
+    n.bajas = asedioBajas(tr.gano, ratio, plan.rb, tac, n.torre); n.total = tr.t; n.gastado = tr.c; n.etapas = hecho.concat(tr.etapas);
     n.parts = Object.assign({}, plan.parts, { total: n.def });
     return n;
   };
@@ -871,7 +894,7 @@
   D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 }; // las de antes de pk-58 (solo para convertirlas)
   // pk-58: red de cintas (PLAN-CINTAS.md). rate: ítems por segundo; vel: casillas por segundo (los ítems van separados
   // vel / rate casillas). cost: lo que cuesta cada casilla al subir a ese nivel. maxFase: hasta qué nivel se construye
-  // por ahora (la Fase C3 abre IV y V). cruce y paso: lo que suman esas piezas.
+  // (C1 y C2 llegaban al III; la Fase C3, pk-60, abre IV y V). cruce y paso: lo que suman esas piezas.
   D.CINTA = {
     niv: [
       { name: 'Cinta de cuero', rate: 1, vel: 1.2, era: 3, cost: { planks: 2, ingots: 1 } },
@@ -880,7 +903,7 @@
       { name: 'Cinta reforzada', rate: 5, vel: 2.6, era: 5, cost: { steel: 1, machinery: 1 } },
       { name: 'Cinta de engranajes', rate: 8, vel: 3.2, era: 6, cost: { machinery: 2, gems: 1 } },
     ],
-    maxFase: 3, cruce: { planks: 4, ingots: 2 }, paso: { planks: 10, ingots: 4, stone: 20 }, pasoMax: 5, alto: 10,
+    maxFase: 5, cruce: { planks: 4, ingots: 2 }, paso: { planks: 10, ingots: 4, stone: 20 }, pasoMax: 5, alto: 10,
     // C2 (pk-59): piezas que unen, reparten y separan. Cuestan además del nivel de la pieza.
     nodos: { u: { planks: 6, ingots: 2 }, v: { planks: 6, ingots: 2 }, s: { ingots: 4, tools: 2, books: 1 } },
     nodoNombre: { u: 'Unidor', v: 'Divisor', s: 'Clasificador' },
@@ -1016,6 +1039,10 @@
     crossbow: { name: 'Ballestero', role: 'Tirador pesado y lento. x2 contra gigantes, x1,4 contra bestias y x1,3 contra gólems.', cost: { wood: 70, gold: 55, ingots: 1 }, time: 30, power: 12, era: 4, lvl: 6, vs: { giant: 2, beast: 1.4, golem: 1.3 } },
     monk: { name: 'Monje guerrero', role: 'Pelea de cerca y cura un poco a los de al lado. x1,5 contra arcanos y no-muertos; reduce las bajas un 1,5% cada uno.', cost: { food: 70, gold: 45, books: 1 }, time: 26, power: 10, era: 5, lvl: 7, vs: { arcane: 1.5, undead: 1.5 }, heal: 0.015 },
     mage: { name: 'Mago de batalla', role: 'Daño en área desde lejos. x2 contra abisales y x1,4 contra gólems.', cost: { food: 60, gold: 160, books: 3 }, time: 45, power: 34, era: 6, lvl: 8, vs: { abyss: 2, golem: 1.4 } },
+    // G5 (pk-62): máquinas de asedio. Valen por su oficio en la etapa de las defensas (D.ASEDIO.oficio); fuera de un
+    // asedio solo cuentan su fuerza base, que es poca.
+    ariete: { name: 'Ariete', maquina: true, role: 'Máquina de asedio: x3 contra las defensas de una parcela con murallas. Fuera de un asedio casi no pelea.', cost: { wood: 260, gold: 60, ingots: 4 }, time: 50, power: 14, era: 3, lvl: 4, vs: {} },
+    torreAsedio: { name: 'Torre de asedio', maquina: true, role: 'Máquina de asedio: x2 contra las defensas y tus tropas caen menos (5 puntos). Fuera de un asedio casi no pelea.', cost: { wood: 420, gold: 160, machinery: 3 }, time: 90, power: 30, era: 5, lvl: 7, vs: {} },
     catapult: { name: 'Catapulta', role: 'x2 contra gólems y x1,8 contra gigantes; la mitad contra bestias.', cost: { wood: 200, gold: 120, machinery: 2 }, time: 60, power: 60, era: 5, lvl: 7, vs: { golem: 2, beast: 0.5, giant: 1.8 } },
   };
   // Partidas de saqueo de los reinos simulados (C6, pk-22; las decide server/sim.js): tope por recurso de una
