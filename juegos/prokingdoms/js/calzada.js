@@ -92,6 +92,9 @@
     if (!vencMemo || t - vencT > 500) { vencMemo = new Set(G().vencidos ? G().vencidos() : []); vencT = t; }
     return vencMemo;
   };
+  // pk-79: los recursos que moviste con monedas: donde estaban ya no ocupan (reporte del dueño: después de mover el oro no
+  // dejaba hacer la Calzada donde había estado)
+  Cz.movidos = () => new Set(Object.keys((S().despeje && S().despeje.mover) || {}).map(Number));
   Cz.libre = function (x, y) {
     if (!W.inb(x, y)) return false;
     const k = W.idx(x, y);
@@ -100,7 +103,7 @@
     else if (W.block[k] !== 0) return false;
     const F = PK.Fort, z = F && F.ciudadela && F.ciudadela();
     if (F && (F.en(x, y) || (z && x >= z.x && y >= z.y && x < z.x + z.w && y < z.y + z.h))) return false;
-    return W.calzadaPuede(k, D.MY_SLOT, null, Cz.ub(), Cz.vencidos());
+    return W.calzadaPuede(k, D.MY_SLOT, null, Cz.ub(), Cz.vencidos(), Cz.movidos());
   };
   // en palabras, para el aviso del primer toque
   Cz.porQue = function (x, y) {
@@ -114,7 +117,7 @@
     if (W.bAt[k] >= 0 || W.wall[k] || W.wallOwner[k]) return 'hay un edificio o una muralla';
     if (W.belt[k] >= 0) return 'hay una cinta';
     const o = Cz.ub().ocupa[k];
-    if (o < 0 || (W.block[k] === 1 && !(W.nodes[W.nodeAt[k]] && W.QUEDAN[W.nodes[W.nodeAt[k]].kind]))) return 'hay un recurso (rodéalo, o muévelo con monedas)';
+    if ((o < 0 && !Cz.movidos().has(-o - 1)) || (W.block[k] === 1 && !(W.nodes[W.nodeAt[k]] && W.QUEDAN[W.nodes[W.nodeAt[k]].kind]))) return 'hay un recurso (rodéalo, o muévelo con monedas)';
     if (o > 0) return W.PISABLE(W.pois[o - 1].kind) ? 'hay un lugar que todavía no venciste' : 'hay un lugar';
     return 'no se puede';
   };
@@ -152,7 +155,7 @@
       return ks.length;
     }
     try {
-      const r = await PK.Net.autopista(ks, [], { venc: Array.from(Cz.vencidos()) });
+      const r = await PK.Net.autopista(ks, [], { venc: Array.from(Cz.vencidos()), mov: Array.from(Cz.movidos()) });
       S().calzada.dia.n = r.hoy || S().calzada.dia.n + r.aceptadas.length;
       Cz.version = r.autopistas.v; Cz.aplicar(r.autopistas.t, r.autopistas.d);
       const fuera = ks.length - r.aceptadas.length;
@@ -187,10 +190,11 @@
     if (!online()) {
       const st = S().calzada, fuera = new Set(ks);
       st.t = st.t.filter(k => !fuera.has(k));
+      Cz.hoy(); st.dia.n = Math.max(0, st.dia.n - mias); // pk-79: lo tuyo que quitas vuelve al cupo del día
       for (const k of ks) delete st.d[k];
       Cz.aplicar(local(), st.d);
     } else {
-      try { const r = await PK.Net.autopista([], ks); Cz.version = r.autopistas.v; Cz.aplicar(r.autopistas.t, r.autopistas.d); }
+      try { const r = await PK.Net.autopista([], ks); Cz.version = r.autopistas.v; Cz.aplicar(r.autopistas.t, r.autopistas.d); if (typeof r.hoy === 'number') { Cz.hoy(); S().calzada.dia.n = r.hoy; } }
       catch (e) { toast('No se pudo quitar la Calzada Real (sin conexión con el servidor).', 'warn'); return 0; }
     }
     if (mias) G().give(Cz.costo(mias), 0.5); // la mitad de lo tuyo vuelve, como con los caminos

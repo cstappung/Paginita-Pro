@@ -986,10 +986,11 @@
       ocup[W.idx(to[0], to[1])] = 1;
     }
     // las casillas que quedan ocupadas por lugares y recursos que no son árboles (para la Calzada, L5). pk-78: un lugar
-    // marca su id + 1 (la Calzada puede ir sobre un campamento o una mazmorra que ese reino ya venció); un recurso, -1
+    // marca su id + 1 (la Calzada puede ir sobre un campamento o una mazmorra que ese reino ya venció); un recurso,
+    // -(id + 1) (pk-79: el que ese jugador movió con monedas ya no está ahí)
     const ocupa = new Int32Array(N);
     for (let id = 0; id < pOrig; id++) { if (out.sub[id]) continue; const p = W.pois[id], [x0, y0] = out.p[id] || W.ORIG.p[id]; for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) ocupa[W.idx(x0 + i, y0 + j)] = id + 1; }
-    for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = -1; }
+    for (let id = 0; id < nOrig; id++) if (!W.QUEDAN[W.nodes[id].kind]) { const [x0, y0] = out.n[id] || W.ORIG.n[id]; ocupa[W.idx(x0, y0)] = -(id + 1); }
     Object.defineProperty(out, 'ocupa', { value: ocupa, enumerable: false }); // fuera del JSON (la prueba compara posiciones)
     return out;
   }
@@ -1024,8 +1025,9 @@
   // la misma respuesta en el cliente y en el servidor. Los edificios los mira solo el cliente (L.calzadaLibre).
   // pk-78 (pedido del dueño): también en las zonas comunes (no sobre el mineral: el recurso marca su casilla en ocupa) y
   // sobre un campamento o una mazmorra que ese reino ya venció (venc: Set o { id: 1 } de ids de W.pois). ub: lo que
-  // devuelve W.ubicarLugares con la capa de Calzada (se pasa una vez para muchas casillas).
-  W.calzadaPuede = function (k, slot, terr, ub, venc) {
+  // devuelve W.ubicarLugares con la capa de Calzada (se pasa una vez para muchas casillas). pk-79: mov, los ids de
+  // W.nodes que ese jugador movió con monedas (st.despeje.mover): su casilla de antes queda libre para él.
+  W.calzadaPuede = function (k, slot, terr, ub, venc, mov) {
     terr = terr || W.terr;
     if (!(k >= 0 && k < W.W * W.H) || W.tema === 'mar' || !W.ORIG) return false;
     const x = k % W.W, y = (k / W.W) | 0, pc = W.parcel(x, y);
@@ -1033,9 +1035,11 @@
     if (terr[pc] && terr[pc] !== slot + 1) return false; // no en tierra ajena
     const o = (ub || W.ubicarLugares(terr)).ocupa[k];
     if (!o) return true;
-    if (o < 0 || !venc) return false;
+    const tiene = (s, id) => !!(s && (s.has ? s.has(id) : s[id]));
+    if (o < 0) return tiene(mov, -o - 1);
+    if (!venc) return false;
     const id = o - 1;
-    return !!(venc.has ? venc.has(id) : venc[id]) && W.PISABLE(W.pois[id].kind);
+    return tiene(venc, id) && W.PISABLE(W.pois[id].kind);
   };
   W.countParcels = slot => { let n = 0; for (let k = 0; k < W.terr.length; k++) if (W.terr[k] === slot + 1) n++; return n; };
   W.saveTerr = () => Array.from(W.terr).join(',');

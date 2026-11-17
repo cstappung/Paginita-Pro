@@ -704,7 +704,7 @@
         panel.append(el('div', { class: 'p-help' }, el('h3', null, 'Trazar Calzada Real'),
           el('p', { class: 'small' }, 'Una franja de piedra de 2 casillas, del color de tu reino, que ven y usan todos los reinos del mundo: carromatos ×3,2, carretas ×2,2, aldeanos ×1,5. Va en tierra de nadie, en la tuya o en las zonas comunes (no sobre los minerales), y sobre los campamentos y mazmorras que ya venciste. Toca dónde empieza y dónde termina; puedes encadenar tramos. Cada casilla cuesta '),
           UI.costEl(D.AUTOPISTA.costo(G().state.era)),
-          el('p', { class: 'small muted' }, 'Hoy: ' + Cz.hoy() + ' de ' + Cz.tope() + ' casillas.'),
+          el('p', { class: 'small muted' }, 'Hoy: ' + Cz.hoy() + ' de ' + Cz.tope() + ' casillas. Si quitas Calzada tuya, ese cupo vuelve y puedes ponerla en otro lado.'),
           el('div', { class: 'row' }, UI.btn('Terminar', () => PK.Input.cancelTool(), { small: true }))));
         return;
       }
