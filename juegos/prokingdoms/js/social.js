@@ -127,7 +127,7 @@
   const medioCompra = (r, n) => tope(r, S().market.p[r] * Math.pow(1.03, n / 200));
   const medioVenta = (r, n) => tope(r, S().market.p[r] * Math.pow(0.97, n / 200));
   Soc.buyPrice = (r, n) => Math.ceil((medioCompra(r, n) * buyRate() * n) / 100);
-  Soc.sellPrice = (r, n) => Math.floor((medioVenta(r, n) * mkRate('sell') * n) / 100);
+  Soc.sellPrice = (r, n) => Math.floor((medioVenta(r, n) * mkRate('sell') * n * (PK.Mundo && PK.Mundo.ciudMia() ? 1 + D.CIUDADELA.bono : 1)) / 100); // G7: la Ciudadela de tu gremio
   // Tope del servidor con los mercaderes (LIM.marketSync y LIM.marketDay en sim.js, medido en oro al precio del
   // mercado): 2 × escala por sync y 20 × escala por día UTC. Sin conexión no hay tope. Pasarlo recortaba la
   // operación en el servidor y marcaba a un jugador honesto como sospechoso.
@@ -539,7 +539,7 @@
   // Defensa: cada Torre y el Centro Urbano aportan según su nivel; las tropas en casa suman su fuerza.
   Soc.defense = function () {
     let d = 0;
-    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'bateria')) d += G().bst(b).defense || 0;
+    for (const b of G().buildings) if (b.owner === 'p' && b.done && (b.type === 'tower' || b.type === 'tc' || b.type === 'bateria' || b.type === 'fuerte')) d += G().bst(b).defense || 0;
     return Math.round(d * (1 + 0.2 * G().lvl('walls')) + Soc.power(S().war.army));
   };
   Soc.barracksLvl = () => G().buildings.reduce((m, b) => (b.owner === 'p' && b.done && b.type === 'barracks' ? Math.max(m, b.lvl) : m), 0);

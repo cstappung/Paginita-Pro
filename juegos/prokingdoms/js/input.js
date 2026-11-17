@@ -333,7 +333,7 @@
     } else if (L.tool === 'copiar' && I.molde && !PK.UI.isTouch()) { // pk-60 (C3): la copia sigue al ratón
       const [tx, ty] = r.screenToTile(sx, sy);
       copiaEn(Math.floor(tx), Math.floor(ty));
-    } else if (PK.Cintas.HERR_PIEZA[L.tool]) { // pk-63: las herramientas del menú de cintas marcan la pieza (o el tramo) que tocarías
+    } else if (PK.Cintas.HERR_PIEZA[L.tool]) { // pk-67: las herramientas del menú de cintas marcan la pieza (o el tramo) que tocarías
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
       if (Ci.piezaEn(x, y)) {
         const k = W.idx(x, y), m = L.tool === 'cmolde' ? Ci.molde(k) : null;
@@ -402,7 +402,7 @@
     if (n) { PK.UI.toast('Copia puesta: ' + n + ' piezas.', 'good'); copiaEn(p.en[0], p.en[1]); }
     PK.UI.refreshPanel(true);
   };
-  // pk-63: menú de construcción de cintas. Herramientas que se usan tocando una pieza: poner un nodo (unidor, divisor o
+  // pk-67: menú de construcción de cintas. Herramientas que se usan tocando una pieza: poner un nodo (unidor, divisor o
   // clasificador), mejorar el tramo al nivel elegido, girar, quitar, o elegir la red que se copia.
   I.abrirCintas = function (tool) {
     const Ci = PK.Cintas;
@@ -470,7 +470,7 @@
       I.estamparCopia();
       return;
     }
-    if (PK.Cintas.HERR_PIEZA[L.tool]) { I.usarEnPieza(sx, sy); return; } // pk-63: menú de cintas
+    if (PK.Cintas.HERR_PIEZA[L.tool]) { I.usarEnPieza(sx, sy); return; } // pk-67: menú de cintas
     if (L.tool === 'cinta') { // pk-58: dos toques (inicio y fin); se encadenan tramos
       const [tx, ty] = r.screenToTile(sx, sy), x = Math.floor(tx), y = Math.floor(ty), Ci = PK.Cintas;
       if (!W.inb(x, y)) return;
@@ -595,6 +595,8 @@
     else if (it.k === 'node') g.sel = { type: 'node', id: it.o.id };
     else if (it.k === 'poi') g.sel = { type: 'poi', id: it.o.id };
     else if (it.k === 'cap') { PK.Campana.openLugar(it.o.n); return; }
+    else if (it.k === 'fort') { PK.UI.openFort(it.o.id); return; } // G6
+    else if (it.k === 'ciud') { PK.UI.openCiudadela(); return; } // G7
     else if (it.k === 'belt') g.sel = { type: 'belt', id: W.idx(it.x, it.y) }; // pk-58: la casilla de la pieza
     else if (it.k === 'puente') g.sel = { type: 'belt', id: it.o.k };
     else if (it.k === 'wall') g.sel = { type: 'wall', id: it.o.k };
@@ -690,7 +692,7 @@
     else if (k === 'r' && PK.Logi.tool === 'copiar') I.girarCopia(); // pk-60
     else if (k === 'b') PK.Quests.openBook();
     else if (k === 'c') PK.UI.openBuild();
-    else if (k === 'k') { if (PK.Cintas.HERR[PK.Logi.tool]) I.cancelTool(); else I.abrirCintas(); } // pk-63: menú de cintas
+    else if (k === 'k') { if (PK.Cintas.HERR[PK.Logi.tool]) I.cancelTool(); else I.abrirCintas(); } // pk-67: menú de cintas
     else if (k === 'v' && g.sel && g.sel.type === 'building') I.startMoving(g.bById.get(g.sel.id)); // mover el edificio elegido
     else if (k === 'm') PK.UI.toast(PK.Sfx.toggle() ? 'Sonido activado.' : 'Sonido silenciado.', 'info');
     else if (k === 'delete' && g.sel && g.sel.type === 'building') { const b = g.bById.get(g.sel.id); if (b) PK.UI.confirmDemolish(b); }

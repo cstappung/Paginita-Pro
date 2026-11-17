@@ -12,6 +12,10 @@ owner outside this repo and dropped in.
 - `PLAN-LOGISTICA.md` (Nov 15 2026): the next plan, «Caminos y Campamentos», phases L1–L6 («implementa la Fase
   L<N> del plan de logística»; L6 is the sea with cargo barges). §10 lists traps; §11 has the owner's answered
   decisions (migrate without a reset, carts always on a hand-picked route with no auto mode).
+- `PLAN-GUERRA.md` (Nov 16 2026): the plan after that, «Estandartes de Guerra», phases G1–G8 («implementa la Fase
+  G<N> del plan de guerra»): conquest as a three-stage siege drawn on the map. G1 and G2 delivered together in `pk-60` (its «Avance» section says
+  what is left); G3 onward not started. Its §1 table (win chance
+  by strength ratio) is the balance contract; §12 lists the owner's open decisions.
 - `PLAN-CINTAS.md` (Nov 16 2026): the belt redesign («Red de cintas»), phases C1–C3 («implementa la Fase C<N> del
   plan de cintas»): belts as pieces on tiles with level I–V, building ports, mixed items, splitter/merger/sorter,
   bottlenecks. §9 holds the owner's answered decisions (Nov 16). C1 done in `pk-58`.
@@ -403,6 +407,58 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   its pieces. `S.barcoColonos` in `sprites-mar.js` defers to `S.barcoColonos3d`.
 
 
+### War plan, G1 + G2: the siege (`pk-60`; built as pk-55 on a parallel branch)
+
+- **The battle plan is the only truth.** `D.asedioPlan({atk, parts, semilla})` (data.js, pure, seeded) decides the
+  whole siege when the campaign arrives: winner, casualties and the three stages (`D.ASEDIO`: frontera = era + around,
+  defensas = towers + walls, estandarte = troops + home). `D.asedioEn(plan, t)` gives the state at second `t`.
+  Everything else only reads it: `terr.js` (`c.plan`, `c.ini`, `c.lado`, phase `go → asedio → back`), the queue row,
+  Territorio, and the drawing. Never keep battle state anywhere else: reload and offline give the same ending because
+  of this (checked: same plan after reload, same result an hour later).
+- **The win chance by strength ratio did not move** (§1 of the plan; `colabtex/tests/pk-asedio.test.cjs` holds it).
+  The roll is the old one (each side ×0.85–1.15); the stages only spread it over ~4 minutes (`D.ASEDIO.total`).
+- **`js/frente.js` (`PK.Frente`) draws and nothing else**: it decides nothing and saves nothing; the cast comes
+  from the plan's seed, and `Math.random` is only for dust, smoke and the like. A test fails if it calls
+  `asedioPlan`/`conquestLoss` or touches camps, threats, battles or resources. Hooks in `render.js` (`suelo`, `collect`,
+  `minimapa`).
+- The parcel changes owner **at the end** of the siege, not on arrival; meanwhile it is «en disputa»
+  (`T.enDisputa`, `G.placeWhy` → `'disputa'`: nothing is built there).
+- Neighbours' probes go through the same siege (`th.plan`). A lost probe still costs the fixed 15% of the army, not
+  the plan's casualties (kept from before; the plan's text said otherwise).
+- Replays: each battle keeps `rep: {plan, units, lado, de, a}`; «Ver de nuevo» calls `PK.Frente.repetir`. Battles
+  decided by the server get a plan rebuilt with `D.asedioDe({gano, …})` so they can be replayed too; real
+  player-vs-player sieges are G3 (server, PROTO 11, needs `firebase deploy --only functions`).
+- The toast on arrival must not show the rolled defence: it gave the result away.
+- Realms start 2–4 free parcels from each other: `T.caminoA(slot)` + «Marcar el camino» tell the player which
+  parcels to claim to reach a neighbour.
+- Autopilot (`tools/piloto.js`): buys wood/stone when short for the next era (it sat on Era III with gold to spare)
+  and claims toward the nearest realm (`frontera()`). Era IV at game minute 145–173 (was 104 in `pk-45`); in 311
+  minutes it never reached a border, so its sieges are only the probes it defends.
+- **Camps and a resource with nowhere to go** (`Lb.lugarCampo`, `mayor.js`): with gold over the store cap (rewards)
+  carts stop taking gold, it filled the mixed mining camp and stone stopped coming in. A resource whose store is at
+  the cap takes at most half a camp, and what was already over half does not take room from the others (stuck camps
+  heal by themselves; a camp can briefly hold up to 1.5× its cap). Villagers and `G.llenoPara` ask `lugarCampo`.
+
+### War plan, G3: sieges between players (`pk-60`, server)
+
+- `tickCamps` (`server/sim.js`): on arrival the campaign gets `c.plan = D.asedioPlan(...)` (same function as local),
+  `c.ini`, `c.lado`, and stays in `camps` until `c.ini + plan.total`; only then the parcel changes owner and the
+  inbox items go out, now with the whole plan (`plan, ini, lado, units`) for the replay. The plan lives in the camp
+  doc, so a restart mid-siege changes nothing.
+- **What travels is `D.asedioVista`** (list `asedios`, version `w.asv`/`asv`, sent only when it changes, to everyone
+  in the world): only the stages already started, a drawing seed that is not the plan's, and until the last stage
+  starts no winner, no casualties and `atk = def` (both bars go down together). Never send `c.plan` or `c.semilla`
+  before the end. A partial view has `parcial: true` and `D.asedioEn` never reports `fin` for it.
+- Client: `Net.asedios` (server clock converted with `Net.aLocal`); `T.asediosRemotos` puts the view in my remote
+  camp; `T.frentes()` adds the others as `mio: 'def'` or `'ver'` (spectator), ids `'r' + id`. **A remote camp is
+  never finished by the browser clock** (`!c.remote` in `T.update`): the `conquest_result` does it.
+- `D.PROTO` was **not** bumped (the plan said 11): old client + new server and new client + old server both work
+  (the result just arrives later, or without a plan and the replay is rebuilt), and a bump would lock everyone out
+  between the push and the manual function deploy. Until `firebase deploy --only functions`, player-vs-player
+  battles still resolve on arrival.
+- At most 2 campaigns against the same player at once. `incoming` only lists campaigns still marching.
+- Not done from the plan's G3: `guarn` (the defender's real troop mix in stage 3; the cast is still generic).
+- Tests: `node tools/asedio-test.js`.
 ### Owner's tweaks, second round (`pk-56`; built as pk-55 in parallel with another pk-55)
 
 - **Roads only on your own land** (`L.roadAllowed` needs `ownerAt === 'p'`; outside goes the Calzada Real).
@@ -479,7 +535,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - No `D.PROTO` bump: the server only uses `W.ubicarLugares` for the Calzada's `ocupa`. Until `firebase deploy --only
   functions`, the deployed server still treats the old footprints as occupied (a Calzada tile there is refused).
 
-## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, menu/packets `pk-63`, `js/cintas.js`, `PK.Cintas`)
+## Belt network (`PLAN-CINTAS.md`, C1 `pk-58`, C2 `pk-59`, C3 `pk-60`, menu/packets `pk-67`, `js/cintas.js`, `PK.Cintas`)
 
 - **Pieces, not pairs:** `st.logi.red.t[k] = { p, d, n, i, j?, f?, hasta?/desde?, lp? }` (`p`: `c` belt, `k` crossing,
   `e`/`x` elevated pass in/out; `d` 0 E 1 S 2 W 3 N; `n` level 1..5 from `D.CINTA.niv`). `W.belt[k]` holds the level
@@ -536,23 +592,128 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   belt that is full because downstream takes less is amber (normal behind a unidor; red there would read as a fault).
   The Asesor uses the same states (`cintaAtasco` 61, `cintaCuello` 40). `Ci.llegan(k)` (upstream items + port
   options) feeds the sorter panel's short list.
-- **Packets (pk-63, owner's request: 4× capacity):** an item is `[res, q, cant]`, up to `D.CINTA.pila` (4) units;
+- **Packets (pk-67, owner's request: 4× capacity):** an item is `[res, q, cant]`, up to `D.CINTA.pila` (4) units;
   no `cant` means 1 (old saves). Same items on screen, so the phone cost does not change. `sacar` takes up to a packet,
   `entregar(b, r, cant)` returns how many fit and the rest waits at the lane's tip (`it0[2]`), `pz.flujo`/`pz.pm`,
   `Ci.enCinta`, `devolverItems` and the offline budget count units. Show rates with `Ci.porMin(n)`, never
   `rate * 60`.
 - **Several belts per building:** `bordeHacia` prefers a free border tile and only falls back to one with a piece
   (it used to take the nearest even if a belt already left from there, so a second belt collided with the first).
-- **Belt menu (pk-63):** `#cintabar` (ui.js `barraCintas`, refreshed with the panel) shows while
+- **Belt menu (pk-67):** `#cintabar` (ui.js `barraCintas`, refreshed with the panel) shows while
   `PK.Render.modoCintas()` (a belt tool in `Ci.HERR`, or a selected piece). Menu button «Cintas» (Reino group, id
   `cintas`), key K, and Logística's «Cintas…» open it (`PK.Input.abrirCintas`). Tap-a-piece tools
   (`Ci.HERR_PIEZA`, handled by `I.usarEnPieza`): `cnodo` (with `L.cintaNodo` u/v/s), `csubir` (whole tramo to
   `L.cintaNivel`), `cgirar`, `cquitar`, `cmolde` (picks the network, then the `copiar` tool). The level starts at
   your era's best until you pick one (`L.cintaNivelElegido`). On phones the labels hide and it wraps in two rows; the
   minimap hides while it is open.
-- **Transparent mode (pk-63, owner's request):** while `modoCintas()`, items in the sorted list draw with
+- **Transparent mode (pk-67, owner's request):** while `modoCintas()`, items in the sorted list draw with
   `TRANSP[it.k]` alpha (buildings 0.28), then a veil and the whole network (and the `puente` items) are drawn again on
   top. Anything new that should fade must use a `k` in `TRANSP`.
-- **Ports (pk-63):** `Sp.beltBoca(d, entrada, n)` — a hopper where a lane delivers into a building, an arched hatch
+- **Ports (pk-67):** `Sp.beltBoca(d, entrada, n)` — a hopper where a lane delivers into a building, an arched hatch
   with a chute where a lane takes from one. `Ci.bocas` lists them per `armarDib` as `k: 'puente'` items; when the
   building is behind the belt (d W/N) the port sorts just after the building so it sits on its visible wall.
+
+
+### War plan, G4: decisions during the siege (`pk-61`)
+
+- **Every decision recalculates the plan from that instant** (`D.asedioReplan(plan, t, ch)`, pure): what was already
+  fought stays (the current stage is cut into segments: several `etapas` entries can share an `id`, with `f0`), the
+  rest is rebuilt with the forces left. It needs the raw fields a `v: 2` plan keeps (`res`, `rb`, `atkR`, `m`);
+  plans saved before G4 return `null` and show no buttons. **Those raw fields never travel** (`D.asedioVista` picks
+  fields by hand: add new ones there on purpose, never spread the plan).
+- Attacker: tactic at launch (`T.attack(k, units, tactica)`) and one change (`D.ASEDIO.tacticas`: asalto shorter and
+  +10 points of losses on a win; cerco longer, −8 points, frontera ×0.9), one column of reinforcements (arrive after
+  half the travel time, min 45 s; late ones go home), retreat (15–50 % losses by how far it got). Defender: one sally
+  in stages 1–2 (+20 % of `parts.troops` to that stage, costs 5 % of the army) and surrender (no losses, attacker
+  gets the parcel and half the loot). `D.ASEDIO.maxAcc` per side.
+- **Troop trades** (`D.ASEDIO.oficio`, `D.asedioOficio(units)` → `plan.m`): the attacker's force is worth more or
+  less per stage, so with specialists `won` is no longer `atk > def`: compare with `plan.gano`. A host without
+  specialists gives `[1, 1, 1]` and the §1 curve; specialists are a mild buff (measured in the test).
+- Local (`T.acciones(f)`, `T.accion(id, a, units)` in `terr.js`) and server (`sim.asedio`, `POST /api/asedio`, in
+  `server/index.js` **and** `functions/index.js`) apply the same function. The server keeps the counts (`accA`,
+  `accD`, `tacCambio`, `salida`, `ref`); reinforcements go through `checkArmy`. On the result the client adds the
+  reinforcements **it** sent, not the server's unit count (the server clips units to its snapshot).
+- `amenazaDe` must look for the threat **with a plan**: a second threat can be on its way to the same parcel.
+- Bots never decide; offline nothing is chosen. Not done from the plan's G4: asking allies for help, and the drawing
+  of the reinforcement column / the retreat (a banner over the battle announces each decision instead).
+
+### War plan, G5: comarcas, Fuerte, siege machines (`pk-62`, `D.PROTO` 11)
+
+- **`D.PROTO` went 10 → 11** (new building `fuerte`, new troops `ariete`, `torreAsedio`): publish the page and run
+  `firebase deploy --only functions` together, or players get «El servidor se está actualizando» in between.
+- **Comarcas** (`D.COMARCAS`, `W.rasgoDe(k)` in `world.js`): one in four parcels that are neither a realm's core nor
+  a common zone has a trait, from its own rng (`D.SEED + 6151`, always two rolls per parcel: do not reorder them or
+  every trait in the world moves). Vega (farms inside +15 %), Bosque viejo (wood +10 %), Cantera vieja (mining
+  +10 %), Cerro (parcel defence ×1.3, for whoever owns it, client and server), Santuario (+3 ánimo, 2 at most).
+  Gathering bonuses are the `extra` of `Vida.recoleccion` (inside `D.VIDA_TOPE`, so the server's `LIM.vida` still
+  holds) and count where the villager works / where the farm stands, only on your own parcel (`G.comarca`).
+  Conquering one gives ×1.5 loot. The plan's «Cruce» (cart speed) was left out: `L.factor` feeds cached route times.
+- **Fuerte fronterizo**: counts in `parcelDefenseParts` like a tower, but each tower entry now carries its radius
+  (`[x, y, defensa, radio]`, 9 for towers, `D.FUERTE_RADIO` for the fort; full inside, half up to twice). It is in
+  `Soc.defense`, `T.defenseParts`, and the server's `towerDefense` (so `defMax`) and `parcelDefense`: a new
+  defensive building must be added to all four.
+- **Siege machines** have `maquina: true` in `D.ARMY`: drawn as a cart wherever the catapult is
+  (`frente.js`, `batalla.js`, `troops.js`), with weak stats in `batalla.js` `TROPA` (a test requires an entry per
+  troop). The ram is ×3 in the defences stage only if the parcel has walls (`asedioOficio(units, muros)`); a siege
+  tower in the host takes 5 points off the losses (`plan.torre`).
+- Not measured: the pace with the autopilot before/after (the plan asks comarcas to move it under 5 %).
+- `tools/cheat-test.js`: the honest account must only send Calzada Real tiles its client would allow
+  (`W.calzadaPuede`, the test loads the same map as the server): it used to send water from its own land, was
+  logged as a suspect and «la cuenta honesta no aparece en el registro» failed.
+
+### War plan, G6: fortresses and visible threats (`pk-63`, client only)
+
+- **Fortresses** (`js/fortalezas.js`, `PK.Fort`, `D.FORT`): up to 8 neutral forts, each at the centre of a parcel,
+  computed from the terrain, the realms' homes and `W.ORIG` with their own rng (`D.SEED + 7127`). They are **not**
+  `W.pois` (the plan said so): the POI list feeds the clearing code and its fixture test, and this avoids both.
+  Nothing may be built next to one (`G.placeWhy` → `'fortaleza'`).
+- Sieging one is the same three-stage siege (`D.asedioPlan`, parts from `F.partes`), with the PvE force
+  (`Exp.powerVs` against its enemy type), no resource cost. `F.frentes()` is concatenated in `T.frentes()` with
+  `fort` set, slot `-1` for the garrison (grey in `frente.js`); `T.acciones` returns nothing for them.
+- Taken: a daily tribute (3 days at most when coming back), a bonus you choose (`D.FORT.bonos`: goes through the
+  `extra` of `Vida.recoleccion` or the ánimo), and every 3–5 real days a host comes to retake it; you defend with
+  half its strength plus your army at home. Lost: it goes back one level stronger. State in `st.fort`.
+- **Probes**: the neighbour's host is drawn marching its last 3 minutes (`Sq.dibujar` in `saqueos.js`) and can be
+  paid off before it arrives (`T.pagarTributo`, 60 % of its power in gold).
+- Not done from the plan's G6: «pedir ayuda» against a probe, probes decided by the server when online (online,
+  simulated realms still never attack your border), heroes in fortress sieges, and the Crónica chapter.
+
+### War plan, G7: the war of the world (`pk-64`, server)
+
+- **Ciudadela** (`D.CIUDADELA`; server `ciudDe`/`ciudInfo`/`ciudadela`, route `POST /api/ciudadela` in both
+  `server/index.js` and `functions/index.js`): one per world, `w.ciud = { sem, imp: { gid: n }, gid, gname }`. One
+  campaign per member per day (`checkArmy`, 12 % losses applied by the client), its force × 0.9–1.1 goes to the
+  guild's ímpetu. On the first sync of a new week the top guild takes it (kept if nobody sieged). Members of the
+  holding guild sell to the merchants for +5 %: the client in `Soc.sellPrice` (`Mundo.ciudMia()`, needs
+  `S().guild.id`, set in `applyGuild`) **and** the server's credit in `checkMarket`, or the snapshot check trips.
+- Where it stands: `Fort.ciudadela()`, the free 3×3 in the common zone nearest the map centre (from `W.ORIG`); drawn
+  with `fuerte` and the guild's banner (`Fort.colorGremio(gid)`), clicked as `k: 'ciud'`. Nothing builds next to it.
+- **Diario de guerra**: `w.diario`, the last 20 battles of the world (player sieges with `D.asedioVista(plan,
+  Infinity)`, bot conquests without plan), versioned by `w.dv2` (`dv` was already taken by diplomacy). Shown in
+  Territorio with «Ver» (`Frente.repetir`).
+- Rankings «Conquistas» (`p.conq`, counted by the server in `conquerBot` and `tickCamps`) and «Fortalezas»
+  (`rk.fort` from the snapshot, +2 per snapshot at most).
+- Not done from the plan's G7: the portrait frame for the holding guild (it lives in Juegos, not here), an ally
+  joining your siege, and simulated guilds sieging the Ciudadela.
+
+### War plan, G8: closing content (`pk-65`)
+
+- War stats (`G.stat`): `asedios_ganados` (parcels and fortresses), `ariete_defensas`, `retirada_a_tiempo` (you
+  retreat while your ímpetu is below their resistance, read before the replan), `salida_resiste`, `comarcas` (claim
+  or conquest), `fortaleza_semana`, `fortalezas_def`, `repeticiones` (`T.verRepeticion`). They feed missions
+  `w13`–`w19`, the Retos del Rey `r_asedios` / `r_fortalezas`, and the pase (`D.PASE_ACT`, so the server caps them).
+- New `Vida.evento` types `'asedio'` and `'defensa'` (desafíos «Asedio limpio» and «Frontera de hierro»);
+  `T.defensaGanada(plan)` is the one place a resisted siege is counted (`st.flags.defDia`).
+- The **Mariscal** (it already existed in the Consejo) also: warns once an hour of the weakest neighbour parcel your
+  army at home can take, suggests the troop mix in the campaign window (`UI.mezclaSugerida`), and with
+  `cs.retirada` orders the retreat when ímpetu < 0.75 × resistance after 40 s. **It only reads what the player
+  sees** (`T.estado`), never `plan.gano`: a test checks it.
+- Tobías at Era III: `T.guiaGuerra` (flag `guiaGuerra` 1 → 2 → 3), only once the onboarding guide is done and no
+  window is open. The autopilot sets the flag so it is never interrupted, and it now sieges fortresses
+  (`fortaleza()` in `tools/piloto.js`).
+- Pace after G8 (`?timelapse`, one run): Era II 10.8, III 30.3, IV 186.6 min of game; Era V in progress at 422
+  (all its checks met). Inside the ±15 range main measured after the belts C3 (Era IV 112–176). The autopilot still
+  never reaches a border (2 parcels claimed) nor gets 1.4× a fortress garrison with 70 % of its army, so no siege
+  of its own was measured; its siege numbers come from the probes it defends.
+- Not done from the plan's G8: new pase cosmetics (banner, siege camp), and the logistics leftovers it listed
+  (map view, camp palisade, bandits raiding escorted carts).

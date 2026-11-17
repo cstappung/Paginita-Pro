@@ -58,9 +58,9 @@
   // Multiplicador de recolección de un recurso (y del tipo de nodo: 'deer', 'berry', 'farm'). Incluye el gatherP del
   // árbol, las cartas y el verano, que por eso no entra por G.perk. Topado entre 0,5 y D.VIDA_TOPE.
   const MINA = { stone: 1, gold: 1, ore: 1, marble: 1, gems: 1 };
-  V.recoleccion = function (res, kind) {
+  V.recoleccion = function (res, kind, extra) { // extra: lo que suma la comarca donde se trabaja (G5), dentro del tope
     const b = V.bono;
-    let s = b('gatherP') + (b('g_' + res) || 0);
+    let s = b('gatherP') + (b('g_' + res) || 0) + (extra || 0);
     if (MINA[res]) s += b('g_mine');
     if (kind === 'deer') s += b('hunt');
     if (kind === 'berry') s += b('berry');
@@ -226,6 +226,10 @@
     const tipos = new Set(g.buildings.filter(b => b.owner === 'p' && b.done && !b.def.deco).map(b => b.type)).size;
     if (tipos >= 6) out.push({ txt: 'Variedad de edificios (' + tipos + ' tipos)', v: Math.min(8, Math.floor((tipos - 3) / 3)) });
     if (juglar()) out.push({ txt: 'Un Juglar gobierna', v: 5 });
+    const sant = PK.Terr && PK.Terr.comarcasMias ? Math.min(D.COMARCA_SANTUARIOS, PK.Terr.comarcasMias('santuario')) : 0; // G5
+    const fa = PK.Fort && st.fort ? PK.Fort.animo() : 0; // G6
+    if (fa) out.push({ txt: 'Feria de tus fortalezas', v: fa });
+    if (sant) out.push({ txt: sant === 1 ? 'Un Santuario en tu tierra' : sant + ' Santuarios en tu tierra', v: sant * D.COMARCAS.santuario.animo });
     if (V.bono('animo')) out.push({ txt: 'Jardines Eternos', v: Math.round(V.bono('animo')) });
     for (const e of st.animo.ev) if (e.hasta > now) out.push({ txt: e.txt, v: e.v });
     if (st.era >= 2 && st.res.food < g.cap('food') * 0.05) out.push({ txt: 'La despensa está vacía', v: -10 });

@@ -23,7 +23,7 @@ function carga(files) {
 }
 const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
-const PILA = D.CINTA.pila || 1; // pk-63: cada ítem de cinta es un paquete de hasta PILA unidades
+const PILA = D.CINTA.pila || 1; // pk-67: cada ítem de cinta es un paquete de hasta PILA unidades
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
 const FUENTES = fs.readdirSync(path.join(PKDIR, 'js')).filter(f => f.endsWith('.js')).map(f => [f, JS(f)]);
 const TODO = FUENTES.map(([, s]) => s).join('\n');
@@ -485,7 +485,7 @@ test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen su
   for (const t of D.MARAVILLAS) { assert.equal(D.BUILD[t].w, 5); assert.equal(D.MARAV[t].fase.length, 7, t + ': 7 etapas'); assert.ok(Object.keys(D.MARAV[t].ef(40)).length); }
   assert.ok(D.DESAFIOS.length >= 40, D.DESAFIOS.length + ' desafíos');
   assert.equal(new Set(D.DESAFIOS.map(d => d.id)).size, D.DESAFIOS.length, 'ids únicos');
-  for (const d of D.DESAFIOS) assert.ok(['tick', 'batalla', 'era', 'fiesta', 'incursion', 'carta'].includes(d.on) && typeof d.ok === 'function', d.id);
+  for (const d of D.DESAFIOS) assert.ok(['tick', 'batalla', 'era', 'fiesta', 'incursion', 'carta', 'asedio', 'defensa'].includes(d.on) && typeof d.ok === 'function', d.id);
   // las estadísticas que piden los Retos del Rey las registra alguien
   for (const r of D.RETOS) assert.ok(r.k.startsWith('g_') || new RegExp("stat\\('" + r.k + "'").test(TODO), r.id + ' pide ' + r.k);
   for (const it of D.TIENDA) assert.ok(['color', 'marco', 'fuegos', 'cola'].includes(it.t) && (it.premio ? !it.precio : it.precio > 0), it.id); // los premios de escalera (V7) no tienen precio
@@ -1529,7 +1529,7 @@ test('pk-62: de cada mazmorra queda la entrada (1 casilla que se pisa), las muda
   assert.match(JS('game.js'), /W\.subAt\.get\(i\)/);
 });
 
-test('pk-63: paquetes de 4, varias cintas desde un mismo edificio, menú de cintas, bocas y modo transparente', () => {
+test('pk-67: paquetes de 4, varias cintas desde un mismo edificio, menú de cintas, bocas y modo transparente', () => {
   const Ci = PK.Cintas, L = PK.Logi, st0 = G.state, bs0 = G.buildings, by0 = G.bById, cap0 = G.cap, stat0 = G.stat, bAt0 = W.bAt.slice(), belt0 = W.belt.slice();
   const buf0 = L.bufCap, pay0 = G.pay;
   G.pay = () => true; G.stat = () => {}; G.cap = () => 1e9;

@@ -85,6 +85,9 @@ const MOTOR = path.resolve(opt('motor', path.join(__dirname, '../../juegos/club/
 for (const f of ['data/enemies.js', 'data/towers.js', 'data/levels.js', 'engine.js', 'prueba.js']) require(path.join(MOTOR, f));
 const PD = globalThis.PD;
 const STEP = 1 / 60;
+// lo más que dura una ronda (s de juego): con los jefes de la versión 6 (a 1/10 de su velocidad)
+// una ronda de jefe pasa de los 900 s, y cortarla ahí ensuciaba la cuenta
+const RONDA_MAX = 2400;
 const AYUDA = +opt('ayuda', 0);
 // El campo de tiro de una torre en un reino no cambia mientras no cambien el motor, los
 // datos, el reino ni este archivo: se guarda en node_modules/.cache/prodefender-bot y la
@@ -136,22 +139,22 @@ const MIXTA = [
   // cuarta era (reinos 15–19): con su defensa nueva
   ['espinas', 'espinas', 'jade', 'espinas', 'prisma', 'mortero', 'vigia', 'balista', 'jade', 'obelisco', 'prisma'],
   ['espinas', 'espinas', 'ruleta', 'espinas', 'prisma', 'voltaico', 'colmena', 'vigia', 'ruleta', 'bumeran', 'prisma'],
-  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'grimorio', 'vigia', 'balista', 'desintegrador', 'grimorio', 'dragon'],
+  ['espinas', 'espinas', 'dragon', 'espinas', 'prisma', 'grimorio', 'vigia', 'balista', 'voltaico', 'grimorio', 'colmena', 'acido', 'dragon'],
   ['espinas', 'espinas', 'satelite', 'espinas', 'prisma', 'balista', 'vigia', 'sierra', 'desintegrador', 'satelite', 'prisma'],
-  ['espinas', 'espinas', 'prisma', 'espinas', 'balista', 'mortero', 'vigia', 'obelisco', 'campanario', 'balista', 'prisma']
+  ['espinas', 'espinas', 'prisma', 'espinas', 'balista', 'voltaico', 'mortero', 'vigia', 'acido', 'obelisco', 'campanario', 'balista', 'prisma']
 ];
 // Tercera era: el héroe que elige (se puede cambiar con --heroe), el orden en que prefiere los
 // pactos (--pacto rechaza los rechaza todos) y el Poder del Reino, que lanza sobre el más fuerte.
 const HEROE_TERCERA = opt('heroe', 'heroevacio');
 // --diff X: prueba otra dificultad del reino (levels.js `diff`) sin tocar el archivo
 // cambia un número del reino también en sus números de la versión 5 (levels.js `v5`, PD.nivel)
-const ajustaNivel = (k, v) => { for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { const L = PD.LEVELS[li]; L[k] = v; if (L.v5) L.v5[k] = v; delete L._rounds; delete L._v5; } };
+const ajustaNivel = (k, v) => { for (const li of String(opt('reino', '')).split(',').map(Number).filter(n => n >= 0)) { const L = PD.LEVELS[li]; L[k] = v; if (L.v5) L.v5[k] = v; if (L.v6) L.v6[k] = v; delete L._rounds; delete L._v5; delete L._v6; } };
 if (opt('diff', '')) ajustaNivel('diff', +opt('diff'));
 // --pactos a,b,c: otro orden de preferencia (p. ej. el de una persona); --precio P: otro
 // pactoPrecio del reino (levels.js), para comparar antes y después
 if (opt('precio', '') !== '') ajustaNivel('pactoPrecio', +opt('precio'));
 // --jefe vida,vel: otros jefes (engine.js JEFE, desde la versión 5)
-if (opt('jefe', '')) { const [v, s, b] = opt('jefe').split(',').map(Number); PD.JEFE.vida = v; PD.JEFE.vel = s; if (b) PD.JEFE.esbirros = b; }
+if (opt('jefe', '')) { const [v, s, b] = opt('jefe').split(',').map(Number); PD.JEFE.vida = v; PD.JEFE.vel = PD.JEFE.vel6 = s; if (b) PD.JEFE.esbirros = PD.JEFE.esbirros6 = b; }
 // --tarde desde,hasta,x: otra vidaTarde (levels.js); --vida X / --oro Y: otra vida y otro oro por
 // enemigo del reino (levels.js vidaX, oroX)
 if (opt('tarde', '')) { const [desde, hasta, x] = opt('tarde').split(',').map(Number); ajustaNivel('vidaTarde', x > 1 ? { desde, hasta, x } : null); }
@@ -275,6 +278,7 @@ class Bot {
     this.sitios = [];
     for (let x = 24; x < PD.W - 20; x += 16) for (let y = 24; y < PD.H - 20; y += 16) this.sitios.push([x, y]);
     const vende = PD.towersFor(li);
+    this.vende = vende;
     this.rota = this.est.rota[li].filter(x => vende.includes(x));
     if (TORRES) this.rota = TORRES.filter(x => vende.includes(x));
     if (this.est.humana) {
@@ -503,9 +507,9 @@ class Bot {
     }
     const granjas = T.filter(t => t.type === 'huerto').length;
     const quiere = r < 5 ? 0 : r < 12 ? 1 : r < 22 ? 2 : r < 45 ? 3 : 0;
-    if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto && !this.est.humana) return nuevo('huerto');
+    if (granjas < quiere && dmg.length >= 4 && !presion && !vet.huerto && !this.est.humana && this.vende.includes('huerto')) return nuevo('huerto');
     const totems = T.filter(t => t.type === 'totem').length;
-    if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760) && !this.est.humana) return nuevo('totem');
+    if (((dmg.length >= 7 && totems < 1) || (dmg.length >= 14 && totems < 2)) && !vet.totem && (!presion || g.money >= 760) && !this.est.humana && this.vende.includes('totem')) return nuevo('totem');
 
     // Lo demás compite por eficiencia: daño que suma cada oro. Cada torre sube por su plan
     // (mirando hasta tres pasos adelante, para que llegue a las mejoras grandes); la torre
@@ -684,7 +688,7 @@ class Bot {
       if (g.pactoPendiente()) eligePacto(g);
       g.startRound();
       let pasos = 0;
-      while (g.active && !g.over && pasos < 60 * 900) {
+      while (g.active && !g.over && pasos < 60 * RONDA_MAX) {
         c.enRonda(pasos);
         g.update(STEP); pasos++;
         if (g.era3 && pasos % 30 === 0) lanzaPoder(g);
@@ -808,7 +812,7 @@ class Bot {
       if (g.pactoPendiente()) { eligePacto(g); this.turno(); }
       g.startRound();
       let pasos = 0, avance = 0;
-      while (g.active && !g.over && pasos < 60 * 900) {
+      while (g.active && !g.over && pasos < 60 * RONDA_MAX) {
         this.enRonda(pasos);
         g.update(STEP); pasos++;
         if (g.era3 && pasos % 30 === 0) lanzaPoder(g);

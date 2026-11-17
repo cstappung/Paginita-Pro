@@ -22,7 +22,7 @@
   const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
   const OPP = d => (d + 2) % 4;
   const NIV = n => D.CINTA.niv[n - 1];
-  // pk-63: un ítem lleva hasta PILA unidades ([recurso, posición, cantidad]; sin cantidad, 1: partidas de antes)
+  // pk-67: un ítem lleva hasta PILA unidades ([recurso, posición, cantidad]; sin cantidad, 1: partidas de antes)
   const PILA = () => D.CINTA.pila || 1;
   const cantDe = it => it[2] || 1;
   Ci.porMin = n => NIV(n).rate * 60 * PILA(); // unidades por minuto de un nivel (sin el bono del árbol)
@@ -88,7 +88,7 @@
   // el unidor recibe de hasta tres, los demás de uno. sig/dst: la primera salida a un carril o a un edificio.
   const NODO = { u: 1, v: 1, s: 1 };
   Ci.NODO = NODO;
-  // pk-63: las herramientas del menú de cintas (PK.Logi.tool) que se usan tocando una pieza, y todas las del menú
+  // pk-67: las herramientas del menú de cintas (PK.Logi.tool) que se usan tocando una pieza, y todas las del menú
   Ci.HERR_PIEZA = { cnodo: 1, csubir: 1, cgirar: 1, cquitar: 1, cmolde: 1 };
   Ci.HERR = Object.assign({ cinta: 1, paso: 1, copiar: 1 }, Ci.HERR_PIEZA);
   let carriles = [], porK = new Map(), orden = [], clave = '';
@@ -474,7 +474,7 @@
     if (mejor) { mejor.bI = bI; mejor.bF = bF; }
     return mejor;
   };
-  // pk-63 (pedido del dueño): primero un borde libre, así de un edificio salen (o le llegan) varias cintas; antes
+  // pk-67 (pedido del dueño): primero un borde libre, así de un edificio salen (o le llegan) varias cintas; antes
   // tomaba el borde más cercano aunque ya tuviera una cinta y la segunda chocaba con la primera
   function bordeHacia(b, hacia) {
     let best = null, bd = Infinity, ocup = null, od = Infinity;
@@ -862,7 +862,7 @@
       c.pts = [x + 0.5 - DIRS[inD][0] * 0.5, y + 0.5 - DIRS[inD][1] * 0.5, x + 0.5, y + 0.5, x + 0.5 + DIRS[d][0] * 0.5, y + 0.5 + DIRS[d][1] * 0.5];
       const [px, py] = R.iso(x, y);
       c.px = px; c.py = py;
-      // pk-63: las bocas (tolva donde entrega, compuerta donde saca), con la profundidad para ordenarlas con el edificio
+      // pk-67: las bocas (tolva donde entrega, compuerta donde saca), con la profundidad para ordenarlas con el edificio
       const boca = (b, bd, ent) => {
         const atras = bd >= 2; // el edificio queda detrás de la cinta: la boca va delante de su pared
         bocasL.push({ k: c.k, x, y, b, bd, ent, n: c.pz.n, px, py, d: atras ? Math.max(x + y + 0.55, b.x + b.y + (b.w + b.h) / 2 + 0.02) : x + y + 0.4 });
@@ -871,7 +871,7 @@
       if (c.src) boca(c.src, OPP(c.inD), false);
     }
   }
-  // pk-63: las bocas, como ítems del dibujo ordenado por profundidad
+  // pk-67: las bocas, como ítems del dibujo ordenado por profundidad
   Ci.bocas = function (R, Sp, seen) {
     const st = S(), out = [];
     if (!st || !st.logi || !st.logi.red) return out;
