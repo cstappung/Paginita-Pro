@@ -1474,6 +1474,14 @@
   q('w9', 'war', 'Muros de piedra', 'Mejora tus murallas a Muro de piedra.', { t: 'wallTier', n: 2 }, { coins: 10, gold: 300 }, ['w8']);
   q('w11', 'war', 'Guardia del pueblo', 'Rechaza una incursión de bandidos. Desde la Era II llegan cada tanto: el cuerno avisa, y tus Torres, tu Centro Urbano y las tropas del Cuartel los frenan.', st('raids_won', 1), { gold: 200, coins: 10 });
   q('w12', 'war', 'Azote de forajidos', 'Rechaza 5 incursiones de bandidos.', st('raids_won', 5), { coins: 20, gold: 600 }, ['w11']);
+  // G8 (pk-65): el asedio
+  q('w13', 'war', 'Primer asedio', 'Gana un asedio: una parcela de otro reino o una fortaleza.', st('asedios_ganados', 1), { coins: 15, gold: 400 }, ['w2']);
+  q('w14', 'war', 'Arietes contra muros', 'Gana un asedio con arietes contra una parcela con murallas.', st('ariete_defensas', 1), { coins: 15, ingots: 40 }, ['w13']);
+  q('w15', 'war', 'Retirada a tiempo', 'Retírate de un asedio que ibas perdiendo: pierdes menos que en una derrota.', st('retirada_a_tiempo', 1), { coins: 10, food: 500 }, ['w13']);
+  q('w16', 'war', 'Salida victoriosa', 'Resiste un asedio después de una salida de tu guarnición.', st('salida_resiste', 1), { coins: 15, stone: 500 }, ['w5']);
+  q('w17', 'war', 'Tierra con nombre', 'Gana una comarca: reclámala o conquístala (en el mapa de territorio se ve su ícono).', st('comarcas', 1), { coins: 10, gold: 300 }, ['w2']);
+  q('w18', 'war', 'Castellano', 'Mantén una fortaleza tuya durante una semana.', st('fortaleza_semana', 1), { coins: 30, gems: 10 }, ['w13']);
+  q('w19', 'war', 'Cronista de la guerra', 'Mira la repetición de una batalla («Ver de nuevo»).', st('repeticiones', 1), { coins: 5 }, ['w2']);
   q('w10', 'war', 'A la aventura', 'Gana una expedición en una mazmorra o un encargo del tablón.', st('exp_won', 1), { gold: 200, coins: 10 }, ['w2']);
   escalera('wt', 'war', 'Señor de la Guerra', [5, 15, 40, 100, 250, 600], n => 'Gana ' + n + ' expediciones o encargos.', n => st('exp_won', n), (n, i) => ({ coins: 20 * (i + 1), gold: 300 * Math.pow(2, i) }), 'w10');
 

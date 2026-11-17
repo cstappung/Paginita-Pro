@@ -278,3 +278,20 @@ test('G7: la Ciudadela está en una zona común, en tierra libre, y los rankings
   assert.ok(/'POST \/api\/ciudadela'/.test(fs.readFileSync(path.join(PKDIR, 'server', 'index.js'), 'utf8')) && /'POST \/api\/ciudadela'/.test(fs.readFileSync(path.join(PKDIR, '..', '..', 'functions', 'index.js'), 'utf8')), 'la ruta está en los dos servidores');
   assert.ok(/diario: !p\.mar && \+b\.dv2/.test(sim) && /D\.asedioVista\(plan, Infinity/.test(sim), 'el diario viaja con versión y sin las tiradas');
 });
+
+// ---------- G8: contenido de cierre ----------
+test('G8: misiones, desafíos, retos y pase del asedio tienen quien los registre', () => {
+  const w2 = {}, c2 = vm.createContext({ window: w2, console, URLSearchParams, location: { search: '' }, performance: { now: () => 0 } });
+  for (const f of ['util.js', 'data.js', 'pase.js', 'datos-vida.js']) vm.runInContext(JS(f), c2, { filename: f });
+  const D2 = w2.PK.D, todo = ['terr.js', 'fortalezas.js', 'consejo.js'].map(JS).join('\n');
+  for (const id of ['w13', 'w14', 'w15', 'w16', 'w17', 'w18', 'w19']) assert.ok(D2.QUESTS.some(q => q.id === id), id);
+  for (const k of ['asedios_ganados', 'ariete_defensas', 'retirada_a_tiempo', 'salida_resiste', 'comarcas', 'fortaleza_semana', 'repeticiones', 'fortalezas_def'])
+    assert.ok(new RegExp("stat\\('" + k + "'").test(todo), k + ' se registra');
+  assert.ok(D2.DESAFIOS.some(d => d.id === 'asedio_limpio') && D2.DESAFIOS.some(d => d.id === 'dos_defensas'));
+  assert.ok(D2.RETOS.some(r => r.k === 'asedios_ganados'));
+  assert.ok(D2.PASE_ACT.asedios_ganados && D2.PASE_STATS.includes('fortalezas'), 'el pase los cuenta (y el servidor los acota)');
+  assert.ok(/Vida\.evento\('asedio'/.test(todo) && /Vida\.evento\('defensa'/.test(todo));
+  // el Mariscal solo mira lo que se ve: nunca el final del plan
+  const m = /G8 \(pk-65\): la guerra[\s\S]*?\/\/ una salida por pasada/.exec(JS('consejo.js'))[0];
+  assert.ok(!/plan\.gano|\.bajas/.test(m) && /impetu/.test(m), 'la retirada del Mariscal no lee quién gana');
+});

@@ -629,3 +629,21 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   (`rk.fort` from the snapshot, +2 per snapshot at most).
 - Not done from the plan's G7: the portrait frame for the holding guild (it lives in Juegos, not here), an ally
   joining your siege, and simulated guilds sieging the Ciudadela.
+
+### War plan, G8: closing content (`pk-65`)
+
+- War stats (`G.stat`): `asedios_ganados` (parcels and fortresses), `ariete_defensas`, `retirada_a_tiempo` (you
+  retreat while your ímpetu is below their resistance, read before the replan), `salida_resiste`, `comarcas` (claim
+  or conquest), `fortaleza_semana`, `fortalezas_def`, `repeticiones` (`T.verRepeticion`). They feed missions
+  `w13`–`w19`, the Retos del Rey `r_asedios` / `r_fortalezas`, and the pase (`D.PASE_ACT`, so the server caps them).
+- New `Vida.evento` types `'asedio'` and `'defensa'` (desafíos «Asedio limpio» and «Frontera de hierro»);
+  `T.defensaGanada(plan)` is the one place a resisted siege is counted (`st.flags.defDia`).
+- The **Mariscal** (it already existed in the Consejo) also: warns once an hour of the weakest neighbour parcel your
+  army at home can take, suggests the troop mix in the campaign window (`UI.mezclaSugerida`), and with
+  `cs.retirada` orders the retreat when ímpetu < 0.75 × resistance after 40 s. **It only reads what the player
+  sees** (`T.estado`), never `plan.gano`: a test checks it.
+- Tobías at Era III: `T.guiaGuerra` (flag `guiaGuerra` 1 → 2 → 3), only once the onboarding guide is done and no
+  window is open. The autopilot sets the flag so it is never interrupted, and it now sieges fortresses
+  (`fortaleza()` in `tools/piloto.js`).
+- Not done from the plan's G8: new pase cosmetics (banner, siege camp), and the logistics leftovers it listed
+  (map view, camp palisade, bandits raiding escorted carts).

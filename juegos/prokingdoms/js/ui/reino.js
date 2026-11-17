@@ -40,7 +40,7 @@
         return el('div', { class: 'bt-et' + (!e ? ' no' : e.rota ? ' rota' : ' ok') }, el('b', null, (i + 1) + '. ' + A.nombres[id]), el('span', { class: 'small' }, ' ' + txt));
       }),
       p.acc && p.acc.length ? el('div', { class: 'small' }, 'Decisiones: ' + p.acc.map(x => NA[x.tipo] + ' (' + U.fmtTime(x.t) + ')').join(', ') + '.') : null,
-      PK.Frente ? el('div', { class: 'row' }, UI.btn('Ver de nuevo', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Frente.repetir(b); }, { small: true, title: 'Repite la batalla en el mapa, acelerada' })) : null);
+      PK.Frente ? el('div', { class: 'row' }, UI.btn('Ver de nuevo', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Terr.verRepeticion(b); }, { small: true, title: 'Repite la batalla en el mapa, acelerada' })) : null);
   }
   UI.frenteEl = function (f) {
     const T = PK.Terr, e = T.estado(f), n = T.nombreFrente(f), A = D.ASEDIO;
@@ -68,6 +68,12 @@
     }
     if (a.peligro && !confirm(a.txt + ': ' + a.title + '\n\n¿Seguro?')) return;
     T.accion(f.id, a);
+  };
+  // G8: qué tropas llevar según la etapa que más pesa en la defensa de esa parcela (lo que dice el Mariscal)
+  UI.mezclaSugerida = function (parts) {
+    const A = D.ASEDIO, peso = A.etapas.map(id => A.partes[id].reduce((s, k) => s + (parts[k] || 0), 0)), i = peso.indexOf(Math.max(...peso));
+    const quien = [['caballeros y jinetes', 'rider'], [parts.walls > 0 ? 'arietes, catapultas y ballesteros' : 'catapultas y ballesteros (sin murallas, el ariete no rinde)', 'catapult'], ['lanceros, monjes y clérigos', 'spear']][i];
+    return 'lo más duro es ' + A.nombres[A.etapas[i]].toLowerCase() + ' (' + Math.round((peso[i] / Math.max(1, parts.total)) * 100) + ' % de su defensa): lleva ' + quien[0] + '.';
   };
   // G7: la Ciudadela del mundo, que sitian los gremios
   UI.openCiudadela = function () {
@@ -98,7 +104,7 @@
     return el('div', null, el('h3', null, 'Diario de guerra del mundo'),
       lista.slice(0, 10).map(e => el('div', { class: 'raid-row' },
         el('span', { class: 'small' }, el('b', { translate: 'no' }, e.deN), e.gano ? ' tomó una parcela de ' : ' no pudo con ', el('b', { translate: 'no' }, e.aN), ' · hace ' + U.fmtTime(Math.max(0, (Date.now() - e.at) / 1000))),
-        e.plan && PK.Frente ? UI.btn('Ver', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Frente.repetir({ k: e.k, rep: { plan: e.plan, units: e.units, lado: e.lado || 0, de: e.de, a: e.a } }); }, { small: true }) : null)));
+        e.plan && PK.Frente ? UI.btn('Ver', () => { UI.closeModal(); if (PK.Terr.mode) PK.Terr.toggle(false); PK.Terr.verRepeticion({ k: e.k, rep: { plan: e.plan, units: e.units, lado: e.lado || 0, de: e.de, a: e.a } }); }, { small: true }) : null)));
   }
   // G6: la ventana de una fortaleza
   UI.openFort = function (id) {
@@ -234,6 +240,7 @@
           last ? el('h3', null, 'Última batalla aquí') : null, last ? UI.battleEl(last) : null);
         return;
       }
+      if (st.flags.guiaGuerra === 2) { st.flags.guiaGuerra = 3; UI.toast('Tobías: «Eso es: su defensa y de dónde sale. Si la etapa más dura son las defensas, lleve catapultas; si es el estandarte, lanceros.»', 'info'); } // G8
       const info = T.realmInfo(slot), def = T.defenseOf(k, slot), why = T.canAttack(k), cost = T.campaignCost(k), w = st.war, rv = T.revenge(k), retake = T.retakeLeft(k);
       add(el('p', null, el('b', null, info.realm), info.human ? ' (jugador)' : '', ' · Era ' + U.roman(info.era)),
         rv ? el('div', { class: 'alert' }, T.revengeText(rv) + '. Te quitó esta parcela: recupérala a mitad de precio, aunque esté en tregua.') : null,
@@ -249,6 +256,7 @@
       const tacSel = el('select', { id: 'cq-tac', title: 'Se puede cambiar una vez durante el asedio' }, el('option', { value: '' }, 'Sin táctica: ritmo normal'), Object.keys(TA).map(t => el('option', { value: t }, TA[t].nombre + ': ' + TA[t].txt)));
       add(el('div', { class: 'row' }, pk.box),
         el('div', { class: 'row' }, el('b', null, 'Táctica: '), tacSel),
+        PK.Consejo && PK.Consejo.activo('mariscal') ? el('p', { class: 'small good-t' }, 'El Mariscal: ' + UI.mezclaSugerida(T.defenseParts(k, slot))) : null,
         el('p', { class: 'small' }, 'Cada tropa tiene su oficio: jinetes y caballeros rinden más en la frontera; catapultas, ballesteros, arietes (si hay murallas) y torres de asedio contra las defensas (los arqueros, menos); lanceros, monjes y clérigos en el estandarte. Durante el asedio puedes cambiar de táctica, mandar refuerzos o retirarte.'),
         el('div', { class: 'row' }, UI.btn('Lanzar campaña', () => { if (T.attack(k, pk.read(), tacSel.value || null)) UI.closeModal(); else UI.rerender(); }, { cls: 'danger' }), UI.btn('Ver en el mapa', () => { UI.closeModal(); PK.Render.centerOn(cx, cy); }, { small: true })));
     });

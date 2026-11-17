@@ -19,7 +19,8 @@
   D.paseExtras = pp => U.clamp(Math.floor((pp - D.PASE.niveles * D.PASE.pp) / D.PASE.extraPP), 0, D.PASE.extraMax);
 
   // Actividad normal: [PP por vez, tope de PP por día]
-  D.PASE_ACT = { upgrades: [5, 150], exp_won: [10, 150], aldeanos: [2, 60] };
+  // G8 (pk-65): asedios y fortalezas también dan puntos (con su tope por día, como el resto)
+  D.PASE_ACT = { upgrades: [5, 150], exp_won: [10, 150], aldeanos: [2, 60], asedios_ganados: [40, 120], fortalezas: [60, 120] };
   // Retos: 3 diarios (de D.PASE_DIARIOS, con semilla del día) y 10 del pase (de D.PASE_RETOS, semilla del período).
   // k: la estadística, n: cuánto tiene que subir desde que empezó el día o el pase.
   D.PASE_DIARIOS = [

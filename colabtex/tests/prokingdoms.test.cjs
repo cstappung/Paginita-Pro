@@ -483,7 +483,7 @@ test('Fase 3b: cercanía, decoraciones, Maravillas, desafíos y tienda tienen su
   for (const t of D.MARAVILLAS) { assert.equal(D.BUILD[t].w, 5); assert.equal(D.MARAV[t].fase.length, 7, t + ': 7 etapas'); assert.ok(Object.keys(D.MARAV[t].ef(40)).length); }
   assert.ok(D.DESAFIOS.length >= 40, D.DESAFIOS.length + ' desafíos');
   assert.equal(new Set(D.DESAFIOS.map(d => d.id)).size, D.DESAFIOS.length, 'ids únicos');
-  for (const d of D.DESAFIOS) assert.ok(['tick', 'batalla', 'era', 'fiesta', 'incursion', 'carta'].includes(d.on) && typeof d.ok === 'function', d.id);
+  for (const d of D.DESAFIOS) assert.ok(['tick', 'batalla', 'era', 'fiesta', 'incursion', 'carta', 'asedio', 'defensa'].includes(d.on) && typeof d.ok === 'function', d.id);
   // las estadísticas que piden los Retos del Rey las registra alguien
   for (const r of D.RETOS) assert.ok(r.k.startsWith('g_') || new RegExp("stat\\('" + r.k + "'").test(TODO), r.id + ' pide ' + r.k);
   for (const it of D.TIENDA) assert.ok(['color', 'marco', 'fuegos', 'cola'].includes(it.t) && (it.premio ? !it.precio : it.precio > 0), it.id); // los premios de escalera (V7) no tienen precio

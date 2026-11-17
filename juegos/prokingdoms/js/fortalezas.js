@@ -152,7 +152,8 @@
       const lvl = F.de(s.id).lvl, loot = D.FORT.botin(st.era, lvl);
       guarda(s.id, { mia: true, bono: null, desde: fin, prox: fin + U.rand(D.FORT.contra[0], D.FORT.contra[1]) * DIA, trib: fin });
       G().give(loot);
-      G().stat('fortalezas', 1);
+      G().stat('fortalezas', 1); G().stat('asedios_ganados', 1);
+      if (PK.Vida) PK.Vida.evento('asedio', { won: true, bajas: plan.bajas });
       const txt = '¡Tomaste ' + o.nombre + '! Botín: ' + Object.keys(loot).map(r => U.fmt(loot[r]) + ' ' + D.RES[r].name.toLowerCase()).join(', ') + '. Perdiste el ' + Math.round(plan.bajas * 100) + ' % de las tropas.';
       PK.Social.log(txt + ' ' + cause, 'good'); G().logNews('Tomaste ' + o.nombre + '.', 'good');
       toast(txt, 'epic', { label: 'Elegir bono', fn: () => PK.UI.openFort(s.id) });
@@ -175,6 +176,7 @@
       G().give({ gold });
       guarda(a.id, { prox: fin + U.rand(D.FORT.contra[0], D.FORT.contra[1]) * DIA });
       G().stat('fortalezas_def', 1);
+      PK.Terr.defensaGanada(plan);
       const txt = '¡' + o.nombre + ' resistió! Recuperaste ' + U.fmt(gold) + ' de oro de lo que dejaron.';
       PK.Social.log(txt + ' ' + cause, 'good'); toast(txt, 'good'); G().logNews(txt, 'good');
     }
@@ -199,6 +201,7 @@
       if (s.phase === 'asedio' && now >= s.ini + s.plan.total * 1000) terminaSitio(s);
       if (s.phase === 'back' && now >= s.back) { for (const u in s.units) st.war.army[u] += s.units[u]; fo.sitio = null; PK.Social.log('Volvieron los sobrevivientes del sitio.', 'info'); }
     }
+    for (const o of F.mias()) { const e = F.de(o.id); if (!e.semana && now - e.desde >= 7 * DIA) { guarda(o.id, { semana: true }); G().stat('fortaleza_semana', 1); } } // G8
     // tributo: una vez por día por fortaleza (como mucho 3 días juntos al volver)
     for (const o of F.mias()) {
       const e = F.de(o.id), dias = Math.min(3, Math.floor((now - e.trib) / DIA));

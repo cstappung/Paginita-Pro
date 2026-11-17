@@ -204,6 +204,9 @@
     { id: 'eventos10', name: 'Pasa de todo', desc: 'Vive 10 eventos del mapa.', on: 'tick', ok: st => (st.stats.events || 0) >= 10 },
     { id: 'lleno0', name: 'Nada se pierde', desc: 'Ten 150 aldeanos y ninguno ocioso.', on: 'tick', ok: () => { const vs = PK.Game.villagers(); return vs.length >= 150 && !vs.some(u => !u.task && !u.inside); } },
     { id: 'capitulo3', name: 'Cronista', desc: 'Cierra el capítulo III de la Crónica.', on: 'tick', ok: st => !!(st.campana && st.campana.hechos && st.campana.hechos[3]) },
+    // G8 (pk-65): el asedio
+    { id: 'asedio_limpio', name: 'Asedio limpio', desc: 'Gana un asedio sin perder más del 15 % de las tropas.', on: 'asedio', ok: (st, e) => e.won && e.bajas <= 0.15 },
+    { id: 'dos_defensas', name: 'Frontera de hierro', desc: 'Resiste dos asedios en un mismo día.', on: 'defensa', ok: st => !!(st.flags.defDia && st.flags.defDia.n >= 2) },
     { id: 'diez_mil', name: 'Graneros de oro', desc: 'Junta 10.000 de oro a la vez.', on: 'tick', ok: st => st.res.gold >= 10000 },
   ];
   D.RETOS = [
@@ -219,6 +222,8 @@
     { id: 'r_nodos', name: 'La biblioteca del rey', desc: 'Investiga 2 nodos del árbol', k: 'nodos', n: 2 },
     { id: 'r_incursiones', name: 'Defensores', desc: 'Rechaza 2 incursiones', k: 'raids_won', n: 2 },
     { id: 'r_encargos', name: 'Mercenarios', desc: 'Cumple 5 encargos del tablón', k: 'missions_done', n: 5 },
+    { id: 'r_asedios', name: 'Señor de los asedios', desc: 'Gana 3 asedios (parcelas o fortalezas)', k: 'asedios_ganados', n: 3 },
+    { id: 'r_fortalezas', name: 'Guardián de fortalezas', desc: 'Defiende una fortaleza tuya', k: 'fortalezas_def', n: 1 },
   ];
 
   // ---------- V8. Tienda del reino (monedas del reino, nunca las de Juegos) ----------

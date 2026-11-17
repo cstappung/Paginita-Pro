@@ -61,6 +61,7 @@
   };
   function took(k) {
     G().stat('parcels', 1);
+    if (W.rasgoDe(k)) G().stat('comarcas', 1); // G8
     const [x, y] = T.center(k);
     if (PK.Render.burst) PK.Render.burst(x, y, [120, 190, 255], 30);
     if (PK.Sfx) PK.Sfx.play('build');
@@ -142,6 +143,7 @@
     const ini = it.plan && PK.Net.aLocal ? PK.Net.aLocal(it.ini) : 0;
     const rep = it.plan ? { plan: it.plan, units: it.units || null, lado: it.lado || 0, de: it.fromSlot, a: me() } : null;
     const cause = T.recordBattle(Object.assign({ role: 'def', k: it.k, vs: it.from, won, atk: it.atk, def: it.def, parts: it.parts }, rep ? { rep } : null), ini ? ini + it.plan.total * 1000 : undefined);
+    if (won) T.defensaGanada(it.plan);
     if (rep && PK.Frente && PK.Frente.final && !G().offline && Date.now() - (ini + it.plan.total * 1000) < 60e3) PK.Frente.final({ id: 'r' + it.k, k: it.k, de: it.fromSlot, a: me(), lado: rep.lado, ini, plan: it.plan, units: rep.units, mio: 'def' }, !won);
     return cause;
   }
@@ -301,6 +303,25 @@
     PK.Social.log(tx, 'info'); toast(tx, 'info'); PK.UI.rerender();
     return true;
   };
+  // G8: un asedio resistido (de un reino, de un jugador o en una fortaleza): para el desafío y la misión
+  T.defensaGanada = function (plan) {
+    const st = S(), d = new Date().toISOString().slice(0, 10);
+    if (!st.flags.defDia || st.flags.defDia.d !== d) st.flags.defDia = { d, n: 0 };
+    st.flags.defDia.n++;
+    if (plan && (plan.acc || []).some(x => x.tipo === 'salida')) G().stat('salida_resiste', 1);
+    if (PK.Vida) PK.Vida.evento('defensa', {});
+  };
+  // G8: Tobías presenta la guerra al llegar a la Era III, en dos pasos: abrir Territorio y leer una parcela vecina.
+  T.guiaGuerra = function () {
+    const st = S();
+    st.flags.guiaGuerra = 1;
+    PK.UI.modal('guiaGuerra', 'Tobías', body => body.append(
+      U.el('p', null, '«Señor, ya estamos en la Era ' + U.roman(D.TERR.minEra) + ': ahora se puede conquistar. Una conquista es un asedio de tres etapas que se ve en el mapa: la frontera, las defensas y el estandarte.»'),
+      U.el('p', null, '«Primero, abra Territorio: ahí está cuánto falta para tocar a cada vecino, las fortalezas que vio y las comarcas. Después toque una parcela del vecino para leer su defensa antes de mandar a nadie.»'),
+      U.el('div', { class: 'row' }, PK.UI.btn('Abrir Territorio', () => { st.flags.guiaGuerra = 2; PK.UI.openTerritory(); }, { cls: 'gold' }), PK.UI.btn('Más tarde', () => PK.UI.closeModal(), { small: true }))));
+  };
+  // G8: «Ver de nuevo» cuenta para la misión del cronista
+  T.verRepeticion = b => { G().stat('repeticiones', 1); return PK.Frente.repetir(b); };
   T.hechas = {}; // lo que ya hice como defensor contra un jugador (no se guarda: el servidor lleva la cuenta de verdad)
   const seg = f => (Date.now() - f.ini) / 1000;
   T.tiempoRefuerzo = c => Math.max(45, (c.travel || 120) * 0.5);
@@ -322,7 +343,7 @@
       const listo = () => {
         c.nAcc = (c.nAcc || 0) + 1;
         if (a.tipo === 'tactica') { c.tacCambio = true; hecho(a.tactica ? 'Tus tropas cambian a ' + D.ASEDIO.tacticas[a.tactica].nombre.toLowerCase() + '.' : 'Tus tropas vuelven al ritmo normal.'); }
-        else hecho('Tus tropas se retiran del asedio.');
+        else { if (T.estado(f).impetu < T.estado(f).resistencia) G().stat('retirada_a_tiempo', 1); hecho('Tus tropas se retiran del asedio.'); } // G8
       };
       if (c.remote) PK.Net.asedio(c.rid, a.tipo, { tactica: a.tactica }).then(listo).catch(e => toast(e.message, 'warn'));
       else { const n = D.asedioReplan(c.plan, seg(f), a); if (!n) { toast('Ya no se puede.', 'warn'); return false; } c.plan = n; listo(); }
@@ -357,6 +378,12 @@
     const rep = pv ? { plan: pv, units: Object.assign({}, c.units), lado: c.lado === undefined ? T.ladoDe(c.k, me()) : c.lado, de: me(), a: c.slot } : null;
     const cause = bt && bt.parts ? T.recordBattle(Object.assign({ role: 'atk', k: c.k, vs: info.realm, won, atk: bt.atk, def: bt.def, parts: bt.parts }, rep ? { rep } : null), fin) : null;
     if (won) delete st.terr.rev[c.k];
+    if (won && plan) { // G8: misiones, desafíos y retos del asedio
+      G().stat('asedios_ganados', 1);
+      if (c.units.ariete > 0 && (plan.parts.walls || 0) > 0) G().stat('ariete_defensas', 1);
+      if (W.rasgoDe(c.k)) G().stat('comarcas', 1);
+      if (PK.Vida) PK.Vida.evento('asedio', { won: true, bajas: plan.bajas });
+    }
     if (c.ref && !c.ref.ok) { for (const u in c.ref.units) st.war.army[u] += c.ref.units[u]; c.ref.ok = true; PK.Social.log('Los refuerzos no alcanzaron a llegar y volvieron a casa.', 'info'); } // G4
     const loss = plan && won === plan.gano ? plan.bajas : D.conquestLoss(won, ratio || 1);
     const antes = Object.assign({}, c.units);
@@ -477,6 +504,7 @@
       toast(bot.name + ' tomó una parcela de tu frontera. Refuerza tus torres.', 'bad');
       G().logNews(bot.realm + ' tomó una parcela de tu frontera. ' + cause, 'bad');
     } else {
+      T.defensaGanada(plan);
       const gold = Math.round(40 * S().era * bot.strength);
       G().give({ gold });
       st.terr.shield = Date.now() + D.TERR.shieldWin * 1000;
@@ -527,6 +555,7 @@
         PK.Social.log('Volvieron los sobrevivientes de la campaña.', 'info');
       }
     }
+    if (!offline && st.era >= D.TERR.minEra && !st.flags.guiaGuerra && st.flags.guia === 'fin' && !PK.UI.modalKey()) T.guiaGuerra(); // G8
     if (online()) return; // el servidor decide sobre el resto
     for (const th of st.terr.threats.slice()) {
       if (!th.warned && now >= th.at - 120e3 && !offline) {

@@ -338,6 +338,20 @@
     if (!obj || fuerza < obj.d * 1.25 || !g.canAfford(T.campaignCost(obj.k))) return;
     if (T.attack(obj.k, Object.assign({}, st.war.army))) { P.campanas = (P.campanas || 0) + 1; anota('Campaña contra ' + mejor.b.realm + ': fuerza ' + Math.round(fuerza) + ' contra aprox. ' + Math.round(obj.d) + '.'); }
   }
+  // G8 (pk-65): sitia una fortaleza cuando la gana de sobra (1,4 veces su guarnición con el 70 % del ejército) y elige
+  // el bono de las que tiene. Como un jugador que mira la ventana de la fortaleza.
+  function fortaleza() {
+    const F = PK.Fort, st = S(), g = G();
+    if (!F) return;
+    st.flags.guiaGuerra = st.flags.guiaGuerra || 3; // Tobías no interrumpe al piloto
+    for (const o of F.mias()) if (!F.de(o.id).bono) F.elegirBono(o.id, 'minas');
+    if (st.fort && st.fort.sitio || g.time - (P._fortT || -1e9) < 600) return;
+    P._fortT = g.time;
+    const units = {};
+    for (const k in st.war.army) if (st.war.army[k] > 0) units[k] = Math.floor(st.war.army[k] * 0.7);
+    const o = F.lista().filter(x => !F.puedeSitiar(x.id)).map(x => ({ x, m: F.fuerzaContra(x.id, units) / F.fuerza(x.id) })).filter(c => c.m >= 1.4).sort((a, b) => b.m - a.m)[0];
+    if (o && F.sitiar(o.x.id, units)) { P.sitios = (P.sitios || 0) + 1; anota('Sitio a ' + o.x.nombre + ' (' + o.m.toFixed(1) + ' veces su guarnición).'); }
+  }
   function medir() {
     const g = G(), st = S();
     if (st.campana) for (const c in st.campana.hechos) if (!P.caps[c]) { P.caps[c] = Math.round((g.time - P.t0) / 6) / 10; anota('Cerró el capítulo ' + U.roman(+c) + '.'); }
@@ -375,10 +389,12 @@
       heroes();
       guerra();
       frontera();
+      fortaleza();
       if (st.ret.welcome) g.openWelcome(true);
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  const F0 = () => (PK.Fort ? PK.Fort.mias().length : 0);
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();
