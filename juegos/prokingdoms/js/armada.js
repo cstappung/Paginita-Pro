@@ -280,7 +280,9 @@
   // el héroe en el mar (pk-30): de pie en un bote, con el dibujo de siempre
   const BOTES = new WeakMap();
   B.ext.heroe = function (f, frame) {
-    const v = Sp.villager(f.col, 1, 1, f.modo === 'walk' ? 'idle' : f.modo, frame, null, f.flip, f.modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
+    const hh = PK.Heroes && Sp.heroe && f.heroeId !== undefined ? PK.Heroes.de(f.heroeId) : null, fg = hh && PK.Heroes.figura(hh); // pk-80: con su cara
+    const v = fg ? Sp.heroe(fg, f.modo === 'walk' ? 'idle' : f.modo, frame, f.flip, false, f.modo === 'work' ? PK.Heroes.armaDe(hh) : null)
+      : Sp.villager(f.col, 1, 1, f.modo === 'walk' ? 'idle' : f.modo, frame, null, f.flip, f.modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
     if (!v) return null;
     if (BOTES.has(v)) return BOTES.get(v);
     const k = v.k || 1, vw = v.k ? v.w : v.c.width, vh = v.k ? v.h : v.c.height, Wd = Math.max(22, vw + 6), Hd = vh + 3;

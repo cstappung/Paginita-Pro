@@ -697,7 +697,7 @@
     const c = PK.Heroes.CLASES[h.clase], H = PK.Heroes;
     b.heroeId = h.id;
     b.heroe = { id: h.id, nombre: h.nombre, clase: h.clase, hab: c.hab, cd: 4, cdMax: c.hab.cd * (1 - H.efecto(h, 'cd')), pot: 1 + H.efecto(h, 'pot'), auto: true, pedir: false, usos: 0,
-      fig: { lado: 'p', tipo: 'heroe', st: { spr: 'heroe', hp: 1 }, look: c.look, col: c.col, pow: 0, rep: 1, hp: 1, max: 1, dps: 0, u: 1.5, v: LV / 2, u0: 1.5, cd: 0, anim: 0, flip: false, modo: 'idle', muerto: 0, golpe: 0, objetivo: null } };
+      fig: { lado: 'p', tipo: 'heroe', heroeId: h.id, st: { spr: 'heroe', hp: 1 }, look: c.look, col: c.col, pow: 0, rep: 1, hp: 1, max: 1, dps: 0, u: 1.5, v: LV / 2, u0: 1.5, cd: 0, anim: 0, flip: false, modo: 'idle', muerto: 0, golpe: 0, objetivo: null } };
     b.muro = 0; b.cancion = 0;
   }
   function heroePaso(b, mios, suyos, dt) {
@@ -1190,8 +1190,12 @@
     const a = f.st, modo = f.modo;
     if (B.ext.sprite && (a.barco || a.mar)) { const s2 = B.ext.sprite(f, frame); if (s2) return s2; }
     if (f.tipo === 'heroe' && D.temaActivo === 'mar' && B.ext.heroe) { const s2 = B.ext.heroe(f, frame); if (s2) return s2; }
-    if (f.tipo === 'heroe') return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
-    if (f.lado === 'p') return f.tipo === 'catapult' || (D.ARMY[f.tipo] || {}).maquina ? Sp.cart(COL_MIOS, f.tipo === 'catapult' ? 'stone' : 'wood', f.flip, frame % 4, modo === 'walk') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
+    if (f.tipo === 'heroe') { // pk-80: con la cara y el traje de su retrato (antes, todos los de una clase iguales)
+      const hh = PK.Heroes && Sp.heroe ? PK.Heroes.de(f.heroeId) : null, fg = hh && PK.Heroes.figura(hh);
+      if (fg) return Sp.heroe(fg, modo, frame, f.flip, false, modo === 'work' ? PK.Heroes.armaDe(hh) : null);
+      return Sp.villager(f.col, 1, 1, modo, frame, null, f.flip, modo === 'work' ? (f.look === 'archer' ? null : 'sword') : null, false, false, null, f.look);
+    }
+    if (f.lado === 'p') return Sp.esMaquina(f.tipo) ? Sp.maquina(f.tipo, COL_MIOS, f.flip, frame % 4, modo === 'walk', modo === 'work') : Sp.troop(f.tipo, COL_MIOS, modo, frame, f.flip, false, modo === 'work' ? TROPA[f.tipo].herr || null : null, f.rep);
     if (a.spr === 'lobo') return Sp.wolf[f.flip ? 1 : 0][(modo === 'walk' || modo === 'work' ? Math.floor(f.anim * 10) : 0) % Sp.wolf[0].length];
     if (a.spr === 'oso') return PK.Fauna ? fauna('oso', modo === 'idle' ? -1 : Math.floor(f.anim * 6) % 6, f.flip) : osoDe()[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'walk' ? 5 : 1)) % 2];
     if (a.spr === 'golem') return PK.Fauna ? fauna('golem' + (a.tinte ? 'F' : ''), Math.floor(f.anim * (modo === 'idle' ? 2 : 5)) % 6, f.flip) : golemDe(!!a.tinte)[f.flip ? 1 : 0][Math.floor(f.anim * (modo === 'idle' ? 1 : 3)) % 2];

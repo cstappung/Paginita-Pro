@@ -17,6 +17,9 @@
 
   let marketOps = [];
   let lastMv = null, mvk = {}; // L4: versión de las murallas que mandaste / que tienes de cada reino
+  // pk-80: lo mismo para tus cintas (y lo que corre en ellas) y tus aspectos, que ahora ven los vecinos
+  let lastCv = null, lastCfv = null, lastAv = null, ckk = {}, avk = {};
+  const aspO = {}; // dueño → { 'x,y': aspecto } de cada edificio suyo con aspecto propio
   let since = 0, kb = {}, lastBver = null, lastSentBuild = 0, seenIncoming = new Set(), syncing = false, tv = 0;
 
   async function api(method, url, body, timeout, extra) {
@@ -94,6 +97,21 @@
     for (const r of ['food', 'wood', 'stone', 'gold']) o[r] = (st.res[r] || 0) + (PK.Libro ? PK.Libro.fuera(r) : 0);
     return o;
   }
+  // pk-80: tus aspectos que ven los demás: el de cada tipo de edificio o decoración, el propio de cada edificio (b.asp)
+  // y el color de tus banderas (tienda o estandarte del Pase). Solo visuales; el servidor solo revisa que existan.
+  function fotoAsp() {
+    const st = S(), b = {}, o = {};
+    for (const k in st.flags || {}) if (k.startsWith('asp_') && st.flags[k] && D.BUILD[k.slice(4)]) b[k.slice(4)] = st.flags[k];
+    for (const bb of G().buildings) if (bb.owner === 'p' && bb.asp && Object.keys(o).length < 300) o[bb.x + ',' + bb.y] = bb.asp;
+    const col = PK.Sprites.ownerColor('p'), c = String(col) === String(D.PLAYER_COLOR) ? null : col.map(v => Math.round(v));
+    const a = { b, o, c };
+    a.v = String(U.strHash(JSON.stringify(a)));
+    return a;
+  }
+  function ponerAspO(owner) {
+    const m = aspO[owner];
+    for (const b of G().buildings) if (b.owner === owner && b.remote) b.asp = (m && m[b.x + ',' + b.y]) || undefined;
+  }
   function snapshot(force) {
     const st = S(), g = G();
     const blds = g.buildings.filter(b => b.owner === 'p').map(b => [b.type, b.x, b.y, b.done ? 1 : 0, b.lvl]);
@@ -112,6 +130,12 @@
     // L4: tus murallas, solo cuando cambian (otros las ven y no las cruzan)
     const d = st.def || { walls: [], gates: [], tier: 1 }, mv = String(U.strHash(d.walls.join() + '|' + d.gates.join() + '|' + d.tier));
     if (force || mv !== lastMv) { snap.muros = { v: mv, t: d.walls.slice(0, 2000), g: d.gates.slice(0, 200), tier: d.tier }; lastMv = mv; }
+    // pk-80: cintas (piezas con versión; lo que corre por ellas aparte, también solo cuando cambia) y aspectos
+    const ci = PK.Cintas && PK.Cintas.foto ? PK.Cintas.foto() : null;
+    if (ci && (force || ci.v !== lastCv)) { snap.cintas = { v: ci.v, t: ci.t }; lastCv = ci.v; }
+    if (ci && (force || ci.cfv !== lastCfv)) { snap.cf = { v: ci.cfv, s: ci.cf }; lastCfv = ci.cfv; }
+    const asp = fotoAsp();
+    if (force || asp.v !== lastAv) { snap.asp = asp; lastAv = asp.v; }
     return snap;
   }
 
@@ -142,7 +166,7 @@
       // está «sin conexión»: nadie lo saquea). No se manda foto, recolección ni pase, y lo de la tierra no se aplica.
       const mar = PK.Game.enMar && PK.Game.enMar();
       const r = await api('POST', '/api/sync', mar ? { since, ack: S().inboxAck, name: playerName(), wsince, mundo: 'mar', dv: PK.Diplo ? PK.Diplo.v : 0 }
-        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, apv: PK.Calzada ? PK.Calzada.version : 0, asv, cv: PK.Mundo ? PK.Mundo.cv : 0, dv2: PK.Mundo ? PK.Mundo.dv2 : 0, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
+        : { since, market: ops, snap: snapshot(first), ack: S().inboxAck, kb, mv: mvk, ck: ckk, av: avk, apv: PK.Calzada ? PK.Calzada.version : 0, asv, cv: PK.Mundo ? PK.Mundo.cv : 0, dv2: PK.Mundo ? PK.Mundo.dv2 : 0, name: playerName(), tv, wsince, pase, dv: PK.Diplo ? PK.Diplo.v : 0 });
       if (r.pase && PK.Pase) PK.Pase.info = r.pase;
       if (PK.Saqueos) PK.Saqueos.desdeSync(r); // C6 (pk-22)
       if (PK.Diplo) PK.Diplo.desdeSync(r); // S1 (pk-23): solo llega cuando cambió
@@ -172,7 +196,7 @@
     } catch (e) {
       // se reintenta en la siguiente vuelta sin perder lo recolectado
       marketOps = ops.concat(marketOps);
-      lastMv = null; // las murallas se vuelven a mandar en el próximo
+      lastMv = null; lastCv = null; lastCfv = null; lastAv = null; // murallas, cintas y aspectos se vuelven a mandar en el próximo
       if (e.status === 401) { U.store.del(TOKEN_KEY); toast('Tu sesión expiró. Recarga la página.', 'bad'); Net.online = false; }
       else if (!Net.lost && Date.now() - (Net.lastOk || 0) > SYNC_MS * 2 + 5000) { Net.lost = true; toast('Sin conexión con el servidor. Reintentando…', 'warn'); }
     } finally { syncing = false; }
@@ -199,8 +223,16 @@
         g.clearOwner(owner, true);
         (pl.buildings || []).forEach((b, i) => g.addRemoteBuilding(b[0], owner, b[1], b[2], !!b[3], 400000 + pl.slot * 5000 + i, b[4] || 1));
         if (g.aplicarDesalojo) g.aplicarDesalojo(owner); // pk-55: los que escondiste de tu tierra
+        ponerAspO(owner);
       }
       if (pl.muros !== undefined) { mvk[pl.id] = pl.mv; PK.Def.ponerAjenas(pl.slot, pl.muros, { v: pl.mv, terr: parcelas(pl.slot) }); }
+      // pk-80: sus aspectos y sus cintas (los paquetes corren solo mientras está conectado)
+      if (pl.asp !== undefined) { avk[pl.id] = pl.av; aspO[owner] = (pl.asp && pl.asp.o) || {}; PK.Sprites.aspectosAjenos(owner, pl.asp); ponerAspO(owner); }
+      if (PK.Cintas && PK.Cintas.ponerAjenas) {
+        if (pl.cintas !== undefined) ckk[pl.id] = pl.ck;
+        PK.Cintas.ponerAjenas(pl.slot, pl.cintas !== undefined ? pl.cintas || [] : null, { online: pl.online, v: pl.ck, cf: pl.cf !== undefined ? pl.cf : undefined });
+        if (pl.cf !== undefined) ckk[pl.id + ':f'] = pl.cfv;
+      }
       applyUnits(owner, pl.slot, pl.units || []);
     }
   }

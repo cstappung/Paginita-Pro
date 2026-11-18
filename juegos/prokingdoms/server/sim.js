@@ -338,6 +338,44 @@ function murosPara(o, w, mvk) {
   return { mv: v, muros: { t: o.muros.t.filter(mio), g: o.muros.g.filter(mio), tier: o.muros.tier } };
 }
 
+// pk-80 (pedido del dueño): las cintas de cada jugador las ven los demás, como las murallas. Solo piezas de sus
+// parcelas (lo que quedó fuera se recorta sin anotar: perder una parcela deja piezas viejas un momento). `i` guarda el
+// índice de cada pieza en la lista del cliente, para alinear lo que corre por ellas (`cf`, un carácter por pieza).
+// Solo se dibujan: no cambian nada del juego. Lo que corre viaja solo mientras el dueño está conectado.
+const PZ_CINTA = { c: 1, k: 1, e: 1, x: 1, u: 1, v: 1, s: 1 };
+function cleanCintas(p, m, w) {
+  const N = D.MAP * D.MAP, me1 = p.slot + 1, t = [], i = [], vistos = new Set();
+  (Array.isArray(m.t) ? m.t.slice(0, 3000) : []).forEach((r, j) => {
+    if (!Array.isArray(r) || t.length >= 2500) return;
+    const k = Math.floor(+r[0]), pz = String(r[1]);
+    if (!(k >= 0 && k < N) || vistos.has(k) || !PZ_CINTA[pz] || w.terr[W.parcel(k % D.MAP, Math.floor(k / D.MAP))] !== me1) return;
+    vistos.add(k); i.push(j);
+    t.push([k, pz, clamp(Math.floor(+r[2] || 0), 0, 3), clamp(Math.floor(+r[3] || 1), 1, 5), clamp(Math.floor(+r[4] || 0), 0, 15)]);
+  });
+  return { v: String(m.v || '').slice(0, 20), t, i };
+}
+function cintasPara(o, w, ck, online) {
+  if (!o.cintas) return {};
+  const out = {}, v = o.cintas.v + ':' + w.tv, me1 = o.slot + 1, nueva = ck[o.id] !== v;
+  const mio = o.cintas.t.map(pz => w.terr[W.parcel(pz[0] % D.MAP, Math.floor(pz[0] / D.MAP))] === me1);
+  if (nueva) { out.ck = v; out.cintas = o.cintas.t.filter((pz, j) => mio[j]); }
+  if (online && o.cf && (nueva || ck[o.id + ':f'] !== o.cf.v)) {
+    out.cfv = o.cf.v;
+    out.cf = o.cintas.i.map(j => o.cf.s[j] || '.').filter((ch, j) => mio[j]).join('');
+  }
+  return out;
+}
+// pk-80: los aspectos (skins) que eligió, para que los vecinos vean sus edificios como él. Solo ids que existen.
+function cleanAsp(m) {
+  const okId = id => { const a = D.aspecto ? D.aspecto(String(id)) : null; return !!(a && a.o && (a.tipo === 'edificio' || a.tipo === 'deco')); };
+  const b = {}, o = {};
+  for (const t of Object.keys(m.b && typeof m.b === 'object' ? m.b : {}).slice(0, 100)) if (D.BUILD[t] && okId(m.b[t])) b[t] = String(m.b[t]).slice(0, 40);
+  for (const k of Object.keys(m.o && typeof m.o === 'object' ? m.o : {}).slice(0, 300)) if (/^\d{1,3},\d{1,3}$/.test(k) && (m.o[k] === 'normal' || okId(m.o[k]))) o[k] = String(m.o[k]).slice(0, 40);
+  const c = Array.isArray(m.c) && m.c.length === 3 ? m.c.map(v => clamp(Math.round(+v || 0), 0, 255)) : null;
+  return { v: String(m.v || '').slice(0, 20), b, o, c };
+}
+const aspPara = (o, av) => (o.asp && av[o.id] !== o.asp.v ? { av: o.asp.v, asp: { b: o.asp.b, o: o.asp.o, c: o.asp.c } } : {});
+
 function sanitizeSnap(s) {
   const res = {};
   for (const r of ['food', 'wood', 'stone', 'gold']) res[r] = Math.max(0, +((s.res || {})[r]) || 0);
@@ -366,6 +404,9 @@ function sync(p, b) {
     p.snap = s;
     p.units = Array.isArray(b.snap.units) ? b.snap.units.slice(0, 250) : [];
     if (b.snap.muros && typeof b.snap.muros === 'object') p.muros = cleanMuros(p, b.snap.muros, w);
+    if (b.snap.cintas && typeof b.snap.cintas === 'object') p.cintas = cleanCintas(p, b.snap.cintas, w); // pk-80
+    if (b.snap.cf && typeof b.snap.cf === 'object') p.cf = { v: String(b.snap.cf.v || '').slice(0, 20), s: String(b.snap.cf.s || '').replace(/[^0-9a-z.]/g, '.').slice(0, 3000) };
+    if (b.snap.asp && typeof b.snap.asp === 'object') p.asp = cleanAsp(b.snap.asp);
   }
   if (b.ack) p.inbox = p.inbox.filter(i => i.id > b.ack);
   if (b.pase && typeof b.pase === 'object') paseStats(p, b.pase);
@@ -375,6 +416,7 @@ function sync(p, b) {
   store.touch('players'); store.touch('worlds');
 
   const kb = b.kb || {}, mvk = b.mv && typeof b.mv === 'object' ? b.mv : {}, players = [];
+  const ck = b.ck && typeof b.ck === 'object' ? b.ck : {}, av = b.av && typeof b.av === 'object' ? b.av : {};
   w.slots.forEach((pid, slot) => {
     if (!pid || pid === p.id || p.mar) return;
     const o = player(pid);
@@ -385,7 +427,7 @@ function sync(p, b) {
       truce: o.snap ? o.snap.truce : true, bver: o.bver,
       score: o.snap ? o.snap.score : 0, army: o.snap ? Math.round(o.snap.army) : 0, newbie: !o.snap || o.snap.era < D.TERR.minEra, tshield: (w.tshield[slot] || 0) > t,
       buildings: kb[o.id] !== o.bver ? o.buildings : undefined, units: online ? o.units : [],
-      ...murosPara(o, w, mvk),
+      ...murosPara(o, w, mvk), ...cintasPara(o, w, ck, online), ...aspPara(o, av),
     });
   });
   ensureTerr(w);

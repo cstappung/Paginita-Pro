@@ -111,6 +111,15 @@
     };
   }
 
+  // pk-80: lo que la cara del retrato eligió (piel, pelo, peinado, barba, casco, capucha, tricornio…), para que la
+  // figura del héroe en el mapa y en la batalla se le parezca. Dibuja el retrato una vez (36x36, barato) porque algunas
+  // decisiones (el tricornio de la Corsaria) salen de tiradas que se hacen mientras se dibuja.
+  R.rasgos = function (h, cl) {
+    if (typeof document === 'undefined') return null;
+    R.ultimo = null; R.canvas(h, cl, null);
+    return R.ultimo;
+  };
+
   // ---------- Dibujo ----------
   R.canvas = function (h, cl, ao) {
     const rng = U.rng(h.semilla), clase = h.clase, col = cl.col;
@@ -241,6 +250,7 @@
     ctx.putImageData(img, 0, 0);
     // marco fino
     ctx.strokeStyle = ao ? '#f0c850' : 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, N - 1, N - 1);
+    R.ultimo = f; // R.rasgos lo lee: la figura del mapa se viste con lo mismo que el retrato
     return cv;
   };
 
@@ -403,7 +413,8 @@
       return;
     }
     if (clase === 'corsaria') {
-      if (rng() < 0.5) { // tricornio
+      f.tricornio = rng() < 0.5; // (la misma tirada de siempre: no cambia ningún retrato)
+      if (f.tricornio) { // tricornio
         L.r(6, TY + 1, 24, 2, [40, 32, 28]); L.r(6, TY + 2, 24, 1, oro);
         for (let y = TY - 3; y <= TY + 1; y++) { const w = 7 - (TY + 1 - y) * 0.6; L.r(Math.round(CX - w), y, Math.round(w * 2), 1, y === TY - 3 ? [64, 54, 48] : [44, 36, 32]); }
         L.p(17, TY - 1, [240, 240, 240]); L.p(18, TY - 2, [240, 240, 240]);
