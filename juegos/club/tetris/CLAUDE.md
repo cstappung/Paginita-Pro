@@ -86,16 +86,19 @@ target, last one standing wins. Three difficulties, one table each:
 Rules that keep it provable:
 
 - **The whole match is deterministic, so the proof is still only the
-  player's moves** (`{v:2, m:"bots", d, u, a, n, e, w, k}`; target changes
+  player's moves** (`{v:3, m:"bots", d, u, a, n, e, w, k}`; target changes
   are letters `O`/`P`/`Q`/`R` in `e`). The four wells step together in
   `TM.PASO` steps; bots decide with their own seeded `rng` and integer
   weights; their target choices come from a seeded `rng` too. `TV.rehace`
   replays the bots and the verifier demands all three out. Anything that
   changes how a bot decides (weights, `BONO_ARMA`, timings, `PERFIL`,
-  targeting, `semillaPozo`) changes old proofs' outcome: **add a v3 and keep
-  v2 frozen**, exactly as v1 is kept (the `======== Versión 1` block,
-  `mundoV1`; `tests/fixtures/tetris-vs-v1.json` holds two real v1 games
-  that must keep verifying).
+  targeting, `PERSONAS`, the mood maths, `semillaPozo`) changes old proofs'
+  outcome: **add a v4 and freeze v3**, exactly as v1 and v2 are kept (the
+  `======== Versión 1/2` blocks, `mundoV1`/`mundoV2` and their `…V1`/`…V2`
+  functions; `TV.VERSIONES` lists what `rehace` accepts;
+  `tests/fixtures/tetris-vs-v1.json` and `-v2.json` hold real games that
+  must keep verifying). v3 reuses v2's pure well helpers (`cabeOc`,
+  `coloca`, `colocaciones`, `valoraV2`…): those are frozen too.
 - **The level rises only with time** (`soloTiempo` in `crear`, 30 s per
   level as in the room). With line-based levels too, the fast bots sped up
   their own gravity and killed themselves; it also bounds the match.
@@ -116,13 +119,39 @@ Rules that keep it provable:
   the stack above 13 they hurry and fail twice as much. ~0.5 / 0.9 / 1.6
   pieces per second. Each bot gets its own bag (`semillaPozo`) so the
   three do not play in lockstep.
-- **Bot targeting**: re-picked every `foco` steps, weighted towards the
-  highest stack (`remata`: 0 on Fácil, so it does not gang up on whoever is
-  losing); revenge on whoever just hit it (`venganza`) but not within
-  `FIRME_PASOS` of the last change (otherwise it flipped on every hit and
-  the screen was unreadable); a fallen target is replaced at once. The
-  last hit within `KO_PASOS` (10 s) of a fall is the KO (`m.ko`,
-  `m.verdugo`), shown as 💀 and in the battle feed.
+- **v3: three different heads** (`PERSONAS`, one per bot, like the
+  Pac-Man ghosts). In v2 all three used the same targeting function, so
+  they reached the same conclusion and piled onto one well (usually the
+  human, who plays differently). Now: **Píxel, Cazador** (goes for the
+  leader/most threatening, avoids wells others already hit, calm, builds
+  Tetrises); **Turbo, Carroñero** (goes for the weakest, joins a fight a
+  bit, avoids the dangerous one when stressed, fast and sloppy, `metralla`:
+  doubles/triples now rather than waiting for the Tetris); **Glitch,
+  Rencoroso** (long memory of who hit it, returns fire, anger makes it
+  faster, more erratic and impulsive). Measured (Medio/Difícil, 10 games):
+  all three on the same well 0–1 % of the time (v2: 2–4 %), two or more on
+  you at about the random baseline.
+- **No hard-coded «if X then Y».** Each bot has a mood of three integers
+  0–1000 that move by themselves once per second (`respira`) and on events:
+  `estres` (towards what its stack and pending garbage say), `enojo` (up
+  with each hit × `sangre`, fades), `confianza` (up with its own clears and
+  KOs, back towards 500). Mood shifts everything a little at a time:
+  thinking time (`prisa`), mistakes (`nervios` × `torpeza`), the build
+  threshold, the Tetris/metralla blend, and the targeting weights.
+  Targeting (`piensa`) sums motives per living rival (`debil`, `amenaza`,
+  `lider`, `rencor`, `devuelve`, `monton`, `sigue`, each 0–1000) × the
+  persona's weights (moved by mood) × the difficulty's `criterio`, plus a
+  `corazonada` (noise; bigger on Fácil via `azar` and when angry). The
+  highest sum wins; the motive that contributed most is `m.motivo[i]` (or
+  «corazonada» if without the noise it would have picked someone else).
+  It re-thinks at its own pace (`piensa` range), when hit for ≥ 2 lines
+  (not within `FIRME_PASOS` of its last change, or the screen flickers) and
+  when its target falls. Memory lives in the world: `rencor[i][j]` (fades
+  per `memoria`) and `ritmo[j]` (recent attack, −10 %/s). The last hit
+  within `KO_PASOS` (10 s) of a fall is the KO (`m.ko`, `m.verdugo`).
+- The screen shows each bot's role, a mood face (`cara()` in game.js:
+  😡 😰 😠 😎 😬 🙂) and the reason for its target («huele sangre»,
+  «venganza», «va por el líder»…, `PORQUE`), in the card and the feed.
 - The rival wells are `TM.pintaResumen` thumbnails; `ubicaRivales` moves
   them under the pit on narrow screens and back as a thin third column in
   immersive phone mode. Nothing on screen decides anything: `vsEventos`

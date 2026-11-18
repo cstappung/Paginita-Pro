@@ -301,8 +301,8 @@
     sprint: 'Cuarenta líneas, lo más rápido que puedas.', ultra: 'Dos minutos: todos los puntos que quepan.',
     maraton: 'Completa filas. Que no llegue arriba.',
     bots: { facil: 'Tres bots tranquilos, que se equivocan seguido. Lo que limpias le cae a tu objetivo.',
-      medio: 'Tres bots que arman Tetris y se vengan. Elige a quién atacas (tócalo o usa la tecla de objetivo).',
-      dificil: 'Tres bots rápidos que casi no fallan y rematan al que va perdiendo. Sobrevive y déjalos fuera.' }
+      medio: 'Píxel caza al que va ganando, Turbo remata al que va perdiendo y Glitch no olvida quién le pegó. Elige a quién atacas.',
+      dificil: 'Los tres, rápidos y casi sin errores, cada uno con su cabeza. Sobrevive y déjalos fuera.' }
   };
   function ponModo() {
     document.querySelectorAll('[data-modo]').forEach(x => x.classList.toggle('activo', x.dataset.modo === modo));
@@ -376,6 +376,22 @@
      acción más (`g.pide('apunta2')`, `'objetivo'`) y queda en la prueba. */
   let rivalesFirma = '', alertaT = 0, batallaFirma = '', feed = [];
   const nombreBot = i => TV.NOMBRES[i - 1];
+  /* Cada bot es alguien (vs.js, PERSONAS): su rol, el porqué de su
+     objetivo y su ánimo, que es lo que hace que no se sienta un «si pasa
+     esto, haz aquello». Solo se lee: nada de aquí decide nada. */
+  const rolBot = i => TV.PERSONAS[i].rol;
+  const PORQUE = { debil: 'huele sangre', amenaza: 'frena al peligroso', lider: 'va por el líder', rencor: 'venganza',
+    devuelve: 'devuelve el golpe', monton: 'se suma al ataque', corazonada: 'corazonada' };
+  /* La cara del ánimo: lo que más pesa de estrés, enojo y confianza. */
+  function cara(a) {
+    if (!a) return ['🙂', 'tranquilo'];
+    if (a.enojo >= 600) return ['😡', 'furioso'];
+    if (a.estres >= 600) return ['😰', 'apurado'];
+    if (a.enojo >= 300) return ['😠', 'molesto'];
+    if (a.confianza >= 750) return ['😎', 'confiado'];
+    if (a.estres >= 300) return ['😬', 'tenso'];
+    return ['🙂', 'tranquilo'];
+  }
   const nombreDe = i => i === 0 ? 'Tú' : nombreBot(i);
   const colorDe = i => i === 0 ? COLOR_TU : COLOR_BOT[i - 1];
   const chip = i => `<b class="tt-chip" style="--c:${colorDe(i)}">${nombreDe(i)}</b>`;
@@ -389,8 +405,8 @@
       rivalesFirma = firma;
       cont.innerHTML = [1, 2, 3].map(i => `<div class="tt-rival${m && m.fuera[i] >= 0 ? ' fuera' : ''}" data-i="${i}" style="--c:${COLOR_BOT[i - 1]}" title="Atacar a ${nombreBot(i)}">` +
         `<em class="tt-sello">🎯 Objetivo</em><span class="tt-lienzo"><span class="tt-diana" aria-hidden="true"><i></i><i></i><i></i><i></i></span>` +
-        `<canvas width="90" height="180" aria-label="Pozo de ${nombreBot(i)}"></canvas></span><span class="nom">${nombreBot(i)}<b class="kos"></b></span>` +
-        `<small class="apunta"></small><small class="dat"></small></div>`).join('');
+        `<canvas width="90" height="180" aria-label="Pozo de ${nombreBot(i)}"></canvas></span><span class="nom"><i class="cara" aria-hidden="true">🙂</i>${nombreBot(i)}<b class="kos"></b></span>` +
+        `<small class="rol">${rolBot(i)}</small><small class="apunta"></small><small class="porque"></small><small class="dat"></small></div>`).join('');
     }
     for (let i = 1; i <= TV.RIVALES; i++) {
       const el = cont.querySelector(`[data-i="${i}"]`);
@@ -406,6 +422,13 @@
       el.classList.toggle('teapunta', jugando && o === 0);
       const ap = el.querySelector('.apunta'), apTxt = o < 0 || !jugando ? '' : o === 0 ? '→ TÚ' : '→ ' + nombreBot(o);
       if (ap.textContent !== apTxt) { ap.textContent = apTxt; ap.style.setProperty('--c', o > 0 ? COLOR_BOT[o - 1] : '#ff4a5e'); }
+      const porque = o >= 0 && jugando ? PORQUE[m.motivo[i]] || '' : '';
+      if (ap.title !== porque) ap.title = porque;
+      const [emo, animo] = vivo && jugando ? cara(m.animo(i)) : ['🙂', ''];
+      const ce = el.querySelector('.cara');
+      if (ce.textContent !== emo) { ce.textContent = emo; ce.title = animo; }
+      const pq = el.querySelector('.porque');
+      if (pq.textContent !== porque) pq.textContent = porque;
       const k = el.querySelector('.kos'), kTxt = m && m.ko[i] ? ` 💀${m.ko[i]}` : '';
       if (k.textContent !== kTxt) k.textContent = kTxt;
     }
@@ -480,11 +503,12 @@
     for (const c of m.cambios.splice(0)) {
       if (c.de === 0) { efecto('fijado'); continue; }
       /* Un bot te pone en la mira: aviso suave (si no hay uno de ataque en pantalla). */
+      const porque = PORQUE[c.motivo] ? ` <small>(${PORQUE[c.motivo]})</small>` : '';
       if (c.a === 0) {
         efecto('teApuntan');
-        anotaFeed(`${chip(c.de)} te apunta 👁`);
-        if (performance.now() > alertaHasta) alerta(`👁 ${nombreBot(c.de)} te apunta`, COLOR_BOT[c.de - 1], 1300);
-      }
+        anotaFeed(`${chip(c.de)} te apunta 👁${porque}`);
+        if (performance.now() > alertaHasta) alerta(`👁 ${nombreBot(c.de)} te apunta${PORQUE[c.motivo] ? ': ' + PORQUE[c.motivo] : ''}`, COLOR_BOT[c.de - 1], 1500);
+      } else anotaFeed(`${chip(c.de)} apunta a ${chip(c.a)}${porque}`);
     }
     for (const a of m.ataques.splice(0)) {
       anotaFeed(`${chip(a.de)} ➜ ${chip(a.a)} <b class="tt-n">${a.n}</b>`);

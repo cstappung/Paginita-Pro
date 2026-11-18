@@ -243,3 +243,11 @@ html.club-inm .tt-diana i{width:9px;height:9px;border-width:2px}
 @media (prefers-reduced-motion:reduce){.tt-pozo[data-apuntan],.tt-bat-ap.peligro,.tt-rival.teapunta .apunta,.tt-rival.objetivo .tt-diana{animation:none}}
 html.club-inm .tt-lienzo{width:100%}
 html.club-inm #tt.vs .tt-hud-rec{display:none}
+/* Personalidades (vs.js, PERSONAS): la cara del ánimo junto al nombre y el
+   rol con el porqué de su objetivo debajo. */
+.tt-rival .cara{font-style:normal;margin-right:3px;font-size:12px}
+.tt-rival .rol{font-size:9px;color:var(--apagado);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em}
+.tt-feed small{color:var(--apagado);font-size:11px}
+.tt-rival .porque{min-height:1.15em;font-size:9px;font-style:italic;color:#c9d3e6;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+html.club-inm .tt-rival :is(.rol,.porque){display:none}
+html.club-inm .tt-rival .cara{font-size:9px;margin-right:1px}

@@ -1069,11 +1069,12 @@ const REGLAS = {
         "<b>VS Bots</b>: tú contra tres bots, todos contra todos, como una sala de cuatro. Lo que limpias le cae a tu <b>objetivo</b> (la diana dorada): lo cambias tocando su pozo o con <b>E / Tab</b>. Cada bot también tiene el suyo, y lo ves debajo de su pozo («→ TÚ» en rojo si eres tú). Ganas cuando los tres quedan fuera; el nivel sube cada 30 segundos."
       ])],
       ["Los bots", lista([
-        "Juegan como personas: con la pila baja dejan una columna libre para meter un <b>Tetris</b>, y cuando se ven apurados limpian lo que pueden. Se equivocan: se pasan una columna (a veces se dan cuenta y corrigen), giran de más, dudan, se asustan cuando les llega basura y fallan más con la pila arriba.",
-        "Eligen a quién atacar: cambian cada tanto, a veces se vengan de quien les acaba de pegar, y los más fuertes prefieren rematar al que va perdiendo.",
-        "<b>Fácil</b>: lentos (menos de una pieza por segundo), se equivocan seguido, casi no arman Tetris y reparten la basura al azar.",
-        "<b>Medio</b>: una pieza por segundo, usan la reserva, arman Tetris y se vengan; fallan de vez en cuando.",
-        "<b>Difícil</b>: casi dos piezas por segundo, miran la pieza siguiente, casi no fallan y rematan al que tiene la pila más alta."
+        "Cada bot es alguien, como los fantasmas de Pac-Man: <b>Píxel, el Cazador</b>, va por el que va ganando y evita sumarse a quien ya atacan otros; <b>Turbo, el Carroñero</b>, huele sangre y remata al que está más alto, juega rápido y manda dobles y triples seguidos; <b>Glitch, el Rencoroso</b>, no olvida quién le pegó y devuelve el golpe, y cuanto más se enoja más rápido y más errático juega.",
+        "Tienen ánimo: el <b>estrés</b> sube con su pila, el <b>enojo</b> con cada golpe y la <b>confianza</b> con sus Tetris y sus KO. El ánimo cambia cuánto piensan, cuánto se equivocan, cuánto se arriesgan y a quién atacan. Lo ves en la carita junto a su nombre (🙂 😬 😰 😠 😡 😎), y debajo de su pozo, el porqué de su objetivo («huele sangre», «venganza», «va por el líder»…).",
+        "Juegan como personas: con la pila baja dejan una columna libre para meter un <b>Tetris</b>, y cuando se ven apurados limpian lo que pueden. Se equivocan: se pasan una columna (a veces se dan cuenta y corrigen), giran de más, dudan y se asustan cuando les llega basura.",
+        "<b>Fácil</b>: lentos (menos de una pieza por segundo), se equivocan seguido, casi no arman Tetris y eligen objetivo casi al azar.",
+        "<b>Medio</b>: una pieza por segundo, usan la reserva, arman Tetris y ya se les nota la personalidad; fallan de vez en cuando.",
+        "<b>Difícil</b>: casi dos piezas por segundo, miran la pieza siguiente, casi no fallan y siguen su personalidad a fondo."
       ])],
       ["Clasificación", "Maratón y Ultra se ordenan por puntos; Sprint por tiempo. VS Bots tiene una tabla por dificultad y compite el <b>tiempo</b> en dejar fuera a los tres bots: perder no cuenta."]
     ]
