@@ -1403,15 +1403,34 @@
   // pk-36: un edificio puede llevar su propio aspecto (b.asp, elegido en su panel o en la ventana Aspectos):
   // 'normal' es sin aspecto, un id del Pase es ese aspecto y vacío sigue al de su tipo (ASP_B)
   const ASP_OV = {};
-  S.aspectoDe = function (type, owner, ov) {
-    if (owner !== 'p') return null;
-    if (!ov) return ASP_B[type] || null;
-    if (ov === 'normal') return null;
+  const aspDeId = ov => {
     if (!(ov in ASP_OV)) {
       const a = D.aspecto ? D.aspecto(ov) : null;
       ASP_OV[ov] = a && a.o && (a.tipo === 'edificio' || a.tipo === 'deco') ? { b: a.o.b, col: a.o.col || a.T.col, techo: a.o.techo || null, id: ov } : null;
     }
-    const o = ASP_OV[ov];
+    return ASP_OV[ov];
+  };
+  // pk-80 (pedido del dueño: «que las skins las pueda ver todo el mundo»): los aspectos de los vecinos llegan con el
+  // sync (net.js → S.aspectosAjenos(owner, {b: {tipo: id}, c: [r, g, b]})); sus edificios piden el suyo por b.asp.
+  const ASP_REM = {};
+  S.aspectosAjenos = function (owner, a) {
+    const antes = JSON.stringify(ASP_REM[owner] || null);
+    if (a) { const b = {}; for (const t in a.b || {}) { const o = aspDeId(String(a.b[t])); if (o && o.b === t) b[t] = o; } ASP_REM[owner] = { b, col: Array.isArray(a.c) && a.c.length === 3 ? a.c.map(v => U.clamp(Math.round(+v || 0), 0, 255)) : null }; }
+    else delete ASP_REM[owner];
+    if (antes !== JSON.stringify(ASP_REM[owner] || null)) for (const k in BCACHE) if (k.includes('|' + owner + '|')) delete BCACHE[k];
+  };
+  // el color de banderas y estandartes de un reino: el tuyo (tienda o Pase) o el que eligió un vecino
+  S.colorBanderas = owner => (owner !== 'p' && ASP_REM[owner] && ASP_REM[owner].col) || S.ownerColor(owner);
+  S.aspectoDe = function (type, owner, ov) {
+    if (owner !== 'p') {
+      const R = ASP_REM[owner];
+      if (!R || ov === 'normal') return null;
+      const o = ov ? aspDeId(ov) : null;
+      return o && o.b === type ? o : R.b[type] || null;
+    }
+    if (!ov) return ASP_B[type] || null;
+    if (ov === 'normal') return null;
+    const o = aspDeId(ov);
     return o && o.b === type ? o : ASP_B[type] || null;
   };
   let techoAsp = null;
@@ -1419,7 +1438,7 @@
     if (D.BUILD[type] && D.BUILD[type].porton) { const st = PK.Game && PK.Game.state; return S.porton(type, owner, owner === 'p' && st && st.def ? st.def.tier : 2, 0, ov); }
     const tier = S.tier(lvl || 1), asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + bkey(type, lvl) + (asp ? '|' + asp.id : '');
     if (BCACHE[key]) return BCACHE[key];
-    const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.ownerColor(owner);
+    const def = D.BUILD[type], col = asp && asp.col ? asp.col : S.colorBanderas(owner);
     techoAsp = asp ? asp.techo : null;
     const draw = (D.temaActivo === 'mar' && S.BDRAW_MAR[type]) || BDRAW[type]; // en el mar, su propio dibujo (sprites-mar.js)
     const spr = isoSprite(def.w, def.h, S.btop(type, lvl), def.flat, (p, meta) => draw(p, col, meta, tier, lvl || 1), tier, col);
@@ -1435,7 +1454,7 @@
   S.porton = function (type, owner, wallTier, frame, ov) {
     const asp = S.aspectoDe(type, owner, ov), key = type + '|' + owner + '|' + wallTier + '|' + frame + (asp ? '|' + asp.id : '');
     if (PORC[key]) return PORC[key];
-    const def = D.BUILD[type], v = def.porton === 'v', col = asp && asp.col ? asp.col : S.ownerColor(owner);
+    const def = D.BUILD[type], v = def.porton === 'v', col = asp && asp.col ? asp.col : S.colorBanderas(owner);
     const t = Math.max(1, Math.min(4, wallTier || 1)), H = [0, 24, 30, 34, 38][t];
     const mat = ['', 'bark', 'stone', 'paving', 'slate'][t], top = ['', 'logend', 'paving', 'marbleS', 'paving'][t];
     const abre = frame / 4;
@@ -2022,25 +2041,37 @@
   const HEAD = { axe: 1.0, pick: 1.6, hammer: 1.0, sickle: 1.1, knife: 0.5, sword: 0.3, spear: 0.3 }; // del extremo del mango al filo que golpea
   // troop: el mismo cuerpo vestido de soldado (militia, spear, archer, knight, cleric o catapult, la dotación).
   // Cambian la túnica, el casco o la capucha y el arma que lleva en la mano de adelante (al pelear, la herramienta).
-  const TROOP_TUNIC = { archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [104, 96, 72], monk: [134, 96, 58], mage: [72, 58, 150] };
+  const TROOP_TUNIC = { militia: [150, 118, 80], archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [118, 100, 70], monk: [126, 88, 52], mage: [72, 58, 150] };
+  // pk-80: cada tropa con su identidad (pedido del dueño): miliciano de jubón con faja del reino y rodela, lancero con
+  // escudo redondo del reino, arquero con carcaj, caballero con yelmo cerrado y sobreveste, clérigo con estola de oro,
+  // ballestero con pavés a la espalda, monje tonsurado con capucha caída, mago con sombrero de ala y barba gris.
   S.vNuevas = 0; // figuras hechas (render.js las cuenta para su presupuesto por cuadro)
-  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop, soloCache) {
-    const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '');
+  // pk-80: héroes. `hero` es la figura de PK.Heroes.figura(h) (piel, pelo, peinado, barba, casco… de su retrato): el
+  // cuerpo es el mismo y la clase pone el traje (looks 'hpal', 'hgua', 'hcle', 'hing', 'hhec', 'hjug', 'hcor').
+  const HERO_LOOK = { paladin: 'hpal', guarda: 'hgua', clerigo: 'hcle', ingeniera: 'hing', hechicero: 'hhec', juglar: 'hjug', corsaria: 'hcor' };
+  const PELO_LARGO = { largo: 1, trenzas: 1, cola: 1, 'moño': 1 };
+  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop, soloCache, hero) {
+    const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '') + (hero ? '|' + hero.k : '');
     const ya = VC.get(key);
     if (ya) { VC.delete(key); VC.set(key, ya); return ya; }
     if (soloCache) return null; // sin presupuesto este cuadro: quien llama usa la de antes
     S.vNuevas++;
     if (VC.size >= VC_MAX) { let n = VC_SUELTA; for (const k of VC.keys()) { VC.delete(k); if (--n <= 0) break; } }
     const PW = VW * VR, PH = VH * VR, pb = new PB(PW, PH);
-    const female = !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage';
+    const HE = hero || null;
+    if (HE) troop = HERO_LOOK[HE.clase] || 'hjug';
+    const female = HE ? !!HE.mujer : !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage' || troop === 'hcle' || troop === 'hhec';
+    const largo = HE ? !!PELO_LARGO[HE.peinado] : female, calvo = !!HE && HE.peinado === 'calvo';
+    const tapado = troop === 'hgua' || troop === 'hcle' || (HE && HE.capucha); // capucha o velo: el pelo no asoma
     const walk = mode === 'walk', ph = walk ? (frame % 6) / 6 * Math.PI * 2 : 0;
     // al recoger a mano se agacha: baja la cadera y adelanta las rodillas
     const crouch = mode === 'work' && tool === 'hand' ? 4 : 0;
     const sv = walk ? Math.sin(ph) : 0, lift = walk ? Math.abs(Math.cos(ph)) : 0, yo = -lift * 0.35 + crouch;
     const working = mode === 'work' && tool;
     // materiales
-    const tcol = troop ? TROOP_TUNIC[troop] || col : scout ? [86, 108, 56] : col;
-    const SK = vRamp(SKIN[skin]), HR = vRamp(HAIR[hair]), BRD = vRamp(sc(HAIR[hair], 0.85));
+    const HERO_TUNIC = { hpal: [168, 174, 188], hgua: [118, 82, 50], hcle: [236, 230, 214], hing: [222, 204, 170] };
+    const tcol = HE ? HERO_TUNIC[troop] || HE.col : troop ? TROOP_TUNIC[troop] || col : scout ? [86, 108, 56] : col;
+    const SK = vRamp(HE ? HE.piel : SKIN[skin]), HR = vRamp(HE ? HE.pelo : troop === 'mage' ? [196, 196, 204] : HAIR[hair]), BRD = vRamp(HE ? sc(HE.pelo, 0.85) : troop === 'mage' ? [214, 214, 220] : sc(HAIR[hair], 0.85));
     const TU = vRamp(tcol), TU2 = vRamp(sc(tcol, 0.78)), LIN = vRamp([212, 196, 160]), LIN2 = vRamp([176, 160, 126]);
     const PA = vRamp([104, 80, 54]), WRAP = vRamp([150, 128, 92]), BO = vRamp([78, 54, 36]), BE = vRamp([92, 58, 30]);
     const WO = vRamp([150, 102, 58]), ME = vRamp([160, 166, 180]), ST = vRamp([216, 180, 98]), BAND = vRamp([150, 72, 40]);
@@ -2129,8 +2160,24 @@
     else arm(6.7, -1, 1, 6.5 + sw * 1.0, 11.6 + yo, 6.5 + sw * 0.45, 9.3 + yo);
     // torso: camisa de lino, túnica del color del reino, escote, cinturón, ruedo y caída de la tela
     const beltY = waist - 0.3;
+    const COLR = HE ? vRamp(HE.col) : troop ? vRamp(col) : null;
     const torsoM = (px, py) => {
-      if (py >= beltY && py < beltY + 0.55) return BE;
+      if (py >= beltY && py < beltY + 0.55) return troop === 'monk' ? LIN2 : troop === 'cleric' ? ST : BE;
+      if (troop && !back) {
+        if (troop === 'knight' && Math.abs(px - (hx + 0.35)) < 0.95 && py > shY + 0.5) return Math.abs(px - (hx + 0.35)) < 0.18 || Math.abs(py - (shY + 2.1)) < 0.18 ? ST : COLR; // sobreveste con cruz
+        if (troop === 'cleric' && (Math.abs(px - (hx - 0.15)) < 0.2 || Math.abs(px - (hx + 0.95)) < 0.2)) return ST; // estola
+        if (troop === 'militia' && Math.abs((py - shY) - (px - hx + 1.6) * 1.1) < 0.45) return COLR; // faja del reino
+        if (troop === 'crossbow' && Math.floor(py * 2.2) % 2 === 0 && py > shY + 0.8) return TU2; // gambesón acolchado
+        if (troop === 'mage' && U.hash(Math.round(px * 3), Math.round(py * 3), 7) > 0.9) return ST; // estrellas bordadas
+        // héroes: lo que el retrato muestra en el pecho
+        if (troop === 'hpal' && Math.abs(px - (hx + 0.35)) < 1.0 && py > shY + 0.6) return (Math.abs(px - (hx + 0.35)) < 0.2 && py < beltY - 0.3) || (Math.abs(py - (shY + 2.0)) < 0.2 && Math.abs(px - (hx + 0.35)) < 0.7) ? LIN : COLR; // sobreveste con la cruz blanca
+        if (troop === 'hcle' && Math.hypot(px - (hx + 0.4), py - (shY + 2.0)) < 0.55) return ST; // el sol de oro
+        if (troop === 'hhec' && (Math.abs(px - (hx + 0.35)) < 0.16 || U.hash(Math.round(px * 3), Math.round(py * 3), 7) > 0.93)) return ST; // ribete y estrellas
+        if (troop === 'hing' && py > shY + 1.5 && Math.abs(px - (hx + 0.3)) < 1.25) return Math.abs(py - (shY + 1.6)) < 0.18 ? BE : vRamp([128, 84, 46]); // delantal de cuero
+        if (troop === 'hjug') return Math.floor((px - hx + 4) * 1.6) % 2 ? COLR : ST; // jubón a franjas
+        if (troop === 'hcor') { if (Math.abs(px - (hx + 0.45)) < (py - shY) * 0.22 + 0.15 && py < shY + 2.4) return LIN; if (Math.abs(px - (hx - 0.2)) < 0.14 && Math.floor(py * 1.6) % 2) return ST; } // camisa y botones
+        if (troop === 'hgua' && Math.abs((py - shY) - (hx + 1.6 - px) * 1.1) < 0.3) return BE; // correa del carcaj
+      }
       if (!back && py < shY + 1.2 && px > hx + 0.05 && px < hx + 0.75 + (py - shY) * 0.3) return py < shY + 0.9 ? SK : LIN; // escote
       if (py > shY + 2.4 && py < beltY && Math.abs(px - (hx + 0.7)) < 0.25 && !back) return TU2;        // costura
       return TU;
@@ -2149,15 +2196,23 @@
     // cabeza: piel, pelo y barba según la zona
     const hairAt = (px, py) => {
       const dx = px - hx, dy = py - hy;
-      if (back) return dy < 1.2 || (female && dy < 1.6);
+      if (calvo) return dy > -0.45 && dy < (back ? 1.1 : 0.7) && (back || dx < -0.55); // pelo solo a los costados
+      if (back) return dy < 1.2 || (largo && dy < 1.6);
       if (dy < -0.65 - Math.max(0, dx) * 0.15) return true;
-      if (dx < -0.55 && dy < (female ? 1.6 : 0.7)) return true;
+      if (dx < -0.55 && dy < (largo ? 1.6 : 0.7)) return true;
       return false;
     };
-    const beard = !back && !female && hair === 1;
-    E(hx, hy, 1.35, 1.6, 4, (px, py) => (hairAt(px, py) ? HR : beard && py - hy > 0.45 && px - hx > -0.7 ? BRD : SK));
+    const HB = HE ? HE.barba : '', beard = !back && (HE ? HB === 'barba' || HB === 'larga' || HB === 'candado' || HB === 'rala' : !female && (hair === 1 || troop === 'mage'));
+    const barbaEn = (px, py) => (HB === 'candado' ? py - hy > 0.75 && px - hx > 0.2 : py - hy > 0.45 && px - hx > -0.7);
+    E(hx, hy, 1.35, 1.6, 4, (px, py) => (hairAt(px, py) ? HR : beard && barbaEn(px, py) ? (HB === 'rala' ? SK : BRD) : SK));
     if (!back) E(hx + 1.35, hy + 0.15, 0.32, 0.35, 4.02, SK); // nariz
-    if (female && !scout && hat !== 3) E(hx - 0.8, hy + 1.6, 0.85, 1.4, 3.8, HR); // trenza
+    if (HE && !back) {
+      if (HB === 'bigote' || HB === 'candado' || HB === 'barba' || HB === 'larga') E(hx + 0.95, hy + 0.62, 0.6, 0.22, 4.03, HR); // bigote
+      if (HB === 'larga') E(hx + 0.5, hy + 1.9, 0.78, 1.0, 4.03, BRD); // barba larga sobre el pecho
+      if (HE.parche) { E(hx + 0.75, hy - 0.05, 0.36, 0.3, 4.05, vRamp([30, 24, 22])); Cp(hx - 1.2, hy - 0.9, hx + 0.6, hy - 0.2, 0.1, 4.04, vRamp([40, 30, 26])); }
+    }
+    if (HE ? largo && !tapado : female && !scout && hat !== 3) E(hx - 0.8, hy + 1.6, 0.85, 1.4, 3.8, HR); // trenza o melena
+    if (HE && HE.peinado === 'moño' && !tapado) E(hx - 0.85, hy - 1.2, 0.65, 0.6, 4.1, HR);
     // sombreros
     if (hat === 1) { E(hx, hy - 1.05, 2.5, 0.55, 4.6, ST); E(hx - 0.05, hy - 1.55, 1.25, 0.85, 4.7, (px, py) => (py > hy - 1.3 ? BAND : ST)); }
     else if (hat === 2) { E(hx - 0.1, hy - 0.6, 1.5, 1.15, 4.6, TU2, (px, py) => py < hy - 0.45); if (!back) E(hx + 1.35, hy - 0.5, 0.7, 0.28, 4.65, TU2); }
@@ -2167,13 +2222,67 @@
       Cp(12.4, 1.2, 12.4, 18.4, 0.32, 6.5, WO); E(12.4, 0.9, 0.5, 0.5, 6.6, WO);
     }
     if (troop) {
-      const helm = troop === 'knight' || troop === 'spear' || troop === 'rider' || troop === 'crossbow' ? ME : troop === 'militia' || troop === 'catapult' ? WRAP : null;
-      if (helm) E(hx - 0.05, hy - 0.5, 1.6, 1.35, 4.65, helm, (px, py) => py < hy - 0.2 || (troop === 'knight' && (back || px < hx + 0.35) && py < hy + 1.3));
-      if (troop === 'knight' || troop === 'rider') E(hx - 0.35, hy - 1.95, 0.5, troop === 'rider' ? 1.2 : 0.8, 4.7, vRamp(col)); // penacho del color del reino
+      const helm = troop === 'spear' || troop === 'rider' || troop === 'crossbow' ? ME : troop === 'militia' ? WRAP : null;
+      if (helm) E(hx - 0.05, hy - 0.5, 1.6, 1.35, 4.65, helm, (px, py) => py < hy - 0.2);
+      if (troop === 'spear' && !back) Cp(hx + 0.75, hy - 0.5, hx + 0.75, hy + 0.7, 0.22, 4.7, ME); // nasal
+      if (troop === 'militia') E(hx - 0.9, hy - 1.1, 0.7, 0.5, 4.7, WRAP); // la punta del gorro acolchado
+      if (troop === 'knight') { // yelmo cerrado con rendija y penacho del reino
+        E(hx, hy - 0.1, 1.55, 1.8, 4.65, (px, py) => (!back && px > hx + 0.15 && Math.abs(py - (hy - 0.05)) < 0.2 ? vRamp([24, 22, 26]) : Math.abs(py - (hy - 1.0)) < 0.16 ? ST : ME));
+        E(hx - 0.3, hy - 2.05, 0.55, 0.85, 4.7, COLR);
+      }
+      if (troop === 'rider') E(hx - 0.35, hy - 1.95, 0.5, 1.2, 4.7, COLR); // penacho del color del reino
       if (troop === 'crossbow') E(hx - 0.05, hy - 0.9, 2.3, 0.4, 4.7, ME); // ala del capacete
-      if (troop === 'archer' || robe) E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, troop === 'monk' ? vRamp([96, 66, 40]) : troop === 'mage' ? vRamp([50, 40, 110]) : robe ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
-      if (troop === 'mage') { E(hx - 0.2, hy - 1.7, 0.9, 1.3, 4.7, vRamp([50, 40, 110])); E(hx - 0.5, hy - 2.7, 0.4, 0.5, 4.75, vRamp([50, 40, 110])); } // sombrero en punta
-      if (troop === 'knight' && !back) E(hx - 1.15, 10.1 + yo, 1.45, 2.0, 3.6, (px, py) => (Math.abs(px - (hx - 1.15)) < 0.3 || Math.abs(py - (10.1 + yo)) < 0.3 ? ST : vRamp(col))); // escudo
+      if (troop === 'archer' || troop === 'cleric' || troop === 'mage') E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, troop === 'mage' ? vRamp([50, 40, 110]) : troop === 'cleric' ? KER : HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'mage') { // sombrero de ala con la copa en punta, doblada atrás
+        E(hx - 0.1, hy - 1.15, 2.5, 0.5, 4.75, vRamp([60, 48, 128]));
+        K(hx - 0.35, hy - 3.6, hy - 1.2, 0.25, 1.25, 4.8, (px, py) => (Math.abs(py - (hy - 1.55)) < 0.2 ? ST : vRamp([60, 48, 128])));
+        E(hx - 0.9, hy - 3.6, 0.45, 0.4, 4.85, vRamp([60, 48, 128]));
+      }
+      if (troop === 'monk') { E(hx - 0.05, hy - 0.95, 1.1, 0.62, 4.08, vRamp(sc(SKIN[skin], 1.12))); E(hx - 0.1, shY + 0.1, 1.95, 0.85, 3.55, vRamp([96, 64, 38])); } // tonsura y capucha caída
+      if (troop === 'archer') { // carcaj a la espalda con las plumas asomando sobre el hombro
+        Cp(hx - 1.7, shY - 0.6, hx - 1.0, waist - 0.6, 0.6, back ? 6 : 1.2, vRamp([108, 70, 40]));
+        for (let i = 0; i < 3; i++) E(hx - 1.85 + i * 0.35, shY - 1.1 - (i % 2) * 0.3, 0.22, 0.45, back ? 6.1 : 1.3, i === 1 ? RED : KER);
+      }
+      if (troop === 'crossbow') K(hx - 1.6, shY - 0.4, waist + 2.2, 1.55, 1.55, back ? 6 : 1.1, (px, py) => (Math.abs(px - (hx - 1.6)) < 0.35 ? COLR : Math.abs(py - (shY + 0.4)) < 0.2 || Math.abs(py - (waist + 1.6)) < 0.2 ? BO : WO)); // pavés
+      if (troop === 'knight' && !back) E(hx - 1.15, 10.1 + yo, 1.45, 2.0, 3.6, (px, py) => (Math.abs(px - (hx - 1.15)) < 0.3 || Math.abs(py - (10.1 + yo)) < 0.3 ? ST : COLR)); // escudo
+      if (troop === 'spear' && !back) E(hx - 1.75, 9.6 + yo, 1.85, 2.0, 3.6, (px, py) => { const dx = px - (hx - 1.75), dy = py - (9.6 + yo), r = Math.hypot(dx / 1.85, dy / 2.0); return r < 0.24 ? ME : r > 0.8 ? ME : (dx > 0) === (dy > 0) ? COLR : LIN; }); // escudo redondo cuartelado, con umbo y borde de hierro
+      if (troop === 'militia' && !back) E(hx - 1.2, 10.4 + yo, 1.05, 1.1, 3.6, (px, py) => (Math.hypot(px - (hx - 1.2), py - (10.4 + yo)) < 0.3 ? ME : WO)); // rodela de madera
+      if (HE) heroeEquipo();
+    }
+    function heroeEquipo() {
+      const NEG = vRamp([40, 32, 28]);
+      if (HE.corona) { E(hx - 0.05, hy - 1.2, 1.4, 0.42, 4.8, ST); for (const dx of [-0.9, 0, 0.9]) E(hx + dx, hy - 1.65, 0.24, 0.4, 4.82, ST); return; }
+      if (HE.capucha && troop !== 'hgua' && troop !== 'hcle') E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, vRamp(sc(HE.col, 0.7)), (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+      if (troop === 'hpal') {
+        E(hx - 1.4, shY + 0.4, 1.15, 0.95, 3.1, ME); E(hx + 1.6, shY + 0.4, 1.1, 0.9, 3.1, ME); // hombreras
+        if (HE.casco) { // yelmo abierto con cinta de oro y penacho rojo, como en el retrato
+          E(hx - 0.05, hy - 0.5, 1.62, 1.4, 4.65, (px, py) => (Math.abs(py - (hy - 0.3)) < 0.16 ? ST : ME), (px, py) => py < hy - 0.15 || (px < hx - 0.6 && py < hy + 1.2));
+          K(hx - 0.25, hy - 2.9, hy - 1.4, 0.3, 0.6, 4.75, RED);
+        } else E(hx - 0.05, hy - 0.8, 1.4, 0.28, 4.62, ST, (px, py) => py > hy - 1.0); // diadema
+      } else if (troop === 'hgua') {
+        K(7.0, shY, 15.6, 1.0, 1.9, 1, vRamp(sc(HE.col, 0.8))); // capa
+        E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, vRamp(HE.col), (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
+        Cp(hx - 1.7, shY - 0.6, hx - 1.0, waist - 0.6, 0.6, back ? 6 : 1.2, vRamp([90, 60, 36]));
+        for (let i = 0; i < 3; i++) E(hx - 1.85 + i * 0.35, shY - 1.1 - (i % 2) * 0.3, 0.22, 0.45, back ? 6.1 : 1.3, i === 1 ? RED : KER);
+      } else if (troop === 'hcle') {
+        E(hx - 0.15, hy - 0.1, 1.8, 2.0, 4.6, (px, py) => (Math.abs(py - (hy - 0.95)) < 0.16 ? ST : KER), (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75)); // velo con cinta de oro
+      } else if (troop === 'hing') {
+        E(hx + 0.2, shY - 0.05, 1.3, 0.55, 3.6, COLR); // pañuelo
+        if (!back) for (const dx of [0.1, 0.95]) E(hx + dx, hy - 0.95, 0.38, 0.32, 4.7, (px, py) => (Math.hypot(px - hx - dx, py - hy + 0.95) < 0.2 ? vRamp([110, 190, 220]) : vRamp([168, 124, 60]))); // gafas sobre la frente
+        else E(hx - 0.05, hy - 0.8, 1.45, 0.22, 4.7, vRamp([80, 54, 34])); // la correa
+      } else if (troop === 'hhec') {
+        const SOM = vRamp(HE.col), SOM2 = vRamp(sc(HE.col, 0.75));
+        E(hx - 0.1, hy - 1.15, 2.6, 0.5, 4.75, SOM2);
+        K(hx - 0.2, hy - 3.9, hy - 1.2, 0.2, 1.3, 4.8, (px, py) => (Math.abs(py - (hy - 1.55)) < 0.2 ? ST : Math.hypot(px - hx, py - hy + 2.6) < 0.25 ? vRamp([255, 236, 150]) : SOM));
+        E(hx - 0.55, hy - 3.95, 0.4, 0.35, 4.85, SOM);
+      } else if (troop === 'hjug') {
+        E(hx + 0.1, shY - 0.15, 1.6, 0.55, 3.6, (px) => (Math.floor(px * 3) % 2 ? KER : LIN)); // gorguera
+        E(hx + 0.1, hy - 0.95, 1.65, 0.8, 4.65, COLR, (px, py) => py < hy - 0.5); E(hx - 0.1, hy - 0.62, 1.7, 0.22, 4.66, ST); // gorro con cinta
+        Cp(hx - 0.7, hy - 1.3, hx - 2.3, hy - 3.3, 0.24, 4.7, KER); // pluma
+      } else if (troop === 'hcor') {
+        if (HE.tricornio) { E(hx - 0.05, hy - 1.05, 2.3, 0.5, 4.7, (px, py) => (Math.abs(py - (hy - 0.85)) < 0.14 ? ST : NEG)); E(hx - 0.1, hy - 1.55, 1.35, 0.75, 4.75, NEG); }
+        else { E(hx - 0.05, hy - 0.6, 1.58, 1.2, 4.65, RED, (px, py) => py < hy - 0.2); E(hx - 1.55, hy - 0.1, 0.4, 0.65, 4.66, RED); } // pañuelo con el nudo atrás
+      }
     }
     // brazo de adelante: herramienta, canasta o balanceo
     if (working && tip) {
@@ -2205,17 +2314,20 @@
       arm(9.9, 1, 5, hX, hY, 10.3, 8.9 + yo);
       const z = 6.5;
       if (troop === 'spear') { Cp(11.3, 0.9 + yo, 11.3, 18.0, 0.3, z, WO); E(11.3, 0.6 + yo, 0.5, 1.0, z + 0.1, ME); }
-      else if (troop === 'knight') { Cp(11.2, 10.0 + yo, 12.6, 3.6 + yo, 0.32, z, ME); Cp(10.3, 9.2 + yo, 12.0, 9.8 + yo, 0.24, z + 0.05, ST); }
-      else if (troop === 'archer') {
+      else if (troop === 'knight' || troop === 'hpal') { Cp(11.2, 10.0 + yo, 12.6, 3.6 + yo, 0.32, z, ME); Cp(10.3, 9.2 + yo, 12.0, 9.8 + yo, 0.24, z + 0.05, ST); }
+      else if (troop === 'archer' || troop === 'hgua') {
         let q = [11.6, 4.6 + yo];
         for (let i = 1; i <= 6; i++) { const a = (i / 6) * Math.PI, n = [11.6 + Math.sin(a) * 1.6, 4.6 + yo + (1 - Math.cos(a)) * 5.6]; Cp(q[0], q[1], n[0], n[1], 0.3, z, WO); q = n; }
         Cp(11.6, 4.6 + yo, 11.6, 15.8 + yo, 0.12, z - 0.1, LIN);
-      } else if (troop === 'rider') { Cp(10.6, 13.0 + yo, 13.4, 1.0 + yo, 0.3, z, WO); E(13.5, 0.7 + yo, 0.45, 0.9, z + 0.1, ME); } // la lanza, alta
+      } else if (troop === 'rider') { Cp(10.6, 13.0 + yo, 13.4, 1.0 + yo, 0.3, z, WO); E(13.5, 0.7 + yo, 0.45, 0.9, z + 0.1, ME); K(12.4, 1.8 + yo, 3.4 + yo, 0.9, 0.2, z - 0.1, COLR); } // la lanza, alta, con banderola
       else if (troop === 'crossbow') { Cp(10.2, 10.4 + yo, 13.6, 9.6 + yo, 0.34, z, WO); Cp(13.2, 7.6 + yo, 13.4, 11.6 + yo, 0.26, z + 0.05, ME); } // ballesta
       else if (troop === 'monk') { Cp(11.4, 2.6 + yo, 11.4, 18.2, 0.34, z, WO); } // bastón
-      else if (troop === 'mage') { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.3, z, BO); E(11.6, 1.3 + yo, 0.8, 0.8, z + 0.1, vRamp([170, 130, 255])); } // vara con su piedra
-      else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.4 + yo, 0.65, 0.65, z + 0.1, ST); }
-      else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, troop === 'catapult' ? 0.8 : 0.65, 0.7, z + 0.05, troop === 'catapult' ? ME : WO); } // garrote o martillo
+      else if (troop === 'mage' || troop === 'hhec') { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.3, z, BO); E(11.6, 1.3 + yo, 0.8, 0.8, z + 0.1, vRamp(troop === 'hhec' ? [140, 230, 255] : [170, 130, 255])); } // vara con su piedra
+      else if (troop === 'hing') { Cp(11.0, 10.8 + yo, 12.6, 6.4 + yo, 0.3, z, WO); Cp(12.0, 6.0 + yo, 13.4, 6.8 + yo, 0.5, z + 0.05, ME); } // martillo de herrera
+      else if (troop === 'hjug') { E(11.2, 11.6 + yo, 1.25, 1.4, z, (px, py) => (Math.hypot(px - 11.3, py - 11.4 - yo) < 0.35 ? BO : WO)); Cp(11.8, 10.5 + yo, 13.6, 6.6 + yo, 0.26, z + 0.05, BO); E(13.7, 6.3 + yo, 0.35, 0.5, z + 0.06, BO); } // laúd
+      else if (troop === 'hcor') { Cp(11.1, 10.0 + yo, 12.4, 6.6 + yo, 0.3, z, ME); Cp(12.4, 6.6 + yo, 12.4, 4.4 + yo, 0.26, z, ME); Cp(10.4, 9.6 + yo, 11.8, 10.2 + yo, 0.24, z + 0.05, ST); } // alfanje
+      else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.2 + yo, 0.95, 0.95, z + 0.1, (px, py) => (Math.hypot(px - 11.6, py - 1.2 - yo) < 0.45 ? vRamp([255, 236, 150]) : ST)); } // báculo con el sol
+      else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, 0.8, 0.85, z + 0.05, (px, py) => (U.hash(Math.round(px * 4), Math.round(py * 4), 3) > 0.8 ? ME : WO)); } // garrote con clavos
       E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, SK);
     } else arm(9.9, 1, 5, 10.1 - sw * 1.0, 11.6 + yo, 10.2 - sw * 0.45, 9.3 + yo);
 
@@ -2481,9 +2593,19 @@
     r(3, 15, 3, 2, M); r(2, 16, 2, 5, M); // cola
     return (MC[key] = { c, ax: flip ? W - 15 : 15, ay: 27, k: K, w: W, h: H });
   }
+  // pk-80: el héroe con la cara de su retrato (fig = PK.Heroes.figura(h)); la escala la pone quien dibuja.
+  S.heroe = (fig, mode, frame, flip, back, tool) => S.villager(fig.col, 0, 0, mode, frame, null, flip, tool || null, false, back, null, 'h', false, fig);
   S.troopIcon = function (type) {
     const key = 'troop_' + type;
     if (ICONS[key]) return ICONS[key];
+    if (S.maquina && S.esMaquina(type)) { // pk-80: la máquina misma, recortada a lo que tiene dibujo (no un soldado suelto)
+      const m = S.maquina(type, PK.D.PLAYER_COLOR, false, 0, false, false), mc = m.c, mx0 = mc.getContext('2d').getImageData(0, 0, mc.width, mc.height).data;
+      let x0 = mc.width, y0 = mc.height, x1 = 0, y1 = 0;
+      for (let y = 0; y < mc.height; y++) for (let x = 0; x < mc.width; x++) if (mx0[(y * mc.width + x) * 4 + 3] > 200) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const lado = Math.max(x1 - x0, y1 - y0) + 3, c2 = mk(lado, lado), ctx2 = c2.getContext('2d');
+      ctx2.drawImage(mc, x0, y0, x1 - x0 + 1, y1 - y0 + 1, Math.floor((lado - (x1 - x0)) / 2), lado - (y1 - y0) - 2, x1 - x0 + 1, y1 - y0 + 1);
+      return (ICONS[key] = c2.toDataURL());
+    }
     const spr = S.troop(type, PK.D.PLAYER_COLOR, 'idle', 0, false, false), c = mk(spr.c.width, spr.c.height), ctx = c.getContext('2d');
     ctx.drawImage(spr.c, 0, 0);
     return (ICONS[key] = c.toDataURL());

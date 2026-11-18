@@ -713,7 +713,7 @@
     else if (it.k === 'fort') { PK.UI.openFort(it.o.id); return; } // G6
     else if (it.k === 'ciud') { PK.UI.openCiudadela(); return; } // G7
     else if (it.k === 'belt') g.sel = { type: 'belt', id: W.idx(it.x, it.y) }; // pk-58: la casilla de la pieza
-    else if (it.k === 'puente') g.sel = { type: 'belt', id: it.o.k };
+    else if (it.k === 'puente') { if (it.o.ajena !== undefined) return; g.sel = { type: 'belt', id: it.o.k }; } // pk-80: el paso elevado de un vecino no se elige
     else if (it.k === 'wall') g.sel = { type: 'wall', id: it.o.k };
     PK.UI.refreshPanel(true);
   }

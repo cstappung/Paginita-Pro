@@ -118,7 +118,7 @@
   const faceOf = (dx, dy) => ({ flip: dx - dy < 0, back: dx + dy < 0 });
   function soldierItem(type, x, y, mode, frame, flip, back, tool, id, extra) {
     const [px, py] = PK.Render.iso(x, y);
-    const spr = type === 'catapult' || (D.ARMY[type] || {}).maquina ? Sp.cart(D.PLAYER_COLOR, type === 'catapult' ? 'stone' : 'wood', flip, frame % 4, mode === 'walk') : Sp.troop(type, Sp.colorDeTropa ? Sp.colorDeTropa(type) : D.PLAYER_COLOR, mode, frame, flip, back, tool, id);
+    const spr = Sp.esMaquina(type) ? Sp.maquina(type, D.PLAYER_COLOR, flip ? (back ? 4 : 2) : (back ? 6 : 0), frame % 4, mode === 'walk', mode === 'work') : Sp.troop(type, Sp.colorDeTropa ? Sp.colorDeTropa(type) : D.PLAYER_COLOR, mode, frame, flip, back, tool, id);
     return Object.assign({ d: x + y, k: 'troop', o: extra || {}, spr, x: px - spr.ax, y: py - spr.ay, px, py }, {});
   }
   function banner(it, flip) {
@@ -202,7 +202,8 @@
       const h = m.heroe && PK.Heroes ? PK.Heroes.de(m.heroe) : null;
       if (h) {
         const c = PK.Heroes.CLASES[h.clase], [x, y, dx, dy] = along(r, d0 + dir * 0.7), f = faceOf(dx * dir, dy * dir), [px, py] = PK.Render.iso(x, y);
-        const spr = Sp.villager(c.col, 1, 1, 'walk', Math.floor(now * 9) % 6, null, f.flip, null, false, f.back, null, c.look);
+        const fg = Sp.heroe && PK.Heroes.figura ? PK.Heroes.figura(h) : null; // pk-80: con la cara de su retrato
+        const spr = fg ? Sp.heroe(fg, 'walk', Math.floor(now * 9) % 6, f.flip, f.back, null) : Sp.villager(c.col, 1, 1, 'walk', Math.floor(now * 9) % 6, null, f.flip, null, false, f.back, null, c.look);
         items.push({ d: x + y, k: 'troop', o: { march: m, heroe: h.id }, spr, x: px - spr.ax, y: py - spr.ay, px, py, after: ctx => { ctx.fillStyle = '#ffd860'; ctx.font = 'bold 7px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillText('★', Math.round(px), Math.round(py - 26)); } });
       }
     }

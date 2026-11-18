@@ -48,7 +48,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `i18n.js` tag here. New `js/` files get the tag too and go into `index.html` in load order (no bundler).
 - **Tests:** `npm run test:juegos` (`colabtex/tests/prokingdoms.test.cjs`). After touching `server/sim.js`:
   `node tools/cheat-test.js`, plus the in-process tests of that area (`tools/saqueo-test.js`, `diplo-test.js`,
-  `mundo-test.js`, `regata-test.js`). Before a big merge: the Playwright pass over every window at 390×844,
+  `mundo-test.js`, `regata-test.js`, `cintas-test.js`). Before a big merge: the Playwright pass over every window at 390×844,
   915×412 and 1280×800, and a `?timelapse` run with an invariant watcher (no NaN, no negatives).
 - **Balance changes:** run the autopilot before and after (`?dev&piloto[=N]` or `?timelapse`, `pkPiloto.resumen()`).
   Pace target (`pk-34`): Era II ~10 min, IV ~2 h, V 4–6 h. The pilot must learn any new mechanic first, and its
@@ -206,7 +206,7 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Vehicles** (`js/vehiculos.js`, `pk-46`): cart, carromato and barge are small 3D models (boxes, ellipsoids,
   cylinders, wheels) rasterized to pixel art in 8 directions (z-buffer, 4 face tones, dark outline), cached per
   colour/cargo/direction/frame (~4 ms each the first time). `S.cart(col, carga, dir, cuadro, anda)`: `dir` 0..7 (45°
-  steps in tile space, 0 = +x) or the old `flip` boolean (catapult, caravans). Direction comes from movement with
+  steps in tile space, 0 = +x) or the old `flip` boolean (caravans). Direction comes from movement with
   hysteresis (`Sp.rumboDe(u)`, drawing only). Animals move tail and ears while parked (render passes a slow frame).
 - **Portraits** (`js/retratos.js`, `pk-50`): 36×36 drawn from the seed (face shape, skin, eyes, brows, nose, mouth,
   age, 11 hair styles, beards, freckles, scar, earring); the class sets clothes, headgear and background, the hero's
@@ -688,8 +688,8 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   (`[x, y, defensa, radio]`, 9 for towers, `D.FUERTE_RADIO` for the fort; full inside, half up to twice). It is in
   `Soc.defense`, `T.defenseParts`, and the server's `towerDefense` (so `defMax`) and `parcelDefense`: a new
   defensive building must be added to all four.
-- **Siege machines** have `maquina: true` in `D.ARMY`: drawn as a cart wherever the catapult is
-  (`frente.js`, `batalla.js`, `troops.js`), with weak stats in `batalla.js` `TROPA` (a test requires an entry per
+- **Siege machines** have `maquina: true` in `D.ARMY`: drawn with `Sp.maquina` wherever the catapult is
+  (`frente.js`, `batalla.js`, `troops.js`; see pk-80 below), with weak stats in `batalla.js` `TROPA` (a test requires an entry per
   troop). The ram is ×3 in the defences stage only if the parcel has walls (`asedioOficio(units, muros)`); a siege
   tower in the host takes 5 points off the losses (`plan.torre`).
 - Not measured: the pace with the autopilot before/after (the plan asks comarcas to move it under 5 %).
@@ -831,3 +831,30 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `st.calzada.dia.n`; online the client copies `r.hoy`). The daily cap now limits net growth, not tiles placed.
 - Needs `firebase deploy --only functions` like pk-78.
 
+
+### Owner's requests: skins and shared belts (`pk-80`)
+
+- **Siege machines are not carts** (they were drawn with `S.cart`, a donkey cart with stones or logs, and players
+  reported «tropas que se ven como carretas»). `S.maquina(tipo, col, dir, cuadro, anda, ataca)` in `vehiculos.js`:
+  catapult, covered ram, siege tower, same rasterizer as the vehicles; `ataca` animates the trade (arm, swinging
+  beam, drawbridge). With the old `flip` boolean they are drawn three-quarter (rumbo 0/2): side-on they were a flat
+  box. `Sp.esMaquina(t)` is the one test; `troopIcon` crops the machine for the Cuartel. New machines go there.
+- **Each troop has its own gear** (`S.villager` troop block, `torsoM`): militia jerkin with the realm's sash and a
+  buckler, spear quartered round shield, archer quiver, knight closed helm and surcoat, cleric stole, crossbow pavise,
+  monk tonsure, mage brimmed hat and grey beard. Keep the realm colour visible on every troop (`COLR`).
+- **Heroes look like their portrait**: `PK.Retratos.rasgos(h, cl)` draws the portrait once and returns what its face
+  picked (`R.ultimo`; the corsair's hat is a roll made while drawing, now kept as `f.tricornio` without changing any
+  portrait). `H.figura(h)` (cached, aspect colour included) → `Sp.heroe(fig, …)` = `S.villager` with a `hero`
+  argument and the looks `hpal hgua hcle hing hhec hjug hcor`. `H.armaDe(h)` is the attack tool. Battle figures carry
+  `heroeId`; used in `batalla.js`, `troops.js` (march) and `armada.js` (sea boat).
+- **Neighbours see your belts and skins** (server, both need `firebase deploy --only functions`; no `D.PROTO` bump,
+  old clients and an old server ignore the new fields). `snap.cintas = {v, t: [[k, p, d, n, x]]}` (`Ci.foto`) and
+  `snap.cf = {v, s}` (what runs on each piece, one base-36 char, from `pz.ur`/`pz.pm`) and `snap.asp = {v, b, o, c}`
+  (`fotoAsp` in `net.js`: aspect per building type, per building `'x,y'`, banner colour). Each travels only when its
+  version changes; viewers send `ck`/`av` maps. The server (`cleanCintas`, `cleanAsp`) keeps pieces inside the
+  owner's parcels, stores the kept indices (`i`) to realign `cf`, accepts only aspect ids that exist, and sends `cf`
+  **only while the owner is online**. Remote belts are drawing only (`Ci.ponerAjenas`, `dibujarAjenas`): they never
+  touch `W.belt`; with the owner offline they stay still and empty (owner's answer: visual only, the offline belt
+  flow of your own economy did not change). Remote aspects: `Sp.aspectosAjenos(owner, a)`, `S.aspectoDe` now answers
+  remote owners, banners use `S.colorBanderas(owner)`; per-building ones are set on remote `b.asp` (`ponerAspO`).
+  Aspect ownership is not verified (cosmetic, client-only state).
