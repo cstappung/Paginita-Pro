@@ -662,7 +662,7 @@
 
   // ---------- Maestros de obras y mejoras ----------
   G.builders = () => 1 + G.countB('builder') + G.maestroMar() + G.maestrosComprados();
-  // pk-80: los Maestros de Obras comprados con monedas del reino. Se compran en tu reino (la tierra) y valen también en
+  // pk-81: los Maestros de Obras comprados con monedas del reino. Se compran en tu reino (la tierra) y valen también en
   // el archipiélago, como el Maestro del puerto.
   const tierraSt = () => (G.enMar() ? S.otro : S);
   G.maestrosComprados = () => { const t = tierraSt(); return Math.min(D.MAESTRO_EXTRA.length, (t && t.flags && t.flags.maestrosExtra) || 0); };

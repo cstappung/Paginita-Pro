@@ -236,11 +236,12 @@
     return spr;
   };
   // polvo detrás de las ruedas al andar (en el piso, atrás según el rumbo)
-  function polvo(L, aAtras, f) {
+  function polvo(L, aAtras, f, ox, oy) {
+    ox = ox === undefined ? 30 : ox; oy = oy === undefined ? 32 : oy;
     return pb => {
       for (let i = 0; i < 5; i++) {
         const a = (aAtras - i * 1.3 - (f % 2)) * L.k, b = (i % 2 ? 2 : -2) * L.k, wx = a * L.ca - b * L.sa, wy = a * L.sa + b * L.ca;
-        pb.set(Math.round(30 + wx - wy), Math.round(32 + (wx + wy) / 2), [196, 176, 136], 120 - i * 20);
+        pb.set(Math.round(ox + wx - wy), Math.round(oy + (wx + wy) / 2), [196, 176, 136], 120 - i * 20);
       }
     };
   }
@@ -488,6 +489,134 @@
     COLC.set(key, spr);
     return spr;
   };
+
+  // ---------- Máquinas de asedio: catapulta, ariete y torre de asedio (pk-80) ----------
+  // Antes las tres se dibujaban con S.cart (la carreta de carga con su burro, piedras o troncos) y los jugadores las
+  // reportaban como «tropas que se ven como carretas». Cada una tiene ahora su modelo, con el color del reino en el
+  // banderín. `ataca` anima el oficio: la catapulta suelta el brazo (cuadros 0..3: cargada, sube, golpea el travesaño,
+  // vuelve), el ariete mece la viga y la torre baja el puente. Firma: S.maquina(tipo, col, dir, cuadro, anda, ataca).
+  // palo: cilindro entre dos puntos cualesquiera (brazos, riostras, cuerdas)
+  function palo(L, a0, b0, z0, a1, b1, z1, r, c) {
+    const va = a1 - a0, vb = b1 - b0, vz = z1 - z0, lg = Math.hypot(va, vb, vz) || 1, u = [va / lg, vb / lg, vz / lg];
+    const t0 = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    let p = [u[1] * t0[2] - u[2] * t0[1], u[2] * t0[0] - u[0] * t0[2], u[0] * t0[1] - u[1] * t0[0]];
+    const pl = Math.hypot(...p); p = p.map(v => v / pl);
+    const q = [u[1] * p[2] - u[2] * p[1], u[2] * p[0] - u[0] * p[2], u[0] * p[1] - u[1] * p[0]];
+    const n = Math.max(6, Math.ceil((2 * Math.PI * r) / L.paso));
+    for (let s = 0; s <= lg; s += L.paso) for (let i = 0; i < n; i++) {
+      const t = (i / n) * Math.PI * 2, ct = Math.cos(t), st = Math.sin(t);
+      const na = p[0] * ct + q[0] * st, nb = p[1] * ct + q[1] * st, nz = p[2] * ct + q[2] * st;
+      L.p(a0 + u[0] * s + na * r, b0 + u[1] * s + nb * r, z0 + u[2] * s + nz * r, na, nb, nz, c);
+    }
+  }
+  // caja con color por punto: f(a, b, z, cara) — tablas, franjas, troneras
+  function cajaP(L, a0, a1, b0, b1, z0, z1, f, sinArriba) {
+    const s = L.paso;
+    if (!sinArriba) for (let a = a0; a <= a1 + 1e-6; a += s) for (let b = b0; b <= b1 + 1e-6; b += s) L.p(a, b, z1, 0, 0, 1, f(a, b, z1, 'z'));
+    for (let a = a0; a <= a1 + 1e-6; a += s) for (let z = z0; z <= z1 + 1e-6; z += s) { L.p(a, b1, z, 0, 1, 0, f(a, b1, z, 'b')); L.p(a, b0, z, 0, -1, 0, f(a, b0, z, 'b')); }
+    for (let b = b0; b <= b1 + 1e-6; b += s) for (let z = z0; z <= z1 + 1e-6; z += s) { L.p(a1, b, z, 1, 0, 0, f(a1, b, z, 'a')); L.p(a0, b, z, -1, 0, 0, f(a0, b, z, 'a')); }
+  }
+  const HIERRO = [96, 100, 110], HIERRO_L = [150, 156, 168], CUERO = [150, 104, 64], CUERO_D = [112, 74, 44];
+  function banderin(L, a, b, z0, alto, col, f, anda) {
+    cilZ(L, a, b, z0, z0 + alto, 0.35, [70, 46, 26]);
+    const ondea = anda ? Math.sin((f / 4) * Math.PI * 2) : Math.sin((f / 4) * Math.PI);
+    for (let i = 0; i < 10; i++) for (let j = 0; j < 5; j++) L.p(a - 0.3 - i * 0.5, b + Math.sin(i * 0.7 + f) * 0.35 * (1 + ondea * 0.5), z0 + alto - 3.6 + j * 0.75 - i * 0.1, 0, 1, 0, j === 4 ? sc(col, 1.15) : i > 7 ? sc(col, 0.85) : col, true);
+  }
+  function catapulta(L, col, f, anda, ataca) {
+    sombraElip(L, -1, 0, 12, 7);
+    const fase = anda ? (f / 4) * (Math.PI / 3) : 0;
+    // bastidor bajo con cuatro ruedas
+    for (const s of [-1, 1]) caja(L, -10, 9, s * 4.2 - 0.7, s * 4.2 + 0.7, 3.2, 4.8, MADERA, MADERA_L);
+    for (const a of [-9, -2.5, 8]) caja(L, a - 0.7, a + 0.7, -4.2, 4.2, 3.4, 4.6, MADERA_D, MADERA);
+    for (const a of [-6.5, 6.5]) for (const s of [-1, 1]) rueda(L, a, s * 5.6, 3, 3, 0.9, fase, 6);
+    // los dos parantes con su riostra y el travesaño acolchado donde pega el brazo
+    for (const s of [-1, 1]) {
+      caja(L, -0.2, 1.2, s * 3.9 - 0.6, s * 3.9 + 0.6, 4.8, 13.5, MADERA, MADERA_L);
+      palo(L, 6.5, s * 3.9, 4.8, 0.8, s * 3.9, 11.5, 0.45, MADERA_D);
+    }
+    caja(L, -0.4, 1.4, -4.4, 4.4, 12.6, 13.9, MADERA_D, MADERA);
+    caja(L, -1.1, -0.3, -2.4, 2.4, 12.2, 14.2, CUERO, sc(CUERO, 1.15)); // cojín de cuero
+    // el haz de cuerdas torcidas que mueve el brazo
+    for (let b = -3.4; b <= 3.4; b += L.paso) for (let t = 0; t < Math.PI * 2; t += 0.18) L.p(-4 + Math.cos(t) * 1.4, b, 5.6 + Math.sin(t) * 1.4, Math.cos(t), 0, Math.sin(t), Math.round(b * 2 + t * 2) % 3 ? CUERDA : sc(CUERDA, 0.78));
+    // el brazo: echado hacia atrás con la piedra en la cuchara; al atacar sube hasta el travesaño
+    const ang = ataca ? [0.22, 0.95, 1.5, 0.7][f] : 0.22, piedra = !ataca || f < 2, largo = 11;
+    const ea = -4 - Math.cos(ang) * largo, ez = 5.6 + Math.sin(ang) * largo;
+    palo(L, -4, 0, 5.6, ea, 0, ez, 0.6, MADERA_D);
+    for (const s of [-1, 1]) palo(L, -4, s * 0.6, 5.6, -4 - Math.cos(ang) * 4, s * 0.6, 5.6 + Math.sin(ang) * 4, 0.3, HIERRO); // flejes
+    elip(L, ea - Math.sin(ang) * 0.6, 0, ez + Math.cos(ang) * 0.6, 1.7, 1.7, 0.9, MADERA, (a, b, z) => (z > ez + Math.cos(ang) * 0.6 + 0.3 ? MADERA_D : null)); // la cuchara
+    if (piedra) elip(L, ea - Math.sin(ang) * 1.2, 0, ez + Math.cos(ang) * 1.3, 1.25, 1.25, 1.15, [132, 128, 120], (a, b, z) => (U.hash(Math.round(a * 3), Math.round(b * 3), Math.round(z * 3)) > 0.75 ? [100, 96, 90] : null));
+    else if (f === 2) elip(L, 3, 0, 18, 1.2, 1.2, 1.1, [132, 128, 120]); // la piedra sale volando
+    // dos piedras de repuesto y el banderín del reino
+    elip(L, 5, -1.6, 5.9, 1.1, 1.1, 1, [120, 116, 108]); elip(L, 5.6, 1.2, 5.8, 1, 1, 0.9, [140, 136, 126]);
+    banderin(L, 8.4, 4.2, 4.8, 12, col, f, anda);
+  }
+  function ariete(L, col, f, anda, ataca) {
+    sombraElip(L, 0, 0, 13, 8);
+    const fase = anda ? (f / 4) * (Math.PI / 3) : 0;
+    for (const s of [-1, 1]) caja(L, -10, 10, s * 5.2 - 0.7, s * 5.2 + 0.7, 3, 4.6, MADERA_D, MADERA);
+    for (const a of [-9.5, 9.5]) caja(L, a - 0.6, a + 0.6, -5.2, 5.2, 3.2, 4.4, MADERA_D);
+    for (const a of [-6.8, 6.8]) for (const s of [-1, 1]) rueda(L, a, s * 6.3, 3.2, 3.2, 1, fase, 6);
+    // la viga con cabeza de hierro, colgada de cadenas: se mece hacia adelante al golpear
+    const em = ataca ? [0, 2.6, 4.4, 1.4][f] : anda ? Math.sin((f / 4) * Math.PI * 2) * 0.5 : 0, zv = 7.2;
+    cilA(L, -9 + em, 11 + em, 0, zv, 1.5, [132, 92, 52], [196, 150, 96]);
+    for (const a of [-5 + em, 4 + em]) for (let t = 0; t < Math.PI * 2; t += 0.15) L.p(a, Math.cos(t) * 1.65, zv + Math.sin(t) * 1.65, 0, Math.cos(t), Math.sin(t), HIERRO); // zunchos
+    for (let a = 11 + em; a <= 14.5 + em; a += L.paso) { const r = 1.8 - (a - 11 - em) * 0.22; for (let t = 0; t < Math.PI * 2; t += 0.15) L.p(a, Math.cos(t) * r, zv + Math.sin(t) * r, 0.4, Math.cos(t), Math.sin(t), (a - em) > 13.6 ? HIERRO_L : HIERRO); }
+    for (const a of [-4, 5]) palo(L, a, 0, 15, a + em * 0.6, 0, zv + 1.5, 0.3, [70, 66, 62]);
+    // cuatro postes y el techo a dos aguas cubierto de cueros cosidos (lo protege de las flechas)
+    for (const a of [-9.2, 9.2]) for (const s of [-1, 1]) caja(L, a - 0.6, a + 0.6, s * 5.2 - 0.6, s * 5.2 + 0.6, 4.6, 9, MADERA, MADERA_L);
+    for (let a = -10.5; a <= 10.5; a += L.paso) for (let b = 0; b <= 6.8; b += L.paso) {
+      const z = 15.2 - b * 1.0, parche = U.hash(Math.floor((a + 11) / 3.4), Math.floor(b / 2.4), 9), costura = Math.abs(((a + 11) % 3.4) - 1.7) > 1.55;
+      const c = costura ? CUERO_D : parche > 0.66 ? sc(CUERO, 1.12) : parche < 0.22 ? CUERO_D : CUERO;
+      for (const s of [-1, 1]) L.p(a, s * b, z, 0, s * 0.7, 0.7, c);
+    }
+    for (let a = -10.5; a <= 10.5; a += L.paso) for (let t = 0; t < Math.PI; t += 0.25) L.p(a, Math.cos(t) * 0.5, 15.3 + Math.sin(t) * 0.5, 0, Math.cos(t), Math.sin(t), sc(col, a % 4 < 2 ? 1 : 0.85)); // cumbrera del color del reino
+    // frontón de tablas atrás (adelante queda abierto para la viga)
+    for (let b = -6.8; b <= 6.8; b += L.paso) for (let z = 8.4; z <= 15.2 - Math.abs(b); z += L.paso) L.p(-10.5, b, z, -1, 0, 0, Math.round(b) % 2 ? MADERA : MADERA_D);
+    banderin(L, -9.8, 0, 15.2, 8, col, f, anda);
+  }
+  function torreAsedio(L, col, f, anda, ataca) {
+    sombraElip(L, 0, 0, 10, 10);
+    const fase = anda ? (f / 4) * (Math.PI / 3) : 0, W = 6, Z0 = 3.4, Z1 = 38;
+    for (const a of [-4.5, 4.5]) for (const s of [-1, 1]) rueda(L, a, s * (W + 0.7), 3, 3, 1, fase, 6);
+    // el cuerpo: tablas verticales, vigas cada piso, troneras, y cueros mojados abajo adelante
+    const pisos = [Z0, 13.5, 24, Z1];
+    cajaP(L, -W, W, -W, W, Z0, Z1, (a, b, z, cara) => {
+      if (cara === 'z') return MADERA_D;
+      const u = cara === 'a' ? b : a, viga = pisos.some(p => Math.abs(z - p) < 0.7);
+      if (viga) return MADERA_D;
+      const tronera = Math.abs(u) < 0.6 && pisos.some((p, i) => i && z < p - 2.5 && z > p - 6.5);
+      if (tronera) return [34, 24, 18];
+      if (cara === 'a' && a > 0 && z < 13.5) return Math.abs((u + 7) % 3 - 1.5) > 1.35 ? CUERO_D : CUERO;
+      return Math.round(u * 0.8) % 2 ? MADERA : sc(MADERA, 0.88);
+    });
+    // almenas de arriba
+    for (let i = -W; i <= W - 1.5; i += 3) for (const [a0, a1, b0, b1] of [[i, i + 1.6, W - 1.2, W], [i, i + 1.6, -W, -W + 1.2], [W - 1.2, W, i, i + 1.6], [-W, -W + 1.2, i, i + 1.6]]) caja(L, a0, a1, b0, b1, Z1, Z1 + 2.4, MADERA, MADERA_L);
+    // el puente levadizo del último piso: cerrado contra la torre o bajado hacia adelante al atacar
+    const zP = 25;
+    if (ataca && f >= 1) {
+      const ang = f === 1 ? 0.8 : 0, lg = 9;
+      for (let s = 0; s <= lg; s += L.paso) for (let b = -3.4; b <= 3.4; b += L.paso) L.p(W + Math.cos(ang) * s, b, zP + Math.sin(ang) * s, -Math.sin(ang), 0, Math.cos(ang), Math.round(s * 0.9) % 2 ? MADERA_L : MADERA);
+      for (const s2 of [-1, 1]) palo(L, W, s2 * 3.2, Z1 - 1, W + Math.cos(ang) * lg, s2 * 3.2, zP + Math.sin(ang) * lg, 0.18, [70, 66, 62]);
+    } else {
+      cajaP(L, W, W + 0.8, -3.6, 3.6, zP, zP + 10, (a, b, z) => (Math.abs(z - zP - 5) < 0.5 ? HIERRO : Math.round(b * 0.9) % 2 ? MADERA_L : MADERA));
+      for (const s2 of [-1, 1]) palo(L, W + 0.8, s2 * 3.2, zP + 9.6, W, s2 * 3.2, Z1 - 0.5, 0.18, [70, 66, 62]);
+    }
+    banderin(L, -W + 0.8, W - 0.8, Z1, 10, col, f, anda);
+    // franja del reino en el piso de abajo
+    for (let b = -W; b <= W; b += L.paso) for (let z = 9; z <= 10.4; z += L.paso) L.p(W + 0.05, b, z, 1, 0, 0, col);
+  }
+  const MQ = new Map(), MQ_TAM = { catapult: [56, 46, 28, 32, 0.9], ariete: [56, 46, 28, 32, 0.8], torreAsedio: [50, 64, 25, 50, 0.7] };
+  // con el «flip» viejo (batalla, frente) se ven de tres cuartos (rumbo 0 o 2): de perfil puro eran una caja plana
+  S.maquina = function (tipo, col, dir, frame, anda, ataca) {
+    const d = typeof dir === 'number' ? rumbo(dir) : dir ? 2 : 0, f = frame % 4, key = tipo + '|' + col.join(',') + '|' + d + '|' + f + '|' + (anda ? 1 : 0) + (ataca ? 1 : 0);
+    if (MQ.has(key)) return MQ.get(key);
+    const [w, h, ox, oy, k] = MQ_TAM[tipo] || MQ_TAM.catapult, L = Lienzo(w, h, ox, oy, (d * Math.PI) / 4, k);
+    (tipo === 'ariete' ? ariete : tipo === 'torreAsedio' ? torreAsedio : catapulta)(L, col, f, anda, ataca);
+    const spr = volcar(L, ox, oy, anda ? polvo(L, -11, f, ox, oy) : null);
+    MQ.set(key, spr);
+    return spr;
+  };
+  S.esMaquina = tipo => tipo === 'catapult' || !!((PK.D.ARMY[tipo] || {}).maquina);
 
   // ---------- Hacia dónde mira cada vehículo (solo dibujo) ----------
   // Del movimiento entre cuadros, con histéresis: no cambia de dirección por un temblor de la ruta.

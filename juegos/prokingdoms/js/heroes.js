@@ -405,6 +405,23 @@
     // pk-50: el dibujo vive en retratos.js (36x36, con muchas más caras posibles)
     return (RET[key] = PK.Retratos.canvas(h, cl, ao).toDataURL());
   };
+  // pk-80: la figura del héroe (mapa, batalla, armada) con la cara de su retrato: piel, pelo, peinado, barba y lo que
+  // lleva en la cabeza salen de PK.Retratos.rasgos; el color, de la clase (o del aspecto del Pase). Sp.heroe la dibuja.
+  const FIG = {};
+  H.figura = function (h) {
+    if (!h) return null;
+    const asp = h.aspecto && D.aspecto ? D.aspecto(h.aspecto) : null, ao = asp && asp.o && asp.o.clase === h.clase ? asp : null;
+    if (!h.rasgos && D.PERSONAJES) { const P = Object.values(D.PERSONAJES).find(o => o.semilla === h.semilla && o.clase === h.clase && o.rasgos); if (P) h = Object.assign({}, h, { rasgos: P.rasgos }); }
+    const key = h.clase + ':' + h.semilla + ':' + (h.mujer ? 1 : 0) + ':' + (h.rasgo || '') + (h.rasgos ? ':' + JSON.stringify(h.rasgos) : '') + (ao ? ':' + h.aspecto : '');
+    if (FIG[key]) return FIG[key];
+    const cl0 = H.CLASES[h.clase] || H.CLASES.juglar, col = ao ? (ao.tipo === 'heroe2' ? ao.o.col.map(v => 255 - v * 0.6) : ao.o.col) : cl0.col;
+    const f = PK.Retratos && PK.Retratos.rasgos ? PK.Retratos.rasgos(h, Object.assign({}, cl0, { col })) : null;
+    const r = f || { mujer: !!h.mujer, piel: [214, 164, 120], pelo: [74, 46, 28], peinado: h.mujer ? 'largo' : 'corto', barba: '', casco: true, sombrero: true };
+    return (FIG[key] = { k: key, clase: h.clase, col: col.map(Math.round), mujer: !!r.mujer, piel: r.piel, pelo: r.pelo, peinado: r.peinado, barba: r.barba || '',
+      casco: r.casco !== false, capucha: !!r.capucha, corona: !!r.corona, tricornio: !!r.tricornio, gafas: !!r.gafas, parche: !!r.parche, edad: r.edad });
+  };
+  // el arma con la que pega en la batalla en vivo (null: el arco o la vara, en su pose)
+  H.armaDe = h => ({ paladin: 'sword', guarda: null, clerigo: 'hammer', ingeniera: 'hammer', hechicero: null, juglar: 'sword', corsaria: 'sword' })[h && h.clase] || null;
   H.retratoEl = (h, cls) => el('img', { class: 'h-ret ' + (cls || ''), src: H.retrato(h), alt: '' });
   // pk-50: el mismo retrato con los ojos cerrados (quien habla parpadea: H.parpadear)
   H.retratoCerrado = function (h) {

@@ -372,12 +372,12 @@
           const dest = itemsDe(o.c), lim = dest.length ? dest[dest.length - 1][1] - JUNTOS : Infinity;
           dest.push(it0[3] ? [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant, 1] : [r, Math.min(Math.max(0, itemsDe(c)[0][1] - c.len), lim), cant]);
           o.c.lib = credito(o.c) + cada(o.c);
-          c.pz.flujo = (c.pz.flujo || 0) + cant;
+          c.pz.flujo = (c.pz.flujo || 0) + cant; c.pz.ur = r; // ur: lo último que pasó (los vecinos lo ven correr, pk-80)
           if (o.c.pz.p === 'u') o.c.turno = (o.c.ent.findIndex(e => e.c === c) + 1) % Math.max(1, o.c.ent.length);
         } else {
           const e = entregar(o.b, r, cant, !!it0[3]);
           if (e === 'no') { noUsa = noUsa || o.b; continue; }
-          if (e > 0) c.pz.flujo = (c.pz.flujo || 0) + e;
+          if (e > 0) { c.pz.flujo = (c.pz.flujo || 0) + e; c.pz.ur = r; }
           if (e < cant) { it0[2] = cant - e; lleno = lleno || o.b; continue; } // lo que no entró espera en la punta (o prueba la otra salida)
         }
         c.rr = (ini + i + 1) % n; c.motivo = null; c.atasco = false;
@@ -991,6 +991,7 @@
   };
   Ci.dibujar = function (ctx, vis, R, Sp) {
     const st = S();
+    if (Object.keys(AJ).length) dibujarAjenas(ctx, vis, R, Sp);
     if (!st || !st.logi || !st.logi.red) return;
     rearmarSiHace();
     if (dibArmado !== armado) armarDib(R, Sp);
@@ -1021,8 +1022,11 @@
         bufX[nI] = Math.round(px); bufY[nI] = Math.round(py - (alto ? Math.max(0, 1 - q * 2) * D.CINTA.alto : 0)); bufR[nI] = it[i][0]; nI++;
       }
     }
-    // todos los ítems en dos pasadas (el fondo oscuro y un trazo por recurso): con miles de ítems, dos fillRect y dos
-    // fillStyle por ítem eran casi la mitad del dibujo de la red
+    pintarItems(ctx, Sp, nI);
+  };
+  // todos los ítems en dos pasadas (el fondo oscuro y un trazo por recurso): con miles de ítems, dos fillRect y dos
+  // fillStyle por ítem eran casi la mitad del dibujo de la red
+  function pintarItems(ctx, Sp, nI) {
     if (!nI) return;
     ctx.fillStyle = 'rgba(20,14,10,0.9)'; ctx.beginPath();
     for (let i = 0; i < nI; i++) ctx.rect(bufX[i] - 3, bufY[i] - 5, 6, 5);
@@ -1035,7 +1039,7 @@
       ctx.fill();
     }
     bufR.length = 0;
-  };
+  }
   let bufX = new Float32Array(256), bufY = new Float32Array(256);
   const bufR = [];
   // «Ver flujo» (C2): gris vacía, verde corre con lugar, amarillo a tope (llena porque adelante se llevan menos, o casi al
@@ -1062,6 +1066,7 @@
   // El tablero de los pasos elevados, como ítems ordenados por profundidad (con lo que viaja arriba).
   Ci.elevados = function (R, Sp, seen) {
     const st = S(), out = [];
+    elevadosAjenos(R, Sp, seen, out);
     if (!st || !st.logi || !st.logi.red) return out;
     rearmarSiHace();
     for (const c of carriles) {
@@ -1084,6 +1089,95 @@
     }
     return out;
   };
+  // ---------- Cintas de los vecinos (pk-80, pedido del dueño: «que las cintas las pueda ver todo el mundo») ----------
+  // Ci.foto() arma lo que va al servidor: cada pieza [k, p, d, n, x] (x: la entrada de una cinta, las bandas de un nodo
+  // o el largo de un paso elevado) y aparte lo que corre por cada una (`cf`, un carácter por pieza: el recurso en base
+  // 36 o '.'). Las dos con versión: solo viajan cuando cambian. El servidor las recorta a las parcelas del dueño
+  // (sim.js cleanCintas). Lo ajeno solo se dibuja: no ocupa W.belt ni frena nada, y sus paquetes corren solo mientras
+  // el dueño está conectado (con él fuera, la cinta queda quieta y vacía).
+  const PZ_OK = { c: 1, k: 1, e: 1, x: 1, u: 1, v: 1, s: 1 };
+  Ci.foto = function () {
+    const st = S();
+    if (!st || !st.logi || !st.logi.red) return null;
+    rearmarSiHace();
+    const t = red().t, out = [];
+    let cf = '';
+    for (const ks in t) {
+      const k = +ks, pz = t[ks], cs = porK.get(k) || [];
+      let x = 0;
+      if (pz.p === 'e') x = pz.lp || 2;
+      else if (NODO[pz.p]) { const c = cs[0]; x = 1 << pz.d; if (c) { for (const o of c.outs) x |= 1 << o.d; for (const e of c.ent) x |= 1 << OPP(e.d); if (c.src) x |= 1 << OPP(c.inD); } }
+      else if (pz.p === 'c') { const c = cs[0]; x = c && c.inD !== undefined ? c.inD : pz.d; }
+      out.push([k, pz.p, pz.d, pz.n, x]);
+      const ri = pz.ur ? D.RES_ORDER.indexOf(pz.ur) : -1;
+      cf += (pz.pm || 0) > 0 && ri >= 0 && ri < 36 ? ri.toString(36) : '.';
+      if (out.length >= 2500) break;
+    }
+    return { v: String(U.strHash(JSON.stringify(out))), t: out, cf, cfv: String(U.strHash(cf)) };
+  };
+  const AJ = {}; // slot → { v, piezas: [{k, x, y, p, d, n, xx, px, py, spr}], cf, online }
+  Ci.ajenas = AJ;
+  Ci.ponerAjenas = function (slot, data, info) {
+    const a = AJ[slot] || (AJ[slot] = { v: '', piezas: [], cf: '', online: false });
+    if (info) { if (info.online !== undefined) a.online = !!info.online; if (info.cf !== undefined) a.cf = String(info.cf || ''); }
+    if (!data) return;
+    a.v = info && info.v || ''; a.piezas = [];
+    for (const r of Array.isArray(data) ? data : []) {
+      const [k, p, d, n, xx] = r;
+      if (!(k >= 0 && k < W.W * W.H) || !PZ_OK[p]) continue;
+      const [x, y] = xyOf(k);
+      a.piezas.push({ k, x, y, p, d: d & 3, n: U.clamp(n | 0, 1, 5), xx: xx | 0, spr: [null, null, null, null] });
+    }
+  };
+  Ci.quitarAjenas = slot => { delete AJ[slot]; };
+  function sprAjena(pz, f, Sp) {
+    if (pz.p === 'k') return Sp.beltCruce(pz.d % 2, f, pz.n);
+    if (NODO[pz.p]) return Sp.beltNodo(pz.p, pz.xx || 1 << pz.d, pz.d, f, pz.n);
+    if (pz.p === 'e' || pz.p === 'x') return Sp.beltRampa(Ci.NOM_DIR[pz.d], pz.p === 'e', f, pz.n);
+    return Sp.belt(Ci.NOM_DIR[OPP(pz.xx & 3)], Ci.NOM_DIR[pz.d], f, pz.n);
+  }
+  function dibujarAjenas(ctx, vis, R, Sp) {
+    const ahora = performance.now(), fase = Math.floor(ahora / 110) % 4, off = W.H * 16;
+    let nI = 0;
+    for (const slot in AJ) {
+      const a = AJ[slot], mueve = a.online;
+      a.piezas.forEach((pz, i) => {
+        if (!W.fog[pz.k]) return;
+        if (pz.px === undefined) { const q = R.iso(pz.x, pz.y); pz.px = q[0]; pz.py = q[1]; }
+        if (!vis(pz.px - 16, pz.py - 8, 32, 26)) return;
+        const f = mueve ? fase : 0, spr = pz.spr[f] || (pz.spr[f] = sprAjena(pz, f, Sp));
+        ctx.drawImage(spr.c, pz.px - 16, pz.py - (spr.oy || 0));
+        // lo que corre: dos paquetes por casilla a la velocidad de su nivel (solo con el dueño conectado)
+        const ch = mueve ? a.cf[i] : '.';
+        if (!ch || ch === '.' || pz.p === 'e') return;
+        const r = D.RES_ORDER[parseInt(ch, 36)];
+        if (!r) return;
+        const inD = pz.p === 'c' ? pz.xx & 3 : pz.d, v = Math.min(2, NIV(pz.n).rate * JUNTOS), alto = pz.p === 'x';
+        for (let j = 0; j < 2; j++) {
+          const q = ((ahora / 1000) * v + j * 0.5 + (pz.k % 7) * 0.13) % 1;
+          let tx, ty;
+          if (q < 0.5) { tx = pz.x + 0.5 - DIRS[inD][0] * (0.5 - q); ty = pz.y + 0.5 - DIRS[inD][1] * (0.5 - q); }
+          else { tx = pz.x + 0.5 + DIRS[pz.d][0] * (q - 0.5); ty = pz.y + 0.5 + DIRS[pz.d][1] * (q - 0.5); }
+          if (nI >= bufX.length) { const nx = new Float32Array(bufX.length * 2), ny = new Float32Array(bufX.length * 2); nx.set(bufX); ny.set(bufY); bufX = nx; bufY = ny; }
+          bufX[nI] = Math.round((tx - ty) * 16 + off); bufY[nI] = Math.round((tx + ty) * 8 - (alto ? Math.max(0, 1 - q * 2) * D.CINTA.alto : 0)); bufR[nI] = r; nI++;
+        }
+      });
+    }
+    pintarItems(ctx, Sp, nI);
+  }
+  // los tableros de los pasos elevados ajenos (ordenados por profundidad como los tuyos)
+  function elevadosAjenos(R, Sp, seen, out) {
+    for (const slot in AJ) for (const pz of AJ[slot].piezas) {
+      if (pz.p !== 'e') continue;
+      const n = pz.xx || 2;
+      for (let i = 1; i < n; i++) {
+        const x = pz.x + DIRS[pz.d][0] * i, y = pz.y + DIRS[pz.d][1] * i;
+        if (!seen(x, y)) continue;
+        const spr = Sp.beltPuente(pz.d % 2, pz.n), [px, py] = R.iso(x, y);
+        out.push({ d: x + y + 0.9, k: 'puente', o: { ajena: +slot }, spr, x: Math.round(px - 16), y: Math.round(py - D.CINTA.alto) });
+      }
+    }
+  }
   let vacioC = null;
   function vacio() { if (!vacioC) { vacioC = document.createElement('canvas'); vacioC.width = vacioC.height = 1; } return vacioC; }
 })();

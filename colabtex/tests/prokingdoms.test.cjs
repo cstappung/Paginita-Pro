@@ -1210,7 +1210,7 @@ test('pk-78: una casilla que se tapa sin avisar (un árbol que vuelve a crecer) 
   assert.match(wsrc, /W\.block\[i\] = 1;\n\s*if \(W\.onBloqueo\) W\.onBloqueo\(i\)/, 'el rebrote avisa');
 });
 
-test('pk-80: dos Maestros de Obras extra con monedas del reino, desde la Era VI y la Era VIII', () => {
+test('pk-81: dos Maestros de Obras extra con monedas del reino, desde la Era VI y la Era VIII', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(D.MAESTRO_EXTRA)), [{ era: 6, precio: 1000 }, { era: 8, precio: 1000 }]);
   const gsrc = fs.readFileSync(path.join(PKDIR, 'js', 'game.js'), 'utf8');
   assert.match(gsrc, /G\.builders = \(\) => 1 \+ G\.countB\('builder'\) \+ G\.maestroMar\(\) \+ G\.maestrosComprados\(\)/, 'cuentan como maestros');

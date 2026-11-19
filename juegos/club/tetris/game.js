@@ -15,6 +15,8 @@
   const NOMBRE = { maraton: 'Maratón', sprint: 'Sprint', ultra: 'Ultra', bots: 'VS Bots' };
   /* Los colores de los tres bots (miniatura, nombre y aviso de ataque). */
   const COLOR_BOT = ['#ff9f43', '#2fd3e8', '#ff4fa3'];
+  /* El tuyo: tus misiles y la diana sobre tu objetivo. */
+  const COLOR_TU = '#ffd23f';
 
   let guardado = {};
   try { guardado = JSON.parse(localStorage.getItem(CLAVE) || '{}') || {}; } catch (_) { /* Storage es opcional. */ }
@@ -122,7 +124,7 @@
     /* VS Bots graba igual, pero con el mundo de cuatro pozos de vs.js. */
     g = modo === 'bots' ? TV.grabadora({ cuenta: CUENTA, sal, dif, alJugar }) : TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar });
     s = g.s;
-    rivalesFirma = '';
+    rivalesFirma = ''; batallaFirma = ''; feed = [];
     fx = nuevosEfectos();
     pulsos = null;
     mando.suelta();
@@ -298,16 +300,18 @@
   const LEMA = {
     sprint: 'Cuarenta líneas, lo más rápido que puedas.', ultra: 'Dos minutos: todos los puntos que quepan.',
     maraton: 'Completa filas. Que no llegue arriba.',
-    bots: { facil: 'Tres bots tranquilos. Cada línea que limpias les cae a ellos.', medio: 'Tres bots que ya saben jugar. Mándales basura y aguanta la suya.',
-      dificil: 'Tres bots rápidos y sin errores. Sobrevive y déjalos fuera.' }
+    bots: { facil: 'Tres bots tranquilos, que se equivocan seguido. Lo que limpias le cae a tu objetivo.',
+      medio: 'Píxel caza al que va ganando, Turbo remata al que va perdiendo y Glitch no olvida quién le pegó. Elige a quién atacas.',
+      dificil: 'Los tres, rápidos y casi sin errores, cada uno con su cabeza. Sobrevive y déjalos fuera.' }
   };
   function ponModo() {
     document.querySelectorAll('[data-modo]').forEach(x => x.classList.toggle('activo', x.dataset.modo === modo));
     document.querySelectorAll('[data-dif]').forEach(x => x.classList.toggle('activo', x.dataset.dif === dif));
     const vs = modo === 'bots';
     $('difs').hidden = !vs; $('rivales').hidden = !vs; $('tt').classList.toggle('vs', vs);
+    $('batalla').hidden = true; pozo.parentElement.dataset.apuntan = 0;
     window.Club?.category(cat());
-    s = null; g = null; estado = 'menu'; inmersivo(false); rivalesFirma = '';
+    s = null; g = null; estado = 'menu'; inmersivo(false); rivalesFirma = ''; batallaFirma = ''; feed = [];
     capa(nombreModo(), vs ? `${LEMA.bots[dif]} Gana el último en pie; compite el tiempo.` : LEMA[modo], 'Jugar');
     pintaDatos(); pinta(); pintaRivales();
   }
@@ -365,11 +369,33 @@
     s.salida = 0;
   }
 
-  /* ---------- VS Bots: los rivales y lo que se mandan ---------- */
-  /* Nada de esto decide nada: el mundo (vs.js) ya repartió la basura y
-     anotó quién cayó; aquí solo se ve y se oye. */
-  let rivalesFirma = '', alertaT = 0;
+  /* ---------- VS Bots: los rivales, a quién apunta cada uno y lo que se mandan ---------- */
+  /* Nada de esto decide nada: el mundo (vs.js) ya repartió la basura, sabe
+     a quién apunta cada pozo y anotó quién cayó; aquí solo se ve y se oye.
+     Lo único que sale de aquí es tu cambio de objetivo, que va como una
+     acción más (`g.pide('apunta2')`, `'objetivo'`) y queda en la prueba. */
+  let rivalesFirma = '', alertaT = 0, batallaFirma = '', feed = [];
   const nombreBot = i => TV.NOMBRES[i - 1];
+  /* Cada bot es alguien (vs.js, PERSONAS): su rol, el porqué de su
+     objetivo y su ánimo, que es lo que hace que no se sienta un «si pasa
+     esto, haz aquello». Solo se lee: nada de aquí decide nada. */
+  const rolBot = i => TV.PERSONAS[i].rol;
+  const PORQUE = { debil: 'huele sangre', amenaza: 'frena al peligroso', lider: 'va por el líder', rencor: 'venganza',
+    devuelve: 'devuelve el golpe', monton: 'se suma al ataque', corazonada: 'corazonada' };
+  /* La cara del ánimo: lo que más pesa de estrés, enojo y confianza. */
+  function cara(a) {
+    if (!a) return ['🙂', 'tranquilo'];
+    if (a.enojo >= 600) return ['😡', 'furioso'];
+    if (a.estres >= 600) return ['😰', 'apurado'];
+    if (a.enojo >= 300) return ['😠', 'molesto'];
+    if (a.confianza >= 750) return ['😎', 'confiado'];
+    if (a.estres >= 300) return ['😬', 'tenso'];
+    return ['🙂', 'tranquilo'];
+  }
+  const nombreDe = i => i === 0 ? 'Tú' : nombreBot(i);
+  const colorDe = i => i === 0 ? COLOR_TU : COLOR_BOT[i - 1];
+  const chip = i => `<b class="tt-chip" style="--c:${colorDe(i)}">${nombreDe(i)}</b>`;
+  const teclaObjetivo = () => (TM.leeTeclas().objetivo || []).map(TM.nombreTecla).join(' / ') || '—';
   function pintaRivales() {
     const cont = $('rivales');
     if (modo !== 'bots') return;
@@ -377,18 +403,59 @@
     const firma = [dif, m ? m.fuera.map(k => k < 0 ? 1 : 0).join('') : '---'].join('|');
     if (firma !== rivalesFirma) {
       rivalesFirma = firma;
-      cont.innerHTML = [1, 2, 3].map(i => `<div class="tt-rival${m && m.fuera[i] >= 0 ? ' fuera' : ''}" data-i="${i}" style="--c:${COLOR_BOT[i - 1]}">` +
-        `<canvas width="90" height="180" aria-label="Pozo de ${nombreBot(i)}"></canvas><span class="nom">${nombreBot(i)}</span><small class="dat"></small></div>`).join('');
+      cont.innerHTML = [1, 2, 3].map(i => `<div class="tt-rival${m && m.fuera[i] >= 0 ? ' fuera' : ''}" data-i="${i}" style="--c:${COLOR_BOT[i - 1]}" title="Atacar a ${nombreBot(i)}">` +
+        `<em class="tt-sello">🎯 Objetivo</em><span class="tt-lienzo"><span class="tt-diana" aria-hidden="true"><i></i><i></i><i></i><i></i></span>` +
+        `<canvas width="90" height="180" aria-label="Pozo de ${nombreBot(i)}"></canvas></span><span class="nom"><i class="cara" aria-hidden="true">🙂</i>${nombreBot(i)}<b class="kos"></b></span>` +
+        `<small class="rol">${rolBot(i)}</small><small class="apunta"></small><small class="porque"></small><small class="dat"></small></div>`).join('');
     }
     for (let i = 1; i <= TV.RIVALES; i++) {
       const el = cont.querySelector(`[data-i="${i}"]`);
       if (!el) continue;
-      const p = m?.pozos[i];
+      const p = m?.pozos[i], vivo = !!(m && m.fuera[i] < 0);
       TM.pintaResumen(el.querySelector('canvas').getContext('2d'), p ? TM.resumen(p) : '', { celda: 9, muerto: !!(m && m.fuera[i] >= 0) });
       const txt = p ? `${p.lineas} lín · ${m.enviadas[i]} env` : TV.NOMBRE_DIF[dif];
       const d = el.querySelector('.dat');
       if (d.textContent !== txt) d.textContent = txt;
+      const jugando = estado === 'jugando' || estado === 'pausa';
+      el.classList.toggle('objetivo', !!(m && jugando && vivo && m.objetivo[0] === i));
+      const o = m && vivo ? m.objetivo[i] : -1;
+      el.classList.toggle('teapunta', jugando && o === 0);
+      const ap = el.querySelector('.apunta'), apTxt = o < 0 || !jugando ? '' : o === 0 ? '→ TÚ' : '→ ' + nombreBot(o);
+      if (ap.textContent !== apTxt) { ap.textContent = apTxt; ap.style.setProperty('--c', o > 0 ? COLOR_BOT[o - 1] : '#ff4a5e'); }
+      const porque = o >= 0 && jugando ? PORQUE[m.motivo[i]] || '' : '';
+      if (ap.title !== porque) ap.title = porque;
+      const [emo, animo] = vivo && jugando ? cara(m.animo(i)) : ['🙂', ''];
+      const ce = el.querySelector('.cara');
+      if (ce.textContent !== emo) { ce.textContent = emo; ce.title = animo; }
+      const pq = el.querySelector('.porque');
+      if (pq.textContent !== porque) pq.textContent = porque;
+      const k = el.querySelector('.kos'), kTxt = m && m.ko[i] ? ` 💀${m.ko[i]}` : '';
+      if (k.textContent !== kTxt) k.textContent = kTxt;
     }
+    pintaBatalla();
+  }
+  /* La barra de batalla, encima del pozo: a quién atacas, quién te tiene
+     en la mira y lo último que pasó. En el celular no cabe: ahí lo dicen
+     el HUD (🎯), las tarjetas de los rivales y el borde rojo del pozo. */
+  function pintaBatalla() {
+    const m = g?.m, jugando = !!m && (estado === 'jugando' || estado === 'pausa' || estado === 'fin');
+    const obj = m && m.fuera[0] < 0 ? m.objetivo[0] : -1;
+    const ap = m ? [1, 2, 3].filter(i => m.fuera[i] < 0 && m.objetivo[i] === 0) : [];
+    $('pozo').parentElement.dataset.apuntan = jugando && estado !== 'fin' ? ap.length : 0;
+    const f = [jugando, obj, ap.join(''), feed.map(x => x.id).join(','), m ? m.ko[0] : 0].join('|');
+    if (f === batallaFirma) return; batallaFirma = f;
+    $('batalla').hidden = !jugando;
+    $('hudObj').textContent = obj > 0 ? nombreBot(obj) : '—';
+    $('hudObj').style.color = obj > 0 ? COLOR_BOT[obj - 1] : '';
+    $('batObj').innerHTML = obj > 0 ? `🎯 Atacas a ${chip(obj)} <small>cambia con ${teclaObjetivo()} o tocando un rival</small>` : '🎯 Sin objetivo';
+    $('batAp').innerHTML = ap.length ? `👁 Te apunta${ap.length > 1 ? 'n' : ''} ${ap.map(chip).join(' ')}` : '<span class="tt-calma">👁 Nadie te apunta</span>';
+    $('batAp').classList.toggle('peligro', ap.length > 0);
+    $('feed').innerHTML = feed.map(x => `<p>${x.html}</p>`).join('');
+  }
+  let feedN = 0;
+  function anotaFeed(html) {
+    feed.unshift({ id: ++feedN, html });
+    if (feed.length > 3) feed.length = 3;
   }
   /* Ancho: los rivales son una cuarta columna junto al pozo. Angosto: una
      fila debajo (dentro de la fila del pozo empujaban «Siguientes» fuera de
@@ -403,24 +470,63 @@
   angosto.addEventListener?.('change', ubicaRivales);
   new MutationObserver(ubicaRivales).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
   ubicaRivales();
+  /* Tocar un rival lo vuelve tu objetivo. Es una pulsación más para la
+     capa anti-bot (origen «T»: puntero, no teclado). */
+  $('rivales').addEventListener('pointerdown', e => {
+    const el = e.target.closest('.tt-rival');
+    if (!el || estado !== 'jugando' || !g?.m) return;
+    e.preventDefault();
+    const i = +el.dataset.i;
+    if (g.m.fuera[i] >= 0 || g.m.objetivo[0] === i) return;
+    pulsos.baja('rival-' + i, e.timeStamp, origen(e, true));
+    acciones('apunta' + i);
+  });
+  $('rivales').addEventListener('pointerup', e => {
+    const el = e.target.closest('.tt-rival');
+    if (el && pulsos) pulsos.sube('rival-' + el.dataset.i, e.timeStamp);
+  });
+  const elDe = i => i === 0 ? pozo : $('rivales').querySelector(`[data-i="${i}"] canvas`);
   function golpe(i) {
     const el = $('rivales').querySelector(`[data-i="${i}"]`);
     if (!el) return;
     el.classList.remove('golpe'); void el.offsetWidth; el.classList.add('golpe');
   }
-  function alerta(i, n) {
+  function alerta(html, c, ms) {
     const el = $('alerta');
-    el.innerHTML = `<span style="--c:${COLOR_BOT[i - 1]}">⚠ ${nombreBot(i)} te manda ${n}</span>`;
+    el.innerHTML = `<span style="--c:${c}">${html}</span>`;
     el.classList.remove('ve'); void el.offsetWidth; el.classList.add('ve');
-    clearTimeout(alertaT); alertaT = setTimeout(() => el.classList.remove('ve'), 1700);
+    clearTimeout(alertaT); alertaT = setTimeout(() => el.classList.remove('ve'), ms || 1700);
   }
+  let alertaHasta = 0;
   function vsEventos() {
     const m = g.m;
-    for (const a of m.ataques.splice(0)) {
-      if (a.a === 0) { fx.amenaza(a.n); efecto('alarma', a.n); alerta(a.de, a.n); }
-      else { golpe(a.a); if (a.de === 0) efecto('envia', a.n); }
+    for (const c of m.cambios.splice(0)) {
+      if (c.de === 0) { efecto('fijado'); continue; }
+      /* Un bot te pone en la mira: aviso suave (si no hay uno de ataque en pantalla). */
+      const porque = PORQUE[c.motivo] ? ` <small>(${PORQUE[c.motivo]})</small>` : '';
+      if (c.a === 0) {
+        efecto('teApuntan');
+        anotaFeed(`${chip(c.de)} te apunta 👁${porque}`);
+        if (performance.now() > alertaHasta) alerta(`👁 ${nombreBot(c.de)} te apunta${PORQUE[c.motivo] ? ': ' + PORQUE[c.motivo] : ''}`, COLOR_BOT[c.de - 1], 1500);
+      } else anotaFeed(`${chip(c.de)} apunta a ${chip(c.a)}${porque}`);
     }
-    for (const i of m.caidas.splice(0)) if (i > 0) { avisa(`¡${nombreBot(i)} fuera!`, 'ko'); efecto('nivel'); }
+    for (const a of m.ataques.splice(0)) {
+      anotaFeed(`${chip(a.de)} ➜ ${chip(a.a)} <b class="tt-n">${a.n}</b>`);
+      const llega = () => {
+        if (a.a === 0) { fx.amenaza(a.n); efecto('alarma', a.n); }
+        else golpe(a.a);
+      };
+      if (a.a === 0) { alertaHasta = performance.now() + 1700; alerta(`⚠ ${nombreBot(a.de)} te manda ${a.n}`, COLOR_BOT[a.de - 1]); }
+      if (a.de === 0) efecto('envia', a.n);
+      FX.misil(elDe(a.de), elDe(a.a), { color: colorDe(a.de), n: a.n, clase: 'tt-misil', dura: 480, alLlegar: llega });
+    }
+    const kos = m.kos.splice(0), conKo = new Set(kos.map(k => k.a));
+    for (const k of kos) {
+      anotaFeed(`💀 ${chip(k.de)} deja fuera a ${chip(k.a)}`);
+      if (k.de === 0) { avisa(`¡KO a ${nombreBot(k.a)}!`, 'ko'); efecto('record'); }
+      else if (k.a !== 0) avisa(`¡${nombreBot(k.a)} fuera! KO de ${nombreBot(k.de)}`, 'ko');
+    }
+    for (const i of m.caidas.splice(0)) if (i > 0 && !conKo.has(i)) { anotaFeed(`💀 ${chip(i)} se ahogó solo`); avisa(`¡${nombreBot(i)} fuera!`, 'ko'); efecto('nivel'); }
   }
 
   function bucle(t) {

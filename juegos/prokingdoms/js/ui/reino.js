@@ -600,7 +600,7 @@
       const ms = g.mastery(), won = st.mastered && st.mastered[st.era];
       body.append(el('div', { class: 'row mastery' + (won ? ' good-t' : '') }, el('b', null, 'Dominio de la Era ' + U.roman(st.era) + ': '),
         el('span', null, ms.done + ' de ' + ms.total + ' edificios al máximo' + (won ? ' · ¡era dominada!' : ' · premio: ')), won ? null : UI.costEl(D.masteryReward(st.era), 1, true)));
-      // pk-80: Maestros de Obras extra, con monedas del reino (Era VI y Era VIII)
+      // pk-81: Maestros de Obras extra, con monedas del reino (Era VI y Era VIII)
       const mx = g.maestroExtraSig();
       if (mx) body.append(el('div', { class: 'row maestro-extra' },
         el('span', { class: 'small' }, el('b', null, 'Maestro de Obras extra ' + (mx.i + 1) + ' de ' + D.MAESTRO_EXTRA.length + ': '), mx.ok ? 'contrátalo para mejorar un edificio más a la vez. ' : mx.why + ' '),
