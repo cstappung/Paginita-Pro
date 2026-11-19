@@ -927,6 +927,9 @@
     { id: 'fuente', name: 'Fuente', era: 2, cost: { stone: 40, gold: 30 }, desc: 'Una fuente de piedra con agua que corre.' },
   ];
   D.AUTOPISTA.decoMax = 300;
+  // pk-81 (pedido del dueño): dos Maestros de Obras más, comprados con monedas del reino; el primero desde la Era VI y
+  // el segundo desde la Era VIII (en orden). Se guardan en st.flags.maestrosExtra (cuántos compraste).
+  D.MAESTRO_EXTRA = [{ era: 6, precio: 1000 }, { era: 8, precio: 1000 }];
   // pk-78: mover un recurso del mapa cuesta monedas del reino: 1 cada 3 casillas, por cada recurso
   D.MOVER_RECURSO = { cada: 3, min: 1, max: 40 };
   D.moverRecursoCosto = dist => Math.max(D.MOVER_RECURSO.min, Math.ceil(dist / D.MOVER_RECURSO.cada));

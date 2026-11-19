@@ -594,12 +594,18 @@
     UI.modal('works', 'Obras y mejoras', body => {
       const g = G(), st = S();
       body.append(el('div', { class: 'war-top' },
-        el('div', null, el('b', null, 'Maestros de Obras: '), g.buildersBusy() + ' ocupados de ' + g.builders(), g.builders() < 5 ? el('span', { class: 'muted small' }, ' · para tener otro, construye: ' + D.BUILD.builder.name) : null),
+        el('div', null, el('b', null, 'Maestros de Obras: '), g.buildersBusy() + ' ocupados de ' + g.builders(), g.countAll('builder') < g.maxCount('builder') ? el('span', { class: 'muted small' }, ' · para tener otro, construye: ' + D.BUILD.builder.name) : null),
         el('div', { class: 'small muted' }, 'Cada edificio sube de nivel por separado. Nivel máximo en la Era ' + U.roman(st.era) + ': ' + D.maxLevel('house', st.era) + '. Las obras siguen aunque cierres el juego.')));
       // dominio de la era: meta alcanzable de cada era, con premio
       const ms = g.mastery(), won = st.mastered && st.mastered[st.era];
       body.append(el('div', { class: 'row mastery' + (won ? ' good-t' : '') }, el('b', null, 'Dominio de la Era ' + U.roman(st.era) + ': '),
         el('span', null, ms.done + ' de ' + ms.total + ' edificios al máximo' + (won ? ' · ¡era dominada!' : ' · premio: ')), won ? null : UI.costEl(D.masteryReward(st.era), 1, true)));
+      // pk-81: Maestros de Obras extra, con monedas del reino (Era VI y Era VIII)
+      const mx = g.maestroExtraSig();
+      if (mx) body.append(el('div', { class: 'row maestro-extra' },
+        el('span', { class: 'small' }, el('b', null, 'Maestro de Obras extra ' + (mx.i + 1) + ' de ' + D.MAESTRO_EXTRA.length + ': '), mx.ok ? 'contrátalo para mejorar un edificio más a la vez. ' : mx.why + ' '),
+        UI.btn(el('span', null, 'Contratar ', UI.amount('coins', mx.precio)), () => { if (g.comprarMaestro()) UI.rerender(); }, { small: true, cls: 'gold', disabled: !mx.ok, title: mx.ok ? 'Pagas ' + mx.precio + ' monedas del reino: un Maestro de Obras más para siempre' : mx.why })));
+      else body.append(el('p', { class: 'small muted' }, 'Ya contrataste los ' + D.MAESTRO_EXTRA.length + ' Maestros de Obras extra.'));
       if (st.era >= D.DECREE_ERAS[0]) body.append(UI.btn(g.decreePending() ? '¡Elegir decreto real!' : 'Decretos del reino', () => UI.openDecree(), { small: true }));
       const busy = g.buildings.filter(b => b.owner === 'p' && b.upg);
       if (busy.length) {

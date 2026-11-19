@@ -661,7 +661,28 @@
   };
 
   // ---------- Maestros de obras y mejoras ----------
-  G.builders = () => 1 + G.countB('builder') + G.maestroMar();
+  G.builders = () => 1 + G.countB('builder') + G.maestroMar() + G.maestrosComprados();
+  // pk-81: los Maestros de Obras comprados con monedas del reino. Se compran en tu reino (la tierra) y valen también en
+  // el archipiélago, como el Maestro del puerto.
+  const tierraSt = () => (G.enMar() ? S.otro : S);
+  G.maestrosComprados = () => { const t = tierraSt(); return Math.min(D.MAESTRO_EXTRA.length, (t && t.flags && t.flags.maestrosExtra) || 0); };
+  // el próximo que se puede comprar: { i, era, precio, ok, why } o null si ya están todos
+  G.maestroExtraSig = function () {
+    const i = G.maestrosComprados(), m = D.MAESTRO_EXTRA[i];
+    if (!m) return null;
+    const why = G.enMar() ? 'Se contrata en tu reino, no en el archipiélago.' : S.era < m.era ? 'Se habilita en la Era ' + U.roman(m.era) + '.' : PK.Platform.getCoins() < m.precio ? 'Te faltan monedas del reino (' + m.precio + ').' : null;
+    return { i, era: m.era, precio: m.precio, ok: !why, why };
+  };
+  G.comprarMaestro = function () {
+    const sig = G.maestroExtraSig();
+    if (!sig || !sig.ok) { toast(sig ? sig.why : 'Ya contrataste todos los Maestros de Obras extra.', 'warn'); return false; }
+    if (!PK.Platform.spendCoins(sig.precio, 'maestro-extra')) { toast('Te faltan monedas del reino (' + sig.precio + ').', 'warn'); return false; }
+    S.flags.maestrosExtra = sig.i + 1;
+    G.stat('maestros_comprados', 1);
+    toast('¡Nuevo Maestro de Obras! Ahora tienes ' + G.builders() + '.', 'good');
+    if (PK.Sfx) PK.Sfx.play('level');
+    return true;
+  };
   // el Astillero del Maestro de Ribera del archipiélago (pk-30) da un maestro más en la tierra
   G.maestroMar = () => (!G.enMar() && S.otro && (S.otro.buildings || []).some(b => b.type === 'maestro' && b.done) ? 1 : 0);
   G.buildersBusy = () => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.upg ? 1 : 0), 0);
