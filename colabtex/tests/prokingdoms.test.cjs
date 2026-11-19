@@ -1210,6 +1210,13 @@ test('pk-78: una casilla que se tapa sin avisar (un árbol que vuelve a crecer) 
   assert.match(wsrc, /W\.block\[i\] = 1;\n\s*if \(W\.onBloqueo\) W\.onBloqueo\(i\)/, 'el rebrote avisa');
 });
 
+test('pk-80: dos Maestros de Obras extra con monedas del reino, desde la Era VI y la Era VIII', () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(D.MAESTRO_EXTRA)), [{ era: 6, precio: 1000 }, { era: 8, precio: 1000 }]);
+  const gsrc = fs.readFileSync(path.join(PKDIR, 'js', 'game.js'), 'utf8');
+  assert.match(gsrc, /G\.builders = \(\) => 1 \+ G\.countB\('builder'\) \+ G\.maestroMar\(\) \+ G\.maestrosComprados\(\)/, 'cuentan como maestros');
+  assert.match(gsrc, /spendCoins\(sig\.precio, 'maestro-extra'\)/, 'se pagan con monedas del reino');
+});
+
 test('pk-54: rutas comodín — «cualquier campamento» va al que tiene más y «cualquier bodega» a la más cercana', () => {
   const L = PK.Logi, st0 = G.state, bs0 = G.buildings, us0 = G.units, by0 = G.bById, cap0 = G.capDe;
   const mk = (id, type, x, inv) => ({ id, type, owner: 'p', done: true, lvl: 1, def: D.BUILD[type], x, y: 10, w: 2, h: 2, cx: x + 1, cy: 11, inv: inv || {} });

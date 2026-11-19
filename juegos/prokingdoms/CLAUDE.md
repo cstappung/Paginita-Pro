@@ -831,3 +831,9 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   `st.calzada.dia.n`; online the client copies `r.hoy`). The daily cap now limits net growth, not tiles placed.
 - Needs `firebase deploy --only functions` like pk-78.
 
+### Extra builders (`pk-80`, owner's request)
+
+- Two more Maestros de Obras bought with kingdom coins (`D.MAESTRO_EXTRA`: 1000 each, from Era VI and Era VIII, in
+  order), in the Obras window. `st.flags.maestrosExtra` counts them on the land state; `G.maestrosComprados()` reads
+  the land state (`S.otro` at sea), so they work in the archipelago too, but are bought only on land.
+
