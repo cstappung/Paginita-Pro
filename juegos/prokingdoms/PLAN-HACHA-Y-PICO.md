@@ -16,8 +16,8 @@
   systems» de `CLAUDE.md`.
 - **Decisiones del dueño:** respondidas el 25 de noviembre de 2026 (§9). Mandan sobre cualquier otra parte del
   plan. Solo queda pendiente la 10 (acelerar con monedas), y el plan usa su recomendación.
-- **Avance:** P1 y P2 entregadas juntas en `pk-82`; P3, P4 y P5 (la mina entera) en `pk-83`. Las dos necesitan desplegar la
-  función (`cleanBuildings`, `kindRate`). Falta la Posada (P6 y P7).
+- **Avance:** P1 y P2 entregadas juntas en `pk-82`; P3, P4 y P5 (la mina entera) en `pk-83`; P6 y P7 (la Posada) en
+  `pk-84`. `pk-82` y `pk-83` necesitan desplegar la función (`cleanBuildings`, `kindRate`). **Plan completo.**
 
 ---
 
@@ -181,7 +181,7 @@ Lo que cuesta cada nivel (igual en las tres ramas, salvo Golpe, que cuesta ×1,3
 
 | Nivel | Era | Costo | Tiempo | Talar antes (en esa rama) |
 |---|---|---|---|---|
-| 1 | II | 300 madera, 150 oro, 40 tablones | 30 min | 1.500 |
+| 1 | II | 250 madera, 60 oro, 30 tablones | 30 min | 1.500 |
 | 2 | III | 400 tablones, 60 herramientas | 1 h 30 | 6.000 |
 | 3 | IV | 200 herramientas, 120 lingotes, 40 acero | 6 h | 40.000 |
 | 4 | VI | 300 acero, 80 maquinaria, 40 libros | 24 h | 250.000 |
@@ -519,7 +519,7 @@ chico que hacer, **sin castigar a quien se va**.
 
 - **La Feria** (semanal, por semana UTC): una barra de 30 escalones que avanza con la fama de esa semana; premios de
   aspecto, decoraciones de la Posada y monedas del reino.
-- **Álbum de viajeros** (unos 40): cada uno con una historia de 5 capítulos que avanza al cumplirle pedidos. Un capítulo
+- **Álbum de viajeros** (24 en `pk-84`): cada uno con una historia de 5 capítulos que avanza al cumplirle pedidos. Un capítulo
   es un diálogo corto con su retrato (como Tobías), con humor. Al completar su historia, el viajero deja un regalo
   permanente chico (decoración única o aspecto).
 - **Visitante ilustre** (con semilla, uno cada uno o dos días): un pedido especial con un premio mayor.

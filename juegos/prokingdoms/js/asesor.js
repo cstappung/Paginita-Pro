@@ -164,6 +164,14 @@
       if (!post || st.flags.scoutDoneR !== g.exploreRange()) return null;
       return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su área (' + U.fmt(g.exploreArea()) + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
     },
+    // pk-84: la Posada con pedidos que ya puedes entregar
+    () => {
+      const Po = PK.Posada;
+      if (!Po || G().enMar() || !Po.taller()) return null;
+      const n = Po.listos();
+      if (n < 3) return null;
+      return { id: 'posada', prioridad: 29, texto: 'Tienes ' + n + ' pedidos listos para entregar en la Posada.', acciones: [{ label: 'Abrir la Posada', fn: cerrarY(() => PK.UI.openPosada('tablero')) }] };
+    },
     // pk-84: la Mina Profunda: bodega llena sin quien la vacíe, montacargas al tope, piso con agua sin bomba, puestos libres
     () => {
       const Mi = PK.Mina, b = Mi && Mi.mia();

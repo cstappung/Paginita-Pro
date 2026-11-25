@@ -1845,6 +1845,7 @@
       }
     }
     G.talaTick(dt);
+    if (PK.Posada) PK.Posada.tick(); // pk-84: viajeros, Diligencia y Feria (con G.ahora: igual sin conexión)
     for (const b of G.buildings) {
       if (b.owner !== 'p' || !b.upg) continue;
       b.upg.t += dt;

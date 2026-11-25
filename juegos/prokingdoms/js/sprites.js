@@ -853,6 +853,33 @@
       }
       p.flag(1.1, 1.05, alto + 10, col, 6);
     },
+    // pk-84: Posada de los Viajeros. Casona de dos pisos con entramado, balcón de madera y un letrero con una llave; al
+    // costado, un patio con un abrevadero y una diligencia esperando. Por nivel: un segundo cuerpo (tier 1+) y faroles.
+    posada(p, col, m, tier) {
+      p.box(0, 0, 3, 3, 0, 1, 'paving', 'paving', 'paving');
+      const b = { x: 0.2, y: 0.2, w: 1.9, h: 2.0 };
+      p.box(b.x, b.y, b.w, b.h, 1, 9, 'stone');
+      p.box(b.x, b.y, b.w, b.h, 9, 19, 'plaster');
+      p.timber(b, 'L', 9, 19, 4); p.timber(b, 'R', 9, 19, 4);
+      p.door(b, 'L', 1.0, 0.5, 8, 1);
+      for (const u of [0.4, 1.6]) p.quad(b, 'L', u - 0.15, u + 0.15, 3, 7, '#f0c060');
+      for (const u of [0.5, 1.4]) p.quad(b, 'R', u - 0.14, u + 0.14, 12, 16, '#f0c060');
+      p.box(b.x - 0.05, b.y + b.h, b.w + 0.1, 0.22, 9, 10, 'plank', 'plank', 'plank'); // balcón
+      for (let i = 0; i < 6; i++) p.post(b.x + 0.1 + i * 0.35, b.y + b.h + 0.12, 3);
+      p.roof(b.x, b.y, b.w, b.h, 19, 11, 'tile', 0.5, 0.22, 'x');
+      p.box(0.4, 0.4, 0.3, 0.3, 24, 32, 'stone'); m.smoke.push(p.P(0.55, 0.55, 32));
+      if (tier >= 1) { const c = { x: 2.2, y: 0.25, w: 0.65, h: 1.2 }; p.box(c.x, c.y, c.w, c.h, 1, 12, 'plaster'); p.timber(c, 'R', 1, 12, 2); p.roof(c.x, c.y, c.w, c.h, 12, 6, 'tile', 0.4, 0.2, 'y'); }
+      // patio: abrevadero y diligencia
+      p.box(2.3, 1.7, 0.55, 0.25, 0, 2, 'plank', 'plank', '#4a78a8');
+      p.box(0.5, 2.45, 1.0, 0.45, 1, 5, 'darkwood', 'darkwood', col ? [col[0], col[1], col[2]] : 'canvasR'); // la diligencia, con el color del reino
+      for (const x of [0.65, 1.35]) { const w = p.P(x, 2.92, 1); p.ctx.fillStyle = '#2a1c12'; p.ctx.fillRect(w[0] - 2, w[1] - 2, 4, 4); p.ctx.fillStyle = '#8a6a40'; p.ctx.fillRect(w[0] - 1, w[1] - 1, 2, 2); }
+      // letrero con una llave dorada
+      const s0 = p.P(b.x + b.w + 0.05, 1.0, 16);
+      p.line(s0, [s0[0] + 7, s0[1] - 3], '#3a2414');
+      p.ctx.fillStyle = '#3a2414'; p.ctx.fillRect(s0[0] + 3, s0[1] - 2, 8, 6);
+      p.ctx.fillStyle = '#e8c060'; p.ctx.fillRect(s0[0] + 5, s0[1] - 1, 4, 1); p.ctx.fillRect(s0[0] + 5, s0[1], 1, 3); p.ctx.fillRect(s0[0] + 8, s0[1], 1, 2);
+      if (tier >= 2) for (const x of [0.2, 2.8]) { p.post(x, 2.85, 10); const l = p.P(x + 0.07, 2.92, 10); p.ctx.fillStyle = '#ffd770'; p.ctx.fillRect(l[0] - 1, l[1] - 2, 3, 3); }
+    },
     builder(p, col) {
       p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.95, 0.5);
       const b = { x: 0.2, y: 0.2, w: 1.3, h: 1.3 };

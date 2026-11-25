@@ -1439,3 +1439,49 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 #minavista .mv-mej { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 3px 6px; background: rgba(0, 0, 0, 0.22); border-radius: 3px; font-size: 13px; }
 #minavista .mv-mej.hecha b { color: #9fe08a; }
 @media (max-width: 700px) { #minavista .mv-top { gap: 2px 10px; padding: 4px 8px; } #minavista .mv-nombre { font-size: 15px; } #minavista .mv-dato { font-size: 12px; } #minavista .mv-btns { margin-left: 0; } #minavista .mv-panel { max-height: 46vh; } }
+
+/* pk-84 (plan Hacha y Pico, P6–P7): la Posada de los Viajeros (js/ui/posada.js) */
+.po-fama { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 6px; }
+.po-fama b { color: var(--gold); }
+.po-bar { flex: 1 1 200px; max-width: 360px; }
+.po-aviso { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 4px 8px; border: 1px solid rgba(255, 215, 106, 0.5); border-radius: 4px; background: rgba(255, 215, 106, 0.08); }
+.po-ret { width: 54px; height: 54px; image-rendering: pixelated; border: 2px solid rgba(0, 0, 0, 0.45); border-radius: 3px; flex: none; }
+.po-ret.chico { width: 32px; height: 32px; }
+.po-ret.grande { width: 108px; height: 108px; }
+.po-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin: 8px 0; }
+.po-card { display: grid; grid-template-columns: 54px 1fr auto; gap: 8px; align-items: center; padding: 6px; background: rgba(0, 0, 0, 0.16); border: 1px solid rgba(0, 0, 0, 0.25); border-radius: 4px; min-width: 0; }
+.po-card.listo { border-color: rgba(120, 200, 90, 0.7); background: rgba(120, 200, 90, 0.1); }
+.po-card.ilustre { margin: 8px 0; border: 2px solid rgba(255, 215, 106, 0.8); background: rgba(255, 215, 106, 0.12); }
+.po-card.vacio { display: flex; justify-content: center; min-height: 66px; border-style: dashed; }
+.po-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.po-acc { display: flex; flex-direction: column; gap: 4px; }
+.po-items { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.po-item { display: inline-flex; align-items: center; gap: 2px; }
+.po-item.falta { color: #e06a4a; }
+.po-premio { display: inline-flex; flex-wrap: wrap; gap: 2px 8px; }
+.po-premio > span { display: inline-flex; align-items: center; gap: 2px; }
+.po-dil-h { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; margin: 6px 0; }
+.po-cajas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.po-caja { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: rgba(110, 70, 30, 0.22); border: 2px solid rgba(80, 50, 20, 0.5); border-radius: 4px; }
+.po-caja.listo { border-color: rgba(120, 200, 90, 0.7); }
+.po-caja.hecha { opacity: 0.7; background: rgba(120, 200, 90, 0.14); }
+.po-caja-h { display: flex; align-items: center; gap: 6px; font-size: 18px; }
+.po-feria { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin: 6px 0 10px; }
+.po-paso { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 3px; background: rgba(0, 0, 0, 0.18); opacity: 0.65; }
+.po-paso.hecho { opacity: 1; background: rgba(255, 215, 106, 0.3); }
+.po-paso.sig { opacity: 1; outline: 2px solid rgba(255, 215, 106, 0.8); }
+.po-paso.grande .po-k { color: #a0401c; font-weight: bold; }
+.po-paga { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
+.po-f { white-space: nowrap; color: #a06a10; }
+.po-k { font-size: 12px; }
+.po-prox { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; }
+.po-album { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.po-fig { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px; background: rgba(0, 0, 0, 0.16); border: 1px solid rgba(0, 0, 0, 0.25); border-radius: 4px; color: inherit; font: inherit; cursor: pointer; }
+.po-fig.nunca { cursor: default; opacity: 0.75; }
+.po-fig.nuevo { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 215, 106, 0.4); }
+.po-caps { display: flex; gap: 3px; }
+.po-caps i { width: 8px; height: 8px; border-radius: 50%; background: rgba(0, 0, 0, 0.35); }
+.po-caps i.si { background: var(--gold); }
+.po-cap { display: flex; gap: 14px; align-items: flex-start; margin: 8px 0; }
+.po-hist { font-size: 16px; line-height: 1.4; margin: 8px 0; }
+@media (max-width: 700px) { .po-grid { grid-template-columns: 1fr; } .po-card { grid-template-columns: 44px 1fr; } .po-card .po-ret { width: 44px; height: 44px; } .po-acc { grid-column: 1 / -1; flex-direction: row; } .po-cajas { grid-template-columns: repeat(2, minmax(0, 1fr)); } .po-feria { grid-template-columns: repeat(6, minmax(0, 1fr)); } .po-cap { flex-direction: column; align-items: center; } }

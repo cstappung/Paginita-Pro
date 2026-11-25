@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'mina.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'mina.js', 'datos-posada.js', 'posada.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 const PILA = D.CINTA.pila || 1; // pk-67: cada ítem de cinta es un paquete de hasta PILA unidades
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
@@ -2044,4 +2044,64 @@ test('HP3 (pk-84): Mina Profunda — estratos, vetas con semilla, topes y lo mis
   // la mina es un campamento para la logística y en ella no descarga nadie
   assert.ok(PK.Libro.CAMPOS.mina);
   assert.match(JS('game.js'), /b\.def\.mina\) continue; \/\/ pk-84: en la mina no descarga nadie/);
+});
+
+test('HP6–HP7 (pk-84): Posada — semilla, nada caduca, tope de monedas, Diligencia, Feria y los 5 capítulos', () => {
+  const Po = PK.Posada, P = D.POSADA;
+  const ids = new Set(D.VIAJEROS.map(v => v.id));
+  assert.equal(ids.size, D.VIAJEROS.length, 'ids únicos');
+  assert.ok(D.VIAJEROS.length >= 20);
+  for (const v of D.VIAJEROS.concat(D.ILUSTRES)) for (const r of v.gusta) assert.ok(D.RES[r], v.id + ' pide ' + r);
+  for (const v of D.VIAJEROS) assert.equal(v.historia.length, 5, v.id + ' tiene 5 capítulos');
+  assert.ok(D.VIAJEROS.filter(v => v.fama === 0).length >= 3, 'al empezar llegan varios');
+  assert.equal(D.BUILD.posada.max, 1);
+  const guarda = {}, cambia = o => { for (const k in o) { if (!(k in guarda)) guarda[k] = G[k]; G[k] = o[k]; } };
+  let ahora = Date.UTC(2026, 10, 23, 12), dado = {};
+  const nuevo = () => {
+    const b = { id: 3, type: 'posada', owner: 'p', done: true, lvl: 4, def: D.BUILD.posada };
+    const st = { era: 4, created: 12345, res: { food: 1e6, wood: 1e6, stone: 1e6, gold: 1e6, planks: 1e6, ore: 1e6, blocks: 1e6, ingots: 1e6, tools: 1e6, books: 1e6, marble: 1e6, gems: 1e6, steel: 1e6 }, flags: {}, stats: {} };
+    dado = {};
+    cambia({ state: st, buildings: [b], ahora: () => ahora, enMar: () => false, cap: () => 1e7, countB: () => 1, offline: true,
+      pay: c => { for (const r in c) st.res[r] -= c[r]; return true; }, give: c => { for (const r in c) dado[r] = (dado[r] || 0) + c[r]; }, stat: (k, n) => { st.stats[k] = (st.stats[k] || 0) + n; } });
+    return st;
+  };
+  try {
+    nuevo(); Po.tick(); ahora += 3 * 3600e3; Po.tick();
+    const a = JSON.stringify(Po.st().tab);
+    assert.equal(Po.st().tab.length, P.lugares(4), 'el tablero se llena mientras no estás');
+    ahora = Date.UTC(2026, 10, 23, 12); nuevo(); Po.tick(); ahora += 3 * 3600e3; Po.tick();
+    assert.equal(JSON.stringify(Po.st().tab), a, 'los mismos pedidos con la misma partida (semilla)');
+    ahora += 5 * 86400e3; Po.tick();
+    assert.equal(JSON.stringify(Po.st().tab), a, 'cinco días después siguen ahí: ningún pedido caduca');
+    // entregar: paga, saca el pedido y las monedas tienen tope por día
+    let n = 0;
+    for (let i = 0; i < 40; i++) { const o = Po.st().tab[0]; if (!o) { ahora += 3600e3; Po.tick(); continue; } assert.ok(Po.entregar(o.id)); n++; }
+    assert.ok(n >= 30);
+    assert.ok(Po.st().mon.n <= P.monedasDia && Po.st().mon.n > 0, 'monedas del día con tope (sin contar la Feria): ' + Po.st().mon.n);
+    assert.ok(dado.gold > 0 && Po.st().fama > 0);
+    // capítulos a las 1, 3, 6, 10 y 15 entregas
+    const al = Po.st().album;
+    for (const id in al) { const c = P.capitulos.filter(k => al[id].n >= k).length; assert.equal(al[id].c, c, id); }
+    // Diligencia: la misma en el mismo bloque, premio extra una sola vez
+    const d1 = JSON.stringify(Po.dil().cajas.map(c => [c.r, c.q]));
+    assert.equal(JSON.stringify(Po.dil().cajas.map(c => [c.r, c.q])), d1);
+    const gemas = dado.gems || 0;
+    for (let i = 0; i < P.dilCajas; i++) assert.ok(Po.llenarCaja(i));
+    assert.ok(Po.dil().bono && (dado.gems || 0) > gemas);
+    assert.ok(!Po.llenarCaja(0), 'una caja cargada no se carga dos veces');
+    ahora += P.dilCada * 1000; Po.tick();
+    assert.ok(!Po.dil().bono && Po.dil().cajas.every(c => !c.hecha), 'parte y llega otra');
+    // Feria: los escalones se pagan al pasarlos y se reinician con la semana
+    const fe = Po.feria();
+    assert.ok(fe.paso > 0 && fe.f >= Po.umbralFeria(fe.paso));
+    ahora += 8 * 86400e3; Po.tick();
+    assert.equal(Po.feria().paso, 0, 'semana nueva, Feria nueva');
+    // el ilustre se queda hasta que lo atiendas
+    const ilu = Po.st().ilu;
+    assert.ok(ilu && !ilu.hecho);
+    ahora += 3 * 86400e3; Po.tick();
+    assert.equal(Po.st().ilu.id, ilu.id, 'un ilustre sin atender no se reemplaza');
+    assert.ok(Po.atenderIlustre()); ahora += 86400e3; Po.tick();
+    assert.notEqual(Po.st().ilu.id, ilu.id);
+  } finally { for (const k in guarda) G[k] = guarda[k]; }
 });

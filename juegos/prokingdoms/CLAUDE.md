@@ -923,3 +923,20 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   the shoulder); villagers walking to the mine wear it on the map too (`render.js`).
 - Asesor rules `minaLlena`, `minaMont`, `minaAgua`, `minaPuestos`; missions `i14`–`i19`; the autopilot builds it in
   Era III and buys lift, pumps, ventilation and rails with at most 15 % of each material.
+
+### P6 + P7: the Posada de los Viajeros (`pk-84`, the owner's accepted proposal, plan §10)
+
+- `js/datos-posada.js` (tables, client only: 24 travellers with a 5-chapter story each, 6 illustrious visitors) and
+  `js/posada.js` (`PK.Posada`, ticked from `G.updateTimers`, so offline is the same). The building is in `data.js`.
+- **Design rules (plan §10.1):** nothing expires (a full board just waits; an unattended illustrious visitor stays),
+  the reward is shown before delivering, and everything is seeded: orders by `st.posada.n` (and `S.created`), the
+  Diligencia by its 4 h block, the visitor by the day. Arrivals use `G.ahora()`.
+- **Anti-cheat:** orders pay gold at 0.6 of their value (≤ `LIM.resSlack` per sync even with several at once); the
+  Diligencia and the Feria pay in things the server does not track (tools, books, gems, ingots, marble, specials).
+  Kingdom coins from orders, the Diligencia bonus and visitors share a daily cap (`D.POSADA.monedasDia`, 30);
+  the weekly Feria (30 steps, paid when crossed) is outside that cap.
+- Chapters at 1, 3, 6, 10 and 15 deliveries to the same traveller (`p.album[id] = { n, c }`, unread in `p.cola`).
+  Travellers unlock with the inn's fame level (`D.POSADA.fama`). A hard Diligencia crate can be asked from the guild
+  through the existing «Necesito…» board (`Soc.askNeed`, server caps unchanged).
+- Menu button «Posada» (group Mundo, land only) with a badge of ready orders and unread chapters; Asesor rule
+  `posada`; missions `t20`–`t24`; the autopilot builds it in Era II and delivers what `A.cabeMeta` allows.

@@ -94,6 +94,8 @@
     // campamento para la logística (Libro.CAMPOS: guarda aparte, la vacían carromatos y cintas), pero nadie descarga en
     // ella: lo que sale de las vetas sube por el montacargas (js/mina.js, D.MINA).
     mina: { name: 'Mina Profunda', w: 4, h: 3, cost: { wood: 600, stone: 300, planks: 150, tools: 40 }, up: { wood: 250, stone: 180, planks: 50 }, time: 180, era: 3, max: 1, upT: 1.3, mina: true, drop: ['stone', 'ore', 'gold', 'marble', 'gems'], desc: 'Cada nivel cava un piso más. Mientras más hondo, más rinden las vetas y más raros son los minerales. Trabajan muchos mineros; lo que sacan sube por el montacargas y lo llevan carromatos o cintas.' },
+    // pk-84 (plan Hacha y Pico, P6–P7): viajeros con pedidos, la Diligencia, la Feria y el álbum (posada.js, datos-posada.js)
+    posada: { name: 'Posada de los Viajeros', w: 3, h: 3, cost: { wood: 300, stone: 120, food: 150 }, time: 60, era: 2, max: 1, upT: 0.9, desc: 'Llegan viajeros con pedidos: entrégales lo que piden y te pagan, se hace famosa tu posada y te cuentan su historia. Cada 4 horas pasa la Diligencia.' },
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
     scout: { name: 'Puesto de Exploradores', w: 2, h: 2, cost: { wood: 100, food: 50 }, time: 25, era: 1, max: 1, trains: 'scout', upT: 0.9, desc: 'Entrena exploradores que revelan el mapa. Su nivel define cuántas casillas alrededor de tu reino pueden explorar (en el nivel 19 o antes, el mapa entero).' },
     cartwright: { name: 'Carretería', w: 3, h: 3, cost: { wood: 250, stone: 100 }, time: 45, era: 2, max: 2, upT: 0.9, desc: 'Construye carretas que llevan insumos a los talleres y sacan lo que producen. Con caminos van mucho más rápido.' },
@@ -122,7 +124,7 @@
     workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, max: e => 1 + Math.floor((e - 3) / 2), desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'hachero', 'mina', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'hachero', 'mina', 'posada', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -182,6 +184,7 @@
     builder: () => ({ builders: 1 }),
     hachero: L => ({ talaNivel: Math.min(5, Math.ceil(L / 2)) }),
     mina: L => ({ pisos: L, minaCap: D.minaCap(L) }),
+    posada: L => ({ lugares: Math.min(9, 6 + Math.floor(L / 3)), viajero: Math.round(Math.max(6, 12 - 0.6 * (L - 1)) * 60) }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
     fuerte: L => ({ defense: Math.round(140 * (1 + 0.4 * (L - 1))), sight: 9 + L }),
@@ -214,6 +217,7 @@
     consejeros: ['Consejeros', v => v + ' de 6'], guildBonus: ['Recolección (en gremio)', pct], relics: ['Reliquias', v => String(v)], relicGold: ['Oro por reliquia/min', v => v.toFixed(1)],
     prestige: ['Prestigio', v => String(v)], allBonus: ['Bono a todo', pct],
     talaNivel: ['Herramientas hasta el nivel', v => String(v)],
+    lugares: ['Pedidos en el tablero', v => String(v)], viajero: ['Un viajero cada', v => U.fmtTime(v)],
     pisos: ['Pisos', v => String(v)], minaCap: ['Bodega de la mina', v => U.fmt(v)],
     carts: ['Carretas', v => String(v)], cartCap: ['Carga por carreta', v => String(v)], cartSpeed: ['Velocidad de carretas', pct],
   };
@@ -961,7 +965,7 @@
     orden: ['filo', 'golpe', 'aguante'],
     // nivel 1 a 5 (índice 0 a 4)
     niveles: [
-      { era: 2, cost: { wood: 300, gold: 150, planks: 40 }, time: 1800, prueba: 1500 },
+      { era: 2, cost: { wood: 250, gold: 60, planks: 30 }, time: 1800, prueba: 1500 }, // pk-84: era 300/150/40 (el piloto se quedaba sin oro para la Era III)
       { era: 3, cost: { planks: 400, tools: 60 }, time: 5400, prueba: 6000 },
       { era: 4, cost: { tools: 200, ingots: 120, steel: 40 }, time: 6 * 3600, prueba: 40000 },
       { era: 6, cost: { steel: 300, machinery: 80, books: 40 }, time: 24 * 3600, prueba: 250000 },
@@ -1594,6 +1598,12 @@
   q('t2', 'trade', 'Primer trato', 'Compra o vende en el mercado.', st('market_ops', 1), { gold: 50 }, ['t1']);
   q('t3', 'trade', 'Palabra de comerciante', 'Acepta 3 ofertas del tablón de otros reinos.', st('trades_accepted', 3), { gold: 200, coins: 10 }, ['t2']);
   q('t4', 'trade', 'Tu propia oferta', 'Publica una oferta en el tablón y espera a que otro reino la acepte.', st('offers_filled', 1), { gold: 150 }, ['t2']);
+  // pk-84 (plan Hacha y Pico, P6–P7): la Posada de los Viajeros
+  q('t20', 'trade', 'Una cama para el viajero', 'Construye la Posada de los Viajeros (Era II) y cumple un pedido.', all(B('posada'), st('posada_pedidos', 1)), { coins: 10, gold: 150 }, ['t1']);
+  q('t21', 'trade', 'La Diligencia', 'Llena las 9 cajas de una Diligencia antes de que parta.', st('posada_dil', 1), { coins: 15, gems: 20 }, ['t20']);
+  q('t22', 'trade', 'Posadero famoso', 'Junta 140 de fama en tu posada.', st('posada_fama', 140), { coins: 25, tools: 40 }, ['t20']);
+  q('t23', 'trade', 'Contador de historias', 'Escucha la historia completa de 3 viajeros.', st('posada_historias', 3), { coins: 40, gems: 40 }, ['t22']);
+  q('t24', 'trade', 'Huésped de honor', 'Atiende a 5 visitantes ilustres.', st('posada_ilustres', 5), { coins: 30, books: 40 }, ['t20']);
   q('t5', 'trade', 'Regateo', 'Sube el Mercado a nivel 4: mejores precios.', LV('market', 4), { gold: 300 }, ['t2']);
   q('t6', 'trade', 'Mercader', 'Mueve 5.000 de oro en el comercio.', st('gold_volume', 5000), { coins: 15 }, ['t3', 't4']);
   escalera('tt', 'trade', 'Magnate', [25e3, 1e5, 5e5, 2e6, 1e7, 5e7], n => 'Mueve ' + U.fmt(n) + ' de oro en el comercio.', n => st('gold_volume', n), (n, i) => ({ coins: 15 * (i + 1), gold: Math.round(n * 0.05) }), 't6');

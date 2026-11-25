@@ -174,7 +174,7 @@
   }
 
   // ---------- HUD ----------
-  let resEls = {}, popEl, eraEl, coinEl, netEl, panel, bookDot, logiDot, mm, tip, buildEl, evEl, asEl;
+  let resEls = {}, popEl, eraEl, coinEl, netEl, panel, bookDot, logiDot, posDot, mm, tip, buildEl, evEl, asEl;
   UI.init = function () {
     const hud = document.getElementById('hud');
     toastBox = el('div', { id: 'toasts' });
@@ -227,6 +227,7 @@
     mbtn('compass', 'Explorar', () => UI.openExplore(), null, 'explore');
     mbtn('flask', 'Investigar', () => UI.openResearch(), null, 'research');
     mbtn('market', 'Mercado', () => PK.Social.openMarket(), null, 'market');
+    posDot = el('span', { class: 'badge' }); mbtn('coin', 'Posada', () => UI.openPosada(), null, 'posada').append(posDot); // pk-84: pedidos listos para entregar
     mbtn('guild', 'Gremio', () => PK.Social.openGuild(), null, 'guild');
     mbtn('scroll', 'Territorio', () => UI.openTerritory(), 'T', 'terr');
     const lb = mbtn('cart', 'Logística', () => UI.openLogistics(), null, 'logi');
@@ -297,7 +298,7 @@
   // Cuartel siempre está: sus murallas (Defensa) sirven desde la Era I y una misión lo nombra.
   const menuIds = {}, allIds = {};
   // En el archipiélago (pk-28) no hay investigación, gremio, territorio, mercado, ejército ni héroes (todavía)
-  const NO_MAR = ['explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'taberna', 'consejo', 'defensa', 'desafios', 'album']; // los héroes viajan (pk-30)
+  const NO_MAR = ['posada', 'explore', 'research', 'market', 'guild', 'terr', 'logi', 'realms', 'taberna', 'consejo', 'defensa', 'desafios', 'album']; // los héroes viajan (pk-30)
   const NO_TIERRA = ['regata']; // lo que solo existe en el archipiélago // la armada (pk-29) sí está en el mar
   const MENU_VER = {
     explore: (g, st) => g.countAll('scout') > 0 || st.era >= 2,
@@ -321,6 +322,7 @@
     taberna: g => g.countAll('tavern') > 0,
     equipo: (g, st) => !!(st.heroes && st.heroes.lista.length),
     consejo: g => g.countAll('consejo') > 0,
+    posada: g => g.countAll('posada') > 0, // pk-84
     aspectos: () => !!(UI.hayAspectos && UI.hayAspectos()), // pk-36: con el primer aspecto del Pase o de la tienda
   };
   // ---------- U1 (Fase 6): menú agrupado ----------
@@ -329,7 +331,7 @@
     { id: 'reino', label: 'Reino', icon: 'hammer', items: ['build', 'works', 'foreman', 'research', 'logi', 'caminos', 'cintas', 'terr', 'consejo', 'galeon', 'aspectos'] },
     { id: 'heroes', label: 'Héroes', icon: 'hero', items: ['heroes', 'taberna', 'equipo'] },
     { id: 'guerra', label: 'Guerra', labelMar: 'Armada', icon: 'war', items: ['war', 'atacar', 'defensa', 'batallas'] },
-    { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'guild', 'realms', 'regata'] },
+    { id: 'mundo', label: 'Mundo', icon: 'compass', items: ['explore', 'market', 'posada', 'guild', 'realms', 'regata'] },
     { id: 'libro', label: 'Libro', icon: 'book', items: ['book', 'diarias', 'desafios', 'album'] },
   ];
   const grupos = [];
@@ -461,6 +463,9 @@
       const sr = PK.Logi.sinRuta();
       logiDot.textContent = sr || '';
       logiDot.style.display = sr ? '' : 'none';
+      const np = PK.Posada && !G().enMar() && PK.Posada.taller() ? PK.Posada.listos() + PK.Posada.capitulosVistos() : 0;
+      posDot.textContent = np || '';
+      posDot.style.display = np ? '' : 'none';
       updateQueueStrip();
       if (UI.revisarCartas) UI.revisarCartas();
       const na = PK.Asesor.cuenta(0.25);
@@ -1293,6 +1298,11 @@
         ociosos.length && Mi.libres(b) > 0 ? UI.btn('Mandar ociosos (' + Math.min(ociosos.length, Mi.libres(b)) + ')', () => { G().command(ociosos.slice(0, Mi.libres(b)), { kind: 'building', obj: b }); UI.refreshPanel(true); }, { small: true }) : null,
         G().countB('establo') ? UI.btn('Ruta de carromato', () => UI.nuevaRutaDesde(b, false), { small: true }) : null));
       act.append(el('p', { class: 'small muted' }, UI.hint('Selecciona aldeanos y haz clic derecho en la mina para que bajen.', 'Elige aldeanos y luego toca la mina para que bajen.')));
+    }
+    else if (b.type === 'posada' && b.owner === 'p' && b.done && PK.Posada) { // pk-84
+      const p = PK.Posada.st();
+      act.append(el('p', null, 'Pedidos en el tablero: ' + p.tab.length + ' · listos para entregar: ' + PK.Posada.listos() + ' · fama ' + U.fmt(p.fama) + ' (nivel ' + PK.Posada.nivel(p.fama) + ')'));
+      act.append(UI.btn('Abrir la Posada', () => UI.openPosada(), { cls: 'gold' }));
     }
     else if (b.type === 'hachero' && b.owner === 'p') { // pk-83
       const t = G().talaSt(), m = G().talaMult();

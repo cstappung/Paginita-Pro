@@ -17,7 +17,7 @@
   // Qué construir en cada era (tipo, cuántos en total). Lo que no alcanza a pagar, lo intenta en la vuelta siguiente.
   const PLAN = {
     1: [['house', 2], ['lumber', 1], ['establo', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
-    2: [['sawmill', 1], ['hachero', 1], ['barracks', 1], ['tavern', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
+    2: [['sawmill', 1], ['hachero', 1], ['posada', 1], ['barracks', 1], ['tavern', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
     3: [['establo', 2], ['mina', 1], ['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
     4: [['university', 1], ['steelworks', 1], ['masonry', 3], ['mining', 4], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8], ['smelter', 2]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
@@ -249,7 +249,7 @@
   function mina() {
     const g = G(), Mi = PK.Mina, b = Mi && Mi.mia();
     if (!b) return;
-    const barato = c => Object.keys(c).every(r => (S().res[r] || 0) * 0.15 >= c[r]);
+    const barato = c => Object.keys(c).every(r => (S().res[r] || 0) * 0.15 >= c[r]) && PK.Auto.cabeMeta(c);
     const s = Mi.montSig(b), r = Mi.resumen(b);
     if (s && !s.why && r.limita && barato(s.m.cost) && Mi.subirMontacargas(b)) { anota('Mina: ' + s.m.name + '.'); return; }
     const c = Mi.cuenta(b);
@@ -261,13 +261,23 @@
       }
     }
   }
+  // pk-84: la Posada: cumple pedidos, cajas e ilustres que se pueden pagar sin tocar la meta de era
+  function posada() {
+    const Po = PK.Posada;
+    if (!Po || !Po.taller() || G().enMar()) return;
+    const p = Po.st(), ok = items => Po.puede({ items }) && PK.Auto.cabeMeta(items);
+    for (const o of p.tab.slice()) if (ok(o.items) && Po.entregar(o.id)) { P.pedidos = (P.pedidos || 0) + 1; return; }
+    const d = Po.dil();
+    for (let i = 0; i < d.cajas.length; i++) if (!d.cajas[i].hecha && ok({ [d.cajas[i].r]: d.cajas[i].q }) && Po.llenarCaja(i)) return;
+    if (p.ilu && !p.ilu.hecho && ok(p.ilu.items)) Po.atenderIlustre();
+  }
   // pk-83: el Taller del Hachero: primero Golpe, después Filo y Aguante, cuando se puede pagar sin tocar la meta de era
   function hachero() {
     const g = G();
     if (!g.talaSig || g.enMar() || g.talaSt().inv) return;
     for (const r of ['golpe', 'filo', 'aguante']) {
       const s = g.talaSig(r);
-      if (s && s.ok && g.talaEmpezar(r)) { anota('Hachero: ' + D.HACHERO.ramas[r].niv[s.n] + '.'); P.hachero = (P.hachero || 0) + 1; return; }
+      if (s && s.ok && PK.Auto.cabeMeta(s.cost) && g.talaEmpezar(r)) { anota('Hachero: ' + D.HACHERO.ramas[r].niv[s.n] + '.'); P.hachero = (P.hachero || 0) + 1; return; }
     }
   }
   // Ejército y salidas: lo mismo que el Mariscal del Consejo, con 80% de probabilidad mínima.
@@ -428,6 +438,7 @@
       investigar();
       hachero();
       mina();
+      posada();
       heroes();
       guerra();
       frontera();
@@ -436,7 +447,7 @@
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
   const F0 = () => (PK.Fort ? PK.Fort.mias().length : 0);
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, hachero: P.hachero || 0, mina: PK.Mina && PK.Mina.mia() ? PK.Mina.mia().lvl + ' pisos, ' + PK.Mina.mia().workers.length + ' mineros, ' + Math.round(S().stats.mina_sacado || 0) + ' sacado, ' + (P.minaMej || 0) + ' mejoras' : 'no', cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, hachero: P.hachero || 0, posada: PK.Posada && PK.Posada.taller() ? (P.pedidos || 0) + ' pedidos, fama ' + PK.Posada.st().fama : 'no', mina: PK.Mina && PK.Mina.mia() ? PK.Mina.mia().lvl + ' pisos, ' + PK.Mina.mia().workers.length + ' mineros, ' + Math.round(S().stats.mina_sacado || 0) + ' sacado, ' + (P.minaMej || 0) + ' mejoras' : 'no', cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();
