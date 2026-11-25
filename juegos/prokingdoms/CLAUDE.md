@@ -19,6 +19,10 @@ owner outside this repo and dropped in.
 - `PLAN-CINTAS.md` (Nov 16 2026): the belt redesign («Red de cintas»), phases C1–C3 («implementa la Fase C<N> del
   plan de cintas»): belts as pieces on tiles with level I–V, building ports, mixed items, splitter/merger/sorter,
   bottlenecks. §9 holds the owner's answered decisions (Nov 16). C1 done in `pk-58`.
+- `PLAN-HACHA-Y-PICO.md` (Nov 25 2026): «Hacha y Pico», phases P1–P5 («implementa la Fase P<N> del plan Hacha y
+  Pico»): workshop caps and bigger camp/cart loads (P1), the Taller del Hachero's felling tools (P2), the Mina
+  Profunda with one floor per level (P3 model, P4 cutaway view, P5 content). §9 holds the owner's open decisions.
+  Not started.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
