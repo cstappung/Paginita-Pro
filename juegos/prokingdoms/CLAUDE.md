@@ -940,3 +940,11 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   through the existing «Necesito…» board (`Soc.askNeed`, server caps unchanged).
 - Menu button «Posada» (group Mundo, land only) with a badge of ready orders and unread chapters; Asesor rule
   `posada`; missions `t20`–`t24`; the autopilot builds it in Era II and delivers what `A.cabeMeta` allows.
+
+### Pace after the plan (`?timelapse`, one run each, game minutes)
+
+- Before (`pk-81`): Era II 12.4, III 31.8, IV 113, **V 349**.
+- After (`pk-83` code with the Hachero's first-level cost lowered): Era II 9.8, III 29.3, IV 113.1, **V 276** (inside
+  the 4–6 h target). The pilot kept the mine at 1–2 floors (its `mejorar()` picks the cheapest upgrades), so a deep
+  mine was not measured. A first `pk-82` run reached Era II at 26 and Era III at 46: the Hachero's level I (300 wood,
+  150 gold, 40 planks) ate the gold Era III asks for; it costs 250/60/30 now and the pilot asks `A.cabeMeta` first.
