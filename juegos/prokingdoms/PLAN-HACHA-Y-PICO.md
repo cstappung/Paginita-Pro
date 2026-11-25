@@ -14,8 +14,9 @@
 - **Cómo pedirlo:** «implementa la Fase P<N> del plan Hacha y Pico». Cada fase es una entrega (un PR, una versión
   `pk-N`). Siguen valiendo todas las reglas de la §1 de `PLAN-MEGA-ACTUALIZACION.md` y las de «Rules that cross
   systems» de `CLAUDE.md`.
-- **Decisiones del dueño:** pendientes (§9). Cada una trae una recomendación, y el plan está escrito con esa
-  recomendación hasta que el dueño responda.
+- **Decisiones del dueño:** respondidas el 25 de noviembre de 2026 las 1, 2, 3, 6 y 7, y el pedido de que la
+  tala llegue a ×4 (§9). Mandan sobre cualquier otra parte del plan. Las 4 y 5 siguen pendientes y el plan usa su
+  recomendación.
 - **Avance:** nada empezado.
 
 ---
@@ -89,7 +90,7 @@ Reglas:
 
 - El tope va en `max` (así lo leen `G.maxCount`, la ventana Construir y «Ya tienes el máximo»), y la ficha del
   edificio muestra «Talleres: 2 de 3 (la Era VI permite 4)».
-- **Partidas que ya tienen más (recomendado: se quedan con ellos, decisión 1).** Siguen trabajando, se pueden
+- **Partidas que ya tienen más (decisión 1 del dueño: se quedan con ellos).** Siguen trabajando, se pueden
   mejorar y mover, y el panel dice «Por encima del tope de la era (lo tenías de antes)». No se puede construir otro
   hasta bajar del tope. Si demuelen uno, no vuelve.
 - **Servidor:** `cleanBuildings` **no** aplica `max` a los tipos con `recipe`. Lo que hacen los talleres no está en
@@ -107,8 +108,8 @@ Reglas:
 | Campamento (`D.campoCap`) | `300 + 150·(L−1)` | `900 + 450·(L−1)` | 300 → **900** | 1.800 → **5.400** |
 | Carromato (`D.CARROMATO`) | `cap 250, capLvl 50` | `cap 600, capLvl 120` | 250 → **600** | 750 → **1.800** |
 | Carreta (`D.CART`) | `cap 20`, +5 por nivel | `cap 45`, +12 por nivel | 20 → **45** | 70 → **165** |
-| Muelle de colonia (mar) | `600 + 200·(L−1)` | `1.500 + 500·(L−1)` (decisión 3) | 600 → 1.500 | 2.600 → 6.500 |
-| Barcaza (mar) | `cap 300, capLvl 60` | `cap 700, capLvl 140` (decisión 3) | | |
+| Muelle de colonia (mar) | `600 + 200·(L−1)` | `1.500 + 500·(L−1)` (decisión 3: sí) | 600 → 1.500 | 2.600 → 6.500 |
+| Barcaza (mar) | `cap 300, capLvl 60` | `cap 700, capLvl 140` (decisión 3: sí) | | |
 
 Lo que hay que cuidar:
 
@@ -143,7 +144,8 @@ Un edificio nuevo, **Taller del Hachero** (`hachero`, 2×2, Era II, `max: 1`), c
 técnicas. Cada herramienta nueva hace que **cada árbol rinda más madera**: el leñador saca más por golpe, y el árbol
 pierde lo mismo que antes. Así el árbol da más madera en total y el campamento recibe más por minuto.
 
-Para que el aumento sea grande, el total llega a **+140 %** (los leñadores rinden 2,4 veces). Para que cueste, cada
+Para que el aumento sea grande, el total llega a **+300 %**: con la última herramienta cada árbol da **cuatro
+veces** la madera (pedido del dueño: «un ×4 al nivel máximo»). Para que cueste, cada
 herramienta pide **cinco cosas a la vez**:
 
 1. la herramienta anterior;
@@ -160,20 +162,24 @@ Después viene un tiempo de investigación largo, que **se puede acelerar** como
 
 | # | Herramienta | Era | Costo | Tiempo | Talar antes | Madera por árbol |
 |---|---|---|---|---|---|---|
-| 1 | Hacha de hierro forjado | II | 300 madera, 150 oro, 40 tablones | 30 min | 1.500 | +10 % |
-| 2 | Cuñas y mazo de roble | III | 400 tablones, 60 herramientas | 1 h 30 | 6.000 | +20 % |
-| 3 | Sierra tronzadora (dos mangos) | III | 150 herramientas, 120 lingotes | 3 h | 20.000 | +35 % |
-| 4 | Hacha de acero templado | IV | 200 herramientas, 80 acero | 6 h | 60.000 | +50 % |
-| 5 | Sierra de bastidor | V | 300 herramientas, 150 acero, 40 libros | 12 h | 150.000 | +70 % |
-| 6 | Cabrias y polipastos | VI | 250 acero, 60 maquinaria | 24 h | 400.000 | +90 % |
-| 7 | Sierra de vapor | VII | 400 acero, 150 maquinaria, 50 gemas | 2 días | 1.000.000 | +115 % |
-| 8 | Sierra de cinta | VIII | 600 acero, 300 maquinaria, 150 gemas | 3 días | 2.500.000 | +140 % |
+| 1 | Hacha de hierro forjado | II | 300 madera, 150 oro, 40 tablones | 30 min | 1.500 | +15 % (×1,15) |
+| 2 | Cuñas y mazo de roble | III | 400 tablones, 60 herramientas | 1 h 30 | 6.000 | +35 % (×1,35) |
+| 3 | Sierra tronzadora (dos mangos) | III | 150 herramientas, 120 lingotes | 3 h | 20.000 | +65 % (×1,65) |
+| 4 | Hacha de acero templado | IV | 200 herramientas, 80 acero | 6 h | 60.000 | +100 % (×2) |
+| 5 | Sierra de bastidor | V | 300 herramientas, 150 acero, 40 libros | 12 h | 150.000 | +145 % (×2,45) |
+| 6 | Cabrias y polipastos | VI | 250 acero, 60 maquinaria | 24 h | 400.000 | +195 % (×2,95) |
+| 7 | Sierra de vapor | VII | 400 acero, 150 maquinaria, 50 gemas | 2 días | 1.000.000 | +250 % (×3,5) |
+| 8 | Sierra de cinta | VIII | 600 acero, 300 maquinaria, 150 gemas | 3 días | 2.500.000 | **+300 % (×4)** |
 
 Los números de «Talar antes» se calibran con el piloto. La idea es que cada prueba tarde lo mismo que la
 investigación o más con los leñadores de esa era, para que no alcance con juntar materiales.
 
+Un ×4 de madera en la Era VIII es mucho: los costos de era piden cientos de miles de madera desde la VII, así que
+sirve, pero hay que medir con el piloto que la madera no deje de importar. Si sobra, se sube la prueba de campo o
+el mantenimiento, **no** se baja el ×4.
+
 **Mantenimiento** (decisión 4, recomendado sí): desde la herramienta 3, los leñadores gastan 1 herramienta del
-pueblo cada 500 de madera talada. Sin herramientas en la bodega, el rinde baja al de la herramienta 2 (y el panel
+pueblo cada 500 de madera talada (cada 300 desde la 6). Sin herramientas en la bodega, el rinde baja al de la herramienta 2 (y el panel
 dice por qué). Le da a la Herrería un uso que no se acaba nunca y hace que el bono no sea gratis.
 
 ### 3.3 Dónde se aplica
@@ -212,7 +218,7 @@ dice por qué). Le da a la Herrería un uso que no se acaba nunca y hace que el 
 
 ### 4.1 La idea
 
-**Mina Profunda** (`mina`, 4×3, Era III, `max: e => (e >= 7 ? 2 : 1)`). En la superficie es un castillete de
+**Mina Profunda** (`mina`, 4×3, Era III, `max: 1`: **una sola mina por reino**, decisión 7 del dueño). En la superficie es un castillete de
 madera con su rueda, la casa del torno y una escombrera. Debajo tiene **un piso por nivel del edificio**: un nivel 9
 tiene 9 pisos. El nivel máximo sigue la regla de todos (`3 + 2·(era−1)`), así que en la Era III llega a 5 pisos, en
 la V a 9, en la VII a 13 y en la X a 19.
@@ -231,7 +237,7 @@ trabajo, pero sí se queda sin lo bueno si nadie avanza.
 | 7–8 | Filón de oro | oro 45, mármol 30, hierro 25 | agua |
 | 9–10 | Mármol profundo | mármol 45, oro 30, gemas 25 | agua, gas (1 de cada 3) |
 | 11–13 | Geodas | gemas 40, mármol 30, oro 30 | gas |
-| 14+ | Corazón de la tierra | gemas 50, oro 30, mármol 20; en algunas vetas, Cristal de cueva o Hierro estelar (decisión 2) | gas y agua |
+| 14+ | Corazón de la tierra | gemas 50, oro 30, mármol 20; en algunas vetas, Cristal de cueva o Hierro estelar (decisión 2: sí, en medida justa, ver abajo) | gas y agua |
 
 Lo que da cada veta crece con la profundidad:
 
@@ -239,6 +245,11 @@ Lo que da cada veta crece con la profundidad:
   veces lo de una del piso 1.
 - **Ritmo por minero:** `D.NODES[k].rate × (1 + 0,05·(piso−1))`: +45 % en el piso 10 y +90 % en el 19. Va con
   Picos templados, el acopio y `Vida.recoleccion` como cualquier minería.
+- **Materiales especiales** (decisión 2 del dueño: sí, en una medida justa): desde el piso 14, una de cada 8 vetas
+  trae además Cristal de cueva o Hierro estelar, de 1 a 3 unidades por cada 1.000 de mineral que se saca de ella
+  (con semilla, siempre igual). La meta es que la mina dé más o menos un tercio de lo que da una semana de
+  mazmorras a ese nivel, para que las mazmorras sigan siendo el camino principal. Se mide con el piloto y se ajusta
+  solo la proporción.
 - **Hallazgos** (con semilla, iguales en vivo y sin conexión): algunas vetas esconden un bolsón que paga un cofre al
   llegar a cierto porcentaje (geoda, pepita, filón). Entra entero con `G.give`.
 
@@ -289,8 +300,9 @@ bodega de la mina (§4.4). Es lo que la hace un edificio para administrar y no s
   `data.js`. Por eso mover o recargar no cambia nada.
 - **La mina no se puede mover** (`G.MOVE_NO`): sus pisos están bajo ese lugar. Demolerla pide confirmar dos veces y
   avisa que se pierden los pisos (vuelve la mitad del costo del edificio, como siempre).
-- **Dónde se pone:** solo en tu tierra, no en tierra de nadie (decisión 6). Puede ir en cualquier casilla libre,
-  pero si la parcela es una comarca «Cantera vieja» sus pisos rinden +10 % (por `extra`, dentro del tope de vida).
+- **Dónde se pone (decisión 6 del dueño):** solo en tu tierra, en cualquier casilla libre. **El lugar no cambia lo
+  que hay debajo**: los pisos salen de la semilla de la mina (`b.id`), no de la parcela ni de la comarca. El dueño
+  no quiere que el territorio pese tanto en la mina.
 
 ### 4.5 Servidor
 
@@ -418,18 +430,24 @@ los lee.
 
 ---
 
-## 9. Decisiones del dueño (pendientes)
+## 9. Decisiones del dueño
 
-1. **Partidas con más talleres que el tope nuevo.** Recomendado: se quedan con ellos (heredados), pero no pueden
-   hacer otro hasta bajar del tope. La otra opción es demoler los que sobran devolviendo el costo entero.
-2. **Materiales especiales en el fondo de la mina** (Cristal de cueva y Hierro estelar desde el piso 14, hoy solo de
-   mazmorras). Recomendado: sí, poco (una de cada 8 vetas, en cantidades chicas). Le da un motivo a bajar tanto, sin
-   quitarles el sentido a las mazmorras.
-3. **Las bodegas grandes, ¿también en el mar?** (muelle de colonia y barcaza). Recomendado: sí, en la misma
-   proporción, para que el Archipiélago no quede atrás.
-4. **Mantenimiento de las herramientas de tala** (gastan herramientas desde la 3). Recomendado: sí.
+Respondidas el 25 de noviembre de 2026:
+
+1. **Partidas con más talleres que el tope nuevo:** se quedan con ellos (heredados). No pueden hacer otro hasta
+   bajar del tope.
+2. **Materiales especiales en el fondo de la mina:** sí, en una medida justa (§4.2).
+3. **Bodegas grandes también en el mar** (muelle de colonia y barcaza): sí, en la misma proporción.
+6. **La mina va en tu territorio**, y lo que hay debajo sale de una semilla, no del lugar.
+7. **Una sola mina por reino.**
+- **Topes de talleres:** los números de la tabla de §2.1 están bien.
+- **Herramientas de tala:** que lleguen a ×4 al nivel máximo (§3.2).
+- La propuesta «El Subsuelo» (prospección, mapa geológico y Vetas Madre) **quedó rechazada**: no se mezcla el
+  territorio con la mina.
+
+Pendientes (el plan usa la recomendación):
+
+4. **Mantenimiento de las herramientas de tala** (gastan herramientas desde la 3). Recomendado: sí. Con el ×4 se
+   vuelve más importante, porque es lo que impide que el bono sea gratis.
 5. **¿Se acelera con monedas la investigación del Hachero?** Recomendado: sí el tiempo, como las mejoras, pero
    **nunca** la prueba de campo.
-6. **Dónde se pone la mina.** Recomendado: solo en tu tierra. La otra opción es tierra de nadie, como los
-   campamentos, pero una mina de 19 pisos fuera del reino queda expuesta a que otro conquiste la parcela.
-7. **Cuántas minas.** Recomendado: 1 hasta la Era VI y 2 desde la VII. Una sola mina ya tiene hasta 19 pisos.
