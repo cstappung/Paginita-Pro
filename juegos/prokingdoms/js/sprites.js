@@ -809,6 +809,50 @@
       }
       p.flag(0.3, 0.3, 17, col, 6);
     },
+    // pk-84: Mina Profunda en la superficie. Castillete sobre la boca del pozo con su rueda (polea), la casa del torno y la
+    // escombrera, que crece con los pisos. Por nivel: castillete de madera (tier 0–1), con chimenea en la casa del torno
+    // (tier 1+), de hierro remachado (tier 2+) y con dos ruedas, la doble jaula (tier 3+).
+    mina(p, col, m, tier) {
+      p.fill([p.P(0, 0, 0), p.P(4, 0, 0), p.P(4, 3, 0), p.P(0, 3, 0)], 'soil', 0.85, 0.5);
+      // escombrera (atrás a la derecha)
+      const esc = tier >= 2 ? ['rock', 'stone', 'rock', 'rust', 'stone'] : ['rock', 'stone', 'soil'];
+      rockPile(p, 3.0, 0.15, esc);
+      if (tier >= 1) rockPile(p, 3.25, 0.85, esc);
+      // casa del torno
+      const h = { x: 2.1, y: 1.55, w: 1.6, h: 1.25 };
+      p.box(h.x, h.y, h.w, h.h, 0, 10, tier >= 2 ? 'stone' : 'plank');
+      p.door(h, 'L', 0.55, 0.4, 7);
+      p.win(h, 'R', 0.6, 6, 0.3, 3);
+      p.roof(h.x, h.y, h.w, h.h, 10, 6, tier >= 1 ? 'tile' : 'thatch', 0.35, 0.18, 'y');
+      if (tier >= 1) p.box(3.35, 1.7, 0.22, 0.22, 10, 24, 'stone', 'stone', '#2a2420'); // chimenea de la máquina
+      // boca del pozo y rieles hasta el frente
+      p.fill([p.P(0.55, 0.55, 0.2), p.P(1.65, 0.55, 0.2), p.P(1.65, 1.55, 0.2), p.P(0.55, 1.55, 0.2)], '#1a1410', 1, 0);
+      p.box(0.45, 0.45, 1.3, 0.12, 0, 1.5, 'darkwood'); p.box(0.45, 1.53, 1.3, 0.12, 0, 1.5, 'darkwood');
+      for (const x of [0.85, 1.35]) { p.line(p.P(x, 1.65, 0.6), p.P(x, 2.95, 0.6), '#5a5a62'); }
+      for (let y = 1.8; y < 2.95; y += 0.3) p.line(p.P(0.75, y, 0.3), p.P(1.45, y, 0.3), '#4a3420');
+      p.box(0.8, 2.3, 0.6, 0.45, 0.6, 3.2, 'rust', 'rust', 'rock'); // vagoneta con mineral
+      // castillete: cuatro patas inclinadas hacia la rueda
+      const pata = tier >= 2 ? '#5c6068' : '#6a4426', pata2 = tier >= 2 ? '#3e4248' : '#4a2e18', alto = 30 + tier * 3;
+      const top = [p.P(0.9, 0.9, alto), p.P(1.3, 0.9, alto), p.P(1.3, 1.2, alto), p.P(0.9, 1.2, alto)];
+      const base = [p.P(0.5, 0.5, 0), p.P(1.7, 0.5, 0), p.P(1.7, 1.6, 0), p.P(0.5, 1.6, 0)];
+      for (let i = 0; i < 4; i++) { p.line(base[i], top[i], i === 2 ? pata2 : pata); p.line([base[i][0] + 1, base[i][1]], [top[i][0] + 1, top[i][1]], pata2); }
+      for (let z = 8; z < alto; z += 8) { // travesaños
+        const k = z / alto, mid = (a, c) => [Math.round(a[0] + (c[0] - a[0]) * k), Math.round(a[1] + (c[1] - a[1]) * k)];
+        const q = [0, 1, 2, 3].map(i => mid(base[i], top[i]));
+        p.line(q[0], q[1], pata2); p.line(q[1], q[2], pata2); p.line(q[3], q[0], pata);
+      }
+      // rueda (polea) arriba, y el cable a la casa del torno
+      const ruedas = tier >= 3 ? [[1.0, 1.05], [1.25, 1.05]] : [[1.1, 1.05]];
+      for (const [rx, ry] of ruedas) {
+        const c = p.P(rx, ry, alto + 4), ctx = p.ctx;
+        ctx.strokeStyle = tier >= 2 ? '#8a8e96' : '#3a2a1c'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(c[0], c[1], 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(c[0] - 5, c[1]); ctx.lineTo(c[0] + 5, c[1]); ctx.moveTo(c[0], c[1] - 5); ctx.lineTo(c[0], c[1] + 5); ctx.stroke();
+        const t = p.P(2.3, 1.9, 9);
+        p.line([c[0] + 4, c[1] + 2], t, '#2a2420');
+      }
+      p.flag(1.1, 1.05, alto + 10, col, 6);
+    },
     builder(p, col) {
       p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.95, 0.5);
       const b = { x: 0.2, y: 0.2, w: 1.3, h: 1.3 };
@@ -2068,7 +2112,7 @@
   const HEAD = { axe: 1.0, pick: 1.6, hammer: 1.0, sickle: 1.1, knife: 0.5, sword: 0.3, spear: 0.3 }; // del extremo del mango al filo que golpea
   // troop: el mismo cuerpo vestido de soldado (militia, spear, archer, knight, cleric o catapult, la dotación).
   // Cambian la túnica, el casco o la capucha y el arma que lleva en la mano de adelante (al pelear, la herramienta).
-  const TROOP_TUNIC = { militia: [150, 118, 80], archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [118, 100, 70], monk: [126, 88, 52], mage: [72, 58, 150] };
+  const TROOP_TUNIC = { minero: [74, 90, 116], militia: [150, 118, 80], archer: [86, 108, 56], knight: [168, 174, 188], cleric: [226, 220, 204], rider: [150, 56, 46], crossbow: [118, 100, 70], monk: [126, 88, 52], mage: [72, 58, 150] };
   // pk-80: cada tropa con su identidad (pedido del dueño): miliciano de jubón con faja del reino y rodela, lancero con
   // escudo redondo del reino, arquero con carcaj, caballero con yelmo cerrado y sobreveste, clérigo con estola de oro,
   // ballestero con pavés a la espalda, monje tonsurado con capucha caída, mago con sombrero de ala y barba gris.
@@ -2248,7 +2292,13 @@
       E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
       Cp(12.4, 1.2, 12.4, 18.4, 0.32, 6.5, WO); E(12.4, 0.9, 0.5, 0.5, 6.6, WO);
     }
-    if (troop) {
+    if (troop === 'minero') { // pk-84: casco de cuero con lámpara de carburo y el pañuelo del color del reino
+      E(hx - 0.05, hy - 0.55, 1.68, 1.32, 4.65, vRamp([128, 90, 50]), (px, py) => py < hy - 0.2);
+      E(hx - 0.05, hy - 0.62, 1.9, 0.26, 4.66, vRamp([96, 66, 36]));
+      if (!back) E(hx + 0.95, hy - 0.85, 0.46, 0.42, 4.75, vRamp([255, 232, 140]));
+      E(hx + 0.2, shY - 0.05, 1.3, 0.55, 3.6, COLR);
+      if (!back) { E(hx + 0.55, hy + 0.55, 0.22, 0.18, 4.7, vRamp([60, 52, 48])); E(hx + 0.15, hy + 0.75, 0.2, 0.16, 4.7, vRamp([60, 52, 48])); } // tizne
+    } else if (troop) {
       const helm = troop === 'spear' || troop === 'rider' || troop === 'crossbow' ? ME : troop === 'militia' ? WRAP : null;
       if (helm) E(hx - 0.05, hy - 0.5, 1.6, 1.35, 4.65, helm, (px, py) => py < hy - 0.2);
       if (troop === 'spear' && !back) Cp(hx + 0.75, hy - 0.5, hx + 0.75, hy + 0.7, 0.22, 4.7, ME); // nasal
@@ -2354,6 +2404,7 @@
       else if (troop === 'hing') { Cp(11.0, 10.8 + yo, 12.6, 6.4 + yo, 0.3, z, WO); Cp(12.0, 6.0 + yo, 13.4, 6.8 + yo, 0.5, z + 0.05, ME); } // martillo de herrera
       else if (troop === 'hjug') { E(11.2, 11.6 + yo, 1.25, 1.4, z, (px, py) => (Math.hypot(px - 11.3, py - 11.4 - yo) < 0.35 ? BO : WO)); Cp(11.8, 10.5 + yo, 13.6, 6.6 + yo, 0.26, z + 0.05, BO); E(13.7, 6.3 + yo, 0.35, 0.5, z + 0.06, BO); } // laúd
       else if (troop === 'hcor') { Cp(11.1, 10.0 + yo, 12.4, 6.6 + yo, 0.3, z, ME); Cp(12.4, 6.6 + yo, 12.4, 4.4 + yo, 0.26, z, ME); Cp(10.4, 9.6 + yo, 11.8, 10.2 + yo, 0.24, z + 0.05, ST); } // alfanje
+      else if (troop === 'minero') { Cp(10.6, 11.0 + yo, 12.4, 5.4 + yo, 0.3, z, WO); Cp(11.2, 4.8 + yo, 13.8, 6.2 + yo, 0.3, z + 0.05, ME); } // pico al hombro
       else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.2 + yo, 0.95, 0.95, z + 0.1, (px, py) => (Math.hypot(px - 11.6, py - 1.2 - yo) < 0.45 ? vRamp([255, 236, 150]) : ST)); } // báculo con el sol
       else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, 0.8, 0.85, z + 0.05, (px, py) => (U.hash(Math.round(px * 4), Math.round(py * 4), 3) > 0.8 ? ME : WO)); } // garrote con clavos
       E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, SK);

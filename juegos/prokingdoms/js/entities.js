@@ -338,6 +338,19 @@
     u.mode = 'idle';
   }
 
+  // pk-84: mineros de la Mina Profunda. Caminan hasta el castillete y bajan (u.inside, como en un taller); ahí el piso lo
+  // elige PK.Mina.ubicar. Lo que sacan lo calcula PK.Mina.paso: adentro no hacen nada por su cuenta.
+  function doMina(u, dt) {
+    const g = G(), b = g.bById.get(u.task.b);
+    if (!b || !b.done || !b.def.mina) { u.task = null; return; }
+    if (u.carry && goDeposit(u, dt)) return; // primero deja lo que lleva
+    if (!nearRect(u, b.x, b.y, b.x + b.w - 1, b.y + b.h - 1)) {
+      if (!pathTo(u, rectGoal(b, true))) { u.task = null; u.mode = 'idle'; }
+      return;
+    }
+    if (!PK.Mina.entrar(b, u)) { u.task = null; u.mode = 'idle'; }
+  }
+
   // Exploradores: buscan el borde de la niebla más cercano dentro de su alcance y caminan hacia él.
   function doExplore(u) {
     const g = G();
@@ -381,7 +394,7 @@
     const def = b.def;
     if (g.esGranja(b)) { if (b.farmer === null || b.farmer === u.id) { g.assign(u, { t: 'farm', b: b.id }); return; } }
     if (def.recipe && b.workers.length < g.slots(b)) { g.assign(u, { t: 'work', b: b.id }); return; }
-    if (def.drop && b.type !== 'tc') {
+    if (def.drop && b.type !== 'tc' && !def.mina) {
       let best = null, bd = 9;
       for (const res of def.drop) {
         const n = W.nearestNode(res, b.cx, b.cy, 9, u.owner);
@@ -543,6 +556,7 @@
       case 'farm': doFarm(u, dt); break;
       case 'build': doBuildOld(u); break;
       case 'work': doWork(u, dt); break;
+      case 'mina': doMina(u, dt); break;
       case 'deposit': doDeposit(u, dt); break;
       case 'explore': doExplore(u, dt); break;
       case 'dig': doDig(u, dt); break;

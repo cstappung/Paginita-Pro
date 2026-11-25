@@ -18,7 +18,7 @@
   const PLAN = {
     1: [['house', 2], ['lumber', 1], ['establo', 1], ['mining', 1], ['scout', 1], ['mill', 1], ['farm', 2], ['house', 4], ['granary', 1], ['warehouse', 1], ['builder', 1]],
     2: [['sawmill', 1], ['hachero', 1], ['barracks', 1], ['tavern', 1], ['library', 1], ['market', 1], ['house', 7], ['barracks', 1], ['tavern', 1], ['consejo', 1], ['farm', 4], ['builder', 2], ['cartwright', 1], ['lumber', 2], ['muelle', 1], ['farol', 2], ['pozo', 1], ['fuente', 1]],
-    3: [['establo', 2], ['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
+    3: [['establo', 2], ['mina', 1], ['estatua', 1], ['banca', 2], ['smelter', 1], ['scriptorium', 1], ['masonry', 1], ['forge', 1], ['house', 10], ['warehouse', 2], ['monastery', 1], ['builder', 3], ['farm', 6], ['mining', 2], ['masonry', 2], ['mining', 3]],
     4: [['university', 1], ['steelworks', 1], ['masonry', 3], ['mining', 4], ['house', 13], ['granary', 2], ['builder', 4], ['farm', 8], ['smelter', 2]],
     5: [['workshop', 1], ['house', 16], ['warehouse', 3], ['farm', 10]],
     6: [['m_jardines', 1], ['house', 19]],
@@ -244,6 +244,23 @@
     ids.sort((a, b) => Object.values(g.techCost(a, g.lvl(a))).reduce((s, v) => s + v, 0) - Object.values(g.techCost(b, g.lvl(b))).reduce((s, v) => s + v, 0));
     if (ids[0]) g.startResearch(ids[0]);
   }
+  // pk-84: la Mina Profunda: montacargas cuando no da abasto, bomba o ventilación en los pisos que lo piden, rieles donde
+  // hay mineros; nunca con más de un 15 % de lo que hay de cada material (no le quita a la meta de era)
+  function mina() {
+    const g = G(), Mi = PK.Mina, b = Mi && Mi.mia();
+    if (!b) return;
+    const barato = c => Object.keys(c).every(r => (S().res[r] || 0) * 0.15 >= c[r]);
+    const s = Mi.montSig(b), r = Mi.resumen(b);
+    if (s && !s.why && r.limita && barato(s.m.cost) && Mi.subirMontacargas(b)) { anota('Mina: ' + s.m.name + '.'); return; }
+    const c = Mi.cuenta(b);
+    for (let n = Mi.pisos(b); n >= 1; n--) {
+      for (const m of Mi.mejorasDe(b, n)) {
+        if (m.tiene || m.why || m.k === 'lamparas' || m.k === 'puestos') continue;
+        if (m.k === 'rieles' && !c[n]) continue;
+        if (barato(m.cost) && Mi.comprar(b, n, m.k)) { P.minaMej = (P.minaMej || 0) + 1; return; }
+      }
+    }
+  }
   // pk-83: el Taller del Hachero: primero Golpe, después Filo y Aguante, cuando se puede pagar sin tocar la meta de era
   function hachero() {
     const g = G();
@@ -410,6 +427,7 @@
       mejorar();
       investigar();
       hachero();
+      mina();
       heroes();
       guerra();
       frontera();
@@ -418,7 +436,7 @@
     } catch (e) { console.error('piloto', e); } finally { PK.UI.mute = false; }
   }
   const F0 = () => (PK.Fort ? PK.Fort.mias().length : 0);
-  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, hachero: P.hachero || 0, cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
+  P.resumen = () => ({ minutosPorEra: Object.assign({}, P.eras), capitulos: Object.assign({}, P.caps), mudanzas: P.mudanzas || 0, cambiosExtrae: P.cambios || 0, compras: P.compras || 0, ociosos: Math.round((100 * (P._oc || 0)) / Math.max(1, P._ocN || 0)) + '%', bodegasLlenas: P.llenos, batallas: P.ganadas + ' ganadas / ' + P.perdidas + ' perdidas', obras: P.obras, mejoras: P.mejoras, heroes: P.heroes || 0, hachero: P.hachero || 0, mina: PK.Mina && PK.Mina.mia() ? PK.Mina.mia().lvl + ' pisos, ' + PK.Mina.mia().workers.length + ' mineros, ' + Math.round(S().stats.mina_sacado || 0) + ' sacado, ' + (P.minaMej || 0) + ' mejoras' : 'no', cintas: P.cintas + ' trazadas, ' + P.cintasSubidas + ' piezas subidas', nivelHeroe: (S().stats.hero_lvl || 0), objetos: (S().stats.items_found || 0), parcelas: P.parcelas || 0, campanas: P.campanas || 0, conquistas: (S().stats.conquests || 0), sitios: P.sitios || 0, fortalezas: F0(), asedios: (S().stats.asedios_ganados || 0), minutos: Math.round((G().time - P.t0) / 6) / 10 });
   P.start = function (o) {
     o = o || {};
     const st = S();

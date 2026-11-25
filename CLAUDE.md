@@ -59,7 +59,7 @@ before the first edit. Read only the docs the task needs.
 | Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 | Cacerías de récords, «Fichado», fichar, mercenarios, poner precio a un récord, recompensas por superar un n.º 1 | `docs/claude/juegos/cazas.md` |
 | Casino, apuestas, el avión, el pingüino(ito), ruleta, blackjack, póker, plinko | `docs/claude/juegos/casino.md` |
-| Pro Kingdoms (reinos, isométrico), sus reportes de errores y sugerencias (🐞), beta testers, juegos en beta, servidor del mundo compartido | `juegos/prokingdoms/CLAUDE.md` |
+| Pro Kingdoms (reinos, isométrico; la Mina Profunda, el Taller del Hachero, la Posada de los Viajeros), sus reportes de errores y sugerencias (🐞), beta testers, juegos en beta, servidor del mundo compartido | `juegos/prokingdoms/CLAUDE.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 

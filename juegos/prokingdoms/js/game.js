@@ -462,6 +462,7 @@
     }
   };
   G.stat = function (k, n) { S.stats[k] = (S.stats[k] || 0) + n; };
+  G.gained = (res, n, zone, hunt) => gained(res, n, zone, hunt); // pk-84: la mina también cuenta lo que saca
   function gained(res, n, zone, hunt) {
     G.stat('g_' + res, n); G.stat('g_total', n);
     if (hunt) G.stat('hunt', n);
@@ -528,7 +529,7 @@
     let bst = null, bd = 1e9;
     const isla = G.enMar() && PK.Arch ? PK.Arch.islaDe(x, y) : -1; // en el mar, solo los acopios de la misma isla
     for (const b of G.buildings) {
-      if (b.owner !== owner || !b.done || !b.def.drop || !b.def.drop.includes(res)) continue;
+      if (b.owner !== owner || !b.done || !b.def.drop || !b.def.drop.includes(res) || b.def.mina) continue; // pk-84: en la mina no descarga nadie
       if (isla >= 0 && PK.Arch.islaDe(b.cx, b.cy) !== isla) continue;
       const d = U.dist(x, y, b.cx, b.cy) - b.w / 2;
       if (d < bd) { bd = d; bst = b; }
@@ -1259,7 +1260,7 @@
     if (u.inside) {
       for (const b of G.buildings) {
         const i = b.workers.indexOf(u.id);
-        if (i >= 0) { b.workers.splice(i, 1); placeOutside(u, b); }
+        if (i >= 0) { b.workers.splice(i, 1); placeOutside(u, b); if (b.mina && PK.Mina) PK.Mina.soltar(b, u.id); }
       }
       u.inside = false;
     }
@@ -1350,6 +1351,18 @@
           else G.assign(u, { t: 'move' }), moveUnit(u, b.x + b.w, b.y + b.h);
         }
         return true;
+      }
+      if (b.def.mina) { // pk-84: mineros de la Mina Profunda
+        let free = PK.Mina.libres(b), ok = 0;
+        for (const u of units) {
+          if (u.task && u.task.t === 'mina' && u.task.b === b.id) { ok++; continue; }
+          if (free <= 0) continue;
+          free--; ok++;
+          G.release(u);
+          G.assign(u, mark({ t: 'mina', b: b.id }));
+        }
+        if (!silent && ok < units.length) toast(b.def.name + ' no tiene más puestos (' + PK.Mina.puestos(b) + '): súbela de nivel para cavar otro piso.', 'warn');
+        return ok > 0;
       }
       if (b.def.recipe) {
         if (b.owner === 'p' && PK.Logi && !PK.Logi.supplied(b)) {
@@ -1674,7 +1687,7 @@
   // Cuesta un 10% de lo que pide el edificio base, para que acomodar no sea gratis pero sí mucho más barato que
   // demoler y volver a construir (que además perdía los niveles). Las cintas que llegaban a él se quitan (su
   // recorrido ya no sirve). El Centro Urbano no se muda: de él salen el hogar y las regiones de los aldeanos.
-  G.MOVE_NO = { tc: D.BUILD.tc.name + ' no se puede mover: es el corazón del reino.', granporton: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.', granportonv: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.' };
+  G.MOVE_NO = { mina: 'La mina no se puede mover: sus pisos están bajo este lugar.', tc: D.BUILD.tc.name + ' no se puede mover: es el corazón del reino.', granporton: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.', granportonv: 'El Gran Portón va en la muralla: demuélelo y ponlo de nuevo.' };
   G.moveCost = b => { const c = {}, base = D.BUILD[b.type].cost || {}; for (const r in base) if (r !== 'coins') c[r] = Math.max(5, Math.round((base[r] * 0.1) / 5) * 5); return c; };
   G.canMove = b => !!b && b.owner === 'p' && !b.remote && !b.static && !G.MOVE_NO[b.type];
   G.moveBuilding = function (b, x, y) {
@@ -1725,6 +1738,7 @@
 
   // ---------- Producción y colas ----------
   G.updateBuildings = function (dt) {
+    if (PK.Mina) PK.Mina.paso(dt); // pk-84: la Mina Profunda (la misma fórmula en vivo y sin conexión)
     for (const b of G.buildings) {
       if (b.owner === 'p' && !b.done) { // obra en curso: avanza sola, a la velocidad de Arquitectura y los deseos
         b.progress += (dt / b.def.time) * G.buildMult('p');
@@ -1930,6 +1944,7 @@
         const t = u.task;
         if (t.t === 'explore' || (t.t === 'move' && t.then)) { if (t.then) u.task = { t: 'explore' }; exploreOffline(u, dt); continue; }
         // iba a descargar: lo deja donde corresponde y sigue con lo suyo (antes quedaba así todo el tiempo sin ti)
+        if (t.t === 'mina' && u.owner === 'p') { const mb = G.bById.get(t.b); if (mb && PK.Mina) PK.Mina.entrar(mb, u); else u.task = null; continue; } // pk-84: sin ti llega enseguida
         if (t.t === 'deposit' && u.owner === 'p') { const bb = t.next && t.next.base ? G.bById.get(t.next.base) : null; G.deposit(u, bb || G.buildings.find(o => o.owner === 'p' && o.type === 'tc')); u.task = t.next || null; continue; }
         if (t.t === 'gather') {
           // pk-42: como en vivo, los tuyos trabajan dentro del radio de su edificio

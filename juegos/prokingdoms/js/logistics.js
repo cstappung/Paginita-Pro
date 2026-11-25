@@ -441,7 +441,8 @@
   // r.res, si está, solo eso. Las rutas de pk-54 (r.res sin tipo) siguen yendo por recurso.
   L.TIPOS_CAMPO = ['lumber', 'mining', 'mill'];
   L.tipoDeRes = res => L.TIPOS_CAMPO.find(t => (D.BUILD[t].drop || []).includes(res)) || null;
-  L.camposDe = (res, tipo) => (res || tipo ? PK.Libro.campos().filter(b => b.type !== 'colonia' && PK.Libro.almacenDe(b) === b && (!tipo || b.type === tipo) && (!res || (b.def.drop || []).includes(res))) : []);
+  // pk-84: la Mina Profunda cuenta como «campamento minero» para las rutas comodín
+  L.camposDe = (res, tipo) => (res || tipo ? PK.Libro.campos().filter(b => b.type !== 'colonia' && PK.Libro.almacenDe(b) === b && (!tipo || b.type === tipo || (tipo === 'mining' && b.type === 'mina')) && (!res || (b.def.drop || []).includes(res))) : []);
   L.camposRuta = r => L.camposDe(r.res, r.tipo);
   const stockCampo = (b, res) => (PK.Libro.inv(b)[res] || 0);
   // lo que guarda un campamento de lo que trae la ruta (y recibe su destino, si es un edificio fijo)

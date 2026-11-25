@@ -90,6 +90,10 @@
     warehouse: { name: 'Almacén', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 30, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánto puedes guardar de todo lo demás.' },
     // pk-83 (plan Hacha y Pico, P2): las herramientas de tala, en tres ramas (D.HACHERO). Su nivel abre los niveles de herramienta.
     hachero: { name: 'Taller del Hachero', w: 2, h: 2, cost: { wood: 220, stone: 60, gold: 40 }, time: 40, era: 2, max: 1, upT: 0.9, desc: 'Investiga herramientas de tala en tres ramas: Filo (más rápido), Golpe (más madera por toque) y Aguante (el árbol dura más). Todo al máximo, ×4 de madera.' },
+    // pk-84 (plan Hacha y Pico, P3): un piso por nivel, una por reino (decisión 7 del dueño), solo en tu tierra. Es un
+    // campamento para la logística (Libro.CAMPOS: guarda aparte, la vacían carromatos y cintas), pero nadie descarga en
+    // ella: lo que sale de las vetas sube por el montacargas (js/mina.js, D.MINA).
+    mina: { name: 'Mina Profunda', w: 4, h: 3, cost: { wood: 600, stone: 300, planks: 150, tools: 40 }, up: { wood: 250, stone: 180, planks: 50 }, time: 180, era: 3, max: 1, upT: 1.3, mina: true, drop: ['stone', 'ore', 'gold', 'marble', 'gems'], desc: 'Cada nivel cava un piso más. Mientras más hondo, más rinden las vetas y más raros son los minerales. Trabajan muchos mineros; lo que sacan sube por el montacargas y lo llevan carromatos o cintas.' },
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
     scout: { name: 'Puesto de Exploradores', w: 2, h: 2, cost: { wood: 100, food: 50 }, time: 25, era: 1, max: 1, trains: 'scout', upT: 0.9, desc: 'Entrena exploradores que revelan el mapa. Su nivel define cuántas casillas alrededor de tu reino pueden explorar (en el nivel 19 o antes, el mapa entero).' },
     cartwright: { name: 'Carretería', w: 3, h: 3, cost: { wood: 250, stone: 100 }, time: 45, era: 2, max: 2, upT: 0.9, desc: 'Construye carretas que llevan insumos a los talleres y sacan lo que producen. Con caminos van mucho más rápido.' },
@@ -118,7 +122,7 @@
     workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, max: e => 1 + Math.floor((e - 3) / 2), desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'hachero', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'hachero', 'mina', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -177,6 +181,7 @@
     warehouse: L => ({ capGoods: capR(1000 * Math.pow(1.6, L - 1)) }),
     builder: () => ({ builders: 1 }),
     hachero: L => ({ talaNivel: Math.min(5, Math.ceil(L / 2)) }),
+    mina: L => ({ pisos: L, minaCap: D.minaCap(L) }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
     fuerte: L => ({ defense: Math.round(140 * (1 + 0.4 * (L - 1))), sight: 9 + L }),
@@ -209,6 +214,7 @@
     consejeros: ['Consejeros', v => v + ' de 6'], guildBonus: ['Recolección (en gremio)', pct], relics: ['Reliquias', v => String(v)], relicGold: ['Oro por reliquia/min', v => v.toFixed(1)],
     prestige: ['Prestigio', v => String(v)], allBonus: ['Bono a todo', pct],
     talaNivel: ['Herramientas hasta el nivel', v => String(v)],
+    pisos: ['Pisos', v => String(v)], minaCap: ['Bodega de la mina', v => U.fmt(v)],
     carts: ['Carretas', v => String(v)], cartCap: ['Carga por carreta', v => String(v)], cartSpeed: ['Velocidad de carretas', pct],
   };
 
@@ -963,6 +969,68 @@
     ],
     lvlTaller: n => 2 * n - 1,
   };
+  // pk-84 (plan Hacha y Pico, P3): la Mina Profunda. Cada piso tiene vetas (con semilla: D.vetaMina) que se agotan y un
+  // frente de avance que las destapa de a una. Lo que se saca sube por el montacargas y entra en la bodega de la mina.
+  // Los peligros son fijos por piso (agua: sin bomba rinde la mitad; gas: sin ventilación no se trabaja): nada al azar en
+  // vivo, para que sin conexión dé lo mismo.
+  D.MINA = {
+    puestos: 6,          // mineros por piso
+    prof: 0.05,          // +5 % de ritmo por piso de profundidad
+    cant: 0.3,           // +30 % de cantidad de veta por piso
+    avance: 0.15,        // parte del trabajo que va al frente aunque haya vetas
+    roca: 0.5,           // el frente da piedra a la mitad del ritmo
+    maxVetas: 4,         // vetas destapadas esperando: con más, el frente se detiene
+    avanceCosto: n => Math.round(900 * (1 + 0.25 * (n - 1))), // minero·segundos para destapar la próxima veta
+    vetasIni: 2,
+    esp: ['crystal', 'starIron'], // desde el piso 14 (decisión 2 del dueño: en medida justa)
+    espDesde: 14, espCada: 8, espPorMil: [1, 3],
+    hallazgo: 6,         // una de cada 6 vetas esconde un bolsón (gemas al agotarla)
+    estratos: [
+      { hasta: 2, name: 'Tierra y roca', res: { stone: 70, ore: 30 }, col: [104, 78, 52] },
+      { hasta: 4, name: 'Roca firme', res: { stone: 40, ore: 45, gold: 15 }, col: [112, 108, 102] },
+      { hasta: 6, name: 'Vetas de hierro', res: { ore: 50, gold: 30, stone: 20 }, col: [96, 86, 84], agua: 1 / 3 },
+      { hasta: 8, name: 'Filón de oro', res: { gold: 45, marble: 30, ore: 25 }, col: [88, 82, 74], agua: 1 / 3 },
+      { hasta: 10, name: 'Mármol profundo', res: { marble: 45, gold: 30, gems: 25 }, col: [150, 146, 140], agua: 1 / 3, gas: 1 / 3 },
+      { hasta: 13, name: 'Geodas', res: { gems: 40, marble: 30, gold: 30 }, col: [70, 62, 84], gas: 0.4 },
+      { hasta: 99, name: 'Corazón de la tierra', res: { gems: 50, gold: 30, marble: 20 }, col: [48, 40, 60], gas: 0.4, agua: 0.4 },
+    ],
+    mejoras: {
+      rieles: { name: 'Rieles y vagonetas', desde: 1, ef: 0.25, txt: '+25 % en este piso', cost: n => ({ ingots: 15 + 8 * n, planks: 40 + 15 * n }) },
+      lamparas: { name: 'Lámparas de aceite', desde: 3, ef: 0.1, txt: '+10 % en este piso', cost: n => ({ gold: 40 + 20 * n, tools: 10 + 4 * n }) },
+      bomba: { name: 'Bomba de agua', solo: 'agua', txt: 'sin bomba este piso rinde la mitad', cost: n => (n < 9 ? { ingots: 40 + 10 * n, tools: 20 + 5 * n } : { steel: 20 + 5 * n, machinery: 5 + n }) },
+      ventilacion: { name: 'Ventilación', solo: 'gas', txt: 'sin ventilación este piso no se trabaja', cost: n => ({ planks: 100 + 20 * n, steel: 15 + 4 * n }) },
+      puestos: { name: 'Puestos extra', desde: 5, ef: 2, txt: '+2 mineros en este piso', cost: n => ({ tools: 40 + 10 * n, steel: 10 + 4 * n }) },
+    },
+    montacargas: [
+      { name: 'Torno de mano', sube: 120, era: 3 },
+      { name: 'Malacate de caballos', sube: 360, era: 4, cost: { planks: 400, tools: 120, food: 600 } },
+      { name: 'Jaula a vapor', sube: 900, era: 6, cost: { steel: 300, machinery: 60, blocks: 300 } },
+      { name: 'Doble jaula a vapor', sube: 1800, era: 8, cost: { steel: 800, machinery: 200, blocks: 800 } },
+    ],
+  };
+  D.minaCap = L => 2000 + 600 * (L - 1);
+  D.estratoDe = n => D.MINA.estratos.find(e => n <= e.hasta);
+  // Peligros fijos de un piso (con la semilla de la mina): { agua, gas }
+  D.pisoMina = function (sem, n) {
+    const r = U.rng((sem * 7919 + n * 104729) >>> 0), e = D.estratoDe(n);
+    r(); // la primera tirada del generador sale pareja con semillas cercanas
+    return { n, e, agua: !!(e.agua && r() < e.agua), gas: !!(e.gas && r() < e.gas) };
+  };
+  // La veta número i del piso n: { res, cant, esp?, espN?, hall? }. Siempre la misma para esa mina.
+  D.vetaMina = function (sem, n, i) {
+    const r = U.rng((sem * 7919 + n * 104729 + (i + 1) * 15485863) >>> 0), e = D.estratoDe(n), M = D.MINA;
+    r();
+    let x = r() * 100, res = 'stone';
+    for (const k in e.res) { if ((x -= e.res[k]) < 0) { res = k; break; } }
+    const cant = Math.round(D.NODES[res].amount * 2 * (1 + M.cant * (n - 1)) * (0.7 + 0.6 * r()));
+    const v = { res, cant };
+    if (n >= M.espDesde && r() < 1 / M.espCada) { v.esp = M.esp[Math.floor(r() * M.esp.length)]; v.espN = Math.max(1, Math.round(cant / 1000 * (M.espPorMil[0] + r() * (M.espPorMil[1] - M.espPorMil[0])))); }
+    if (r() < 1 / M.hallazgo) v.hall = 5 + 2 * n;
+    return v;
+  };
+  // Ritmo extra de un minero en el piso n (profundidad × rieles × lámparas), y el mejor de la era para el servidor
+  D.minaRitmo = (n, rieles, lamparas) => (1 + D.MINA.prof * (n - 1)) * (1 + (rieles ? D.MINA.mejoras.rieles.ef : 0)) * (1 + (lamparas ? D.MINA.mejoras.lamparas.ef : 0));
+  D.minaMax = era => D.minaRitmo(Math.max(1, D.maxLevel('mina', era)), true, true);
   D.talaCosto = (rama, n) => { const c = {}, b = D.HACHERO.niveles[n - 1].cost, k = D.HACHERO.ramas[rama].costo; for (const r in b) c[r] = Math.round(b[r] * k / 5) * 5; return c; };
   D.talaNivelMax = era => D.HACHERO.niveles.reduce((m, nv, i) => (nv.era <= era ? i + 1 : m), 0);
   // el mejor Filo × Golpe posible en esa era (lo que sube la madera por minuto): el servidor lo suma a kindRate
@@ -1511,6 +1579,13 @@
   q('i11', 'ind', 'Primer filo', 'Construye el Taller del Hachero (Era II) y termina una herramienta de tala.', all(B('hachero'), st('tala_niveles', 1)), { coins: 15, planks: 80 }, ['i1']);
   q('i12', 'ind', 'Herramientas de oficio', 'Termina 6 herramientas de tala (en cualquier rama).', st('tala_niveles', 6), { coins: 25, tools: 60 }, ['i11']);
   q('i13', 'ind', 'Leñador de leyenda', 'Lleva las tres ramas del Taller del Hachero al nivel V.', st('tala_niveles', 15), { coins: 80, gems: 60 }, ['i12']);
+  // pk-84 (plan Hacha y Pico, P3–P5): la Mina Profunda (los ids nunca cambian)
+  q('i14', 'ind', 'Primer piso', 'Construye la Mina Profunda (Era III) y manda mineros a trabajar.', all(B('mina'), st('mina_sacado', 100)), { coins: 15, tools: 40 }, ['i3']);
+  q('i15', 'ind', 'Bajo tierra', 'Lleva la Mina Profunda al nivel 5: cinco pisos bajo tierra.', { t: 'level', lvl: 5, n: 1, b: 'mina' }, { coins: 20, planks: 200 }, ['i14']);
+  q('i16', 'ind', 'Hasta el mármol', 'Cava la Mina Profunda hasta el piso 9.', { t: 'level', lvl: 9, n: 1, b: 'mina' }, { coins: 35, steel: 40 }, ['i15']);
+  q('i17', 'ind', 'Corazón de la tierra', 'Cava la Mina Profunda hasta el piso 14, donde las vetas esconden tesoros.', { t: 'level', lvl: 14, n: 1, b: 'mina' }, { coins: 80, gems: 80 }, ['i16']);
+  q('i18', 'ind', 'Cuadrilla', 'Junta 10.000 de mineral en la Mina Profunda.', st('mina_sacado', 10000), { coins: 25, ingots: 120 }, ['i14']);
+  q('i19', 'ind', 'Ni una gota', 'Pon 3 mejoras en los pisos de la mina (rieles, lámparas, bombas, ventilación o puestos).', st('mina_mejoras', 3), { coins: 20, tools: 80 }, ['i14']);
   q('i10', 'ind', 'Talleres de primera', 'Ten 3 edificios de producción en nivel 5 o más.', { t: 'level', lvl: 5, n: 3, recipe: true }, { coins: 20, tools: 50 }, ['i6']);
   escalera('it', 'ind', 'Maestro Artesano', [1e3, 1e4, 1e5, 1e6, 1e7, 1e8], n => 'Produce ' + U.fmt(n) + ' bienes elaborados.', n => st('p_total', n), (n, i) => ({ coins: 15 * (i + 1), tools: Math.round(n * 0.02) }), 'i9');
 

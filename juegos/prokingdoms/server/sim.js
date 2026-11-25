@@ -157,11 +157,14 @@ const guildStageOf = p => { const g = guildOf(p); return g ? g.stage : 0; };
 
 // Mejor tasa por aldeano y segundo de un tipo de recurso: técnica al máximo de la era, punto de acopio al
 // máximo, gremio real y un margen para todo lo demás.
+const MINEROS = ['stone', 'gold', 'ore', 'marble', 'gems'];
 function kindRate(kind, era, stage) {
   const L = techMax(era), tech = kind === 'deer' ? 1 + 0.2 * L : 1 + 0.15 * L;
   // pk-83: las herramientas del Taller del Hachero (Filo × Golpe, hasta ×4 desde la Era VIII) suben la madera por minuto
   const tala = D.NODES[kind].res === 'wood' && D.talaMax ? D.talaMax(era) : 1;
-  return D.NODES[kind].rate * tech * (1 + 0.1 * (L - 1)) * (1 + 0.03 * stage + 0.02 * L) * LIM.slack * LIM.vida * tala;
+  // pk-84: un minero de la Mina Profunda rinde más cuanto más hondo (piso máximo de la era, con rieles y lámparas)
+  const mina = MINEROS.includes(D.NODES[kind].res) && D.minaMax ? D.minaMax(era) : 1;
+  return D.NODES[kind].rate * tech * (1 + 0.1 * (L - 1)) * (1 + 0.03 * stage + 0.02 * L) * LIM.slack * LIM.vida * tala * mina;
 }
 const RES_KINDS = {};
 for (const k in D.NODES) (RES_KINDS[D.NODES[k].res] = RES_KINDS[D.NODES[k].res] || []).push(k);

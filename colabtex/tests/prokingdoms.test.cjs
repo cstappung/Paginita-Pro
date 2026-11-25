@@ -21,7 +21,7 @@ function carga(files) {
   PK.World.generate(PK.D.SEED);
   return PK;
 }
-const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
+const PK = carga(['util.js', 'data.js', 'pase.js', 'world.js', 'entities.js', 'game.js', 'auto.js', 'logistics.js', 'cintas.js', 'mayor.js', 'mina.js', 'consejo.js', 'asesor.js', 'heroes.js', 'incursion.js', 'life.js', 'aventura.js', 'leyendas.js', 'campana.js', 'datos-vida.js', 'datos-mar.js', 'vida.js']);
 const { D, World: W, Game: G } = PK;
 const PILA = D.CINTA.pila || 1; // pk-67: cada ítem de cinta es un paquete de hasta PILA unidades
 // ojo: los arreglos que vienen del vm tienen otro prototipo, y deepEqual estricto los da por distintos
@@ -1991,4 +1991,57 @@ test('HP2 (pk-83): Taller del Hachero — tres ramas que al máximo dan ×4 por 
   // el árbol pierde por desgaste, no por lo que junta (en vivo y sin conexión)
   assert.match(JS('entities.js'), /n\.amount -= dg/);
   assert.match(JS('game.js'), /n\.amount -= take \* dg/);
+});
+
+test('HP3 (pk-84): Mina Profunda — estratos, vetas con semilla, topes y lo mismo en vivo que sin conexión', () => {
+  const M = D.MINA, Mi = PK.Mina;
+  for (const e of M.estratos) assert.equal(Object.values(e.res).reduce((a, b) => a + b, 0), 100, e.name + ' suma 100');
+  assert.equal(D.BUILD.mina.max, 1, 'una sola mina por reino');
+  assert.ok(D.BUILD.mina.mina && D.BUILD.mina.era === 3);
+  assert.equal(D.BSTATS.mina(9).pisos, 9, 'un piso por nivel');
+  assert.deepEqual({ ...D.vetaMina(1234, 7, 3) }, { ...D.vetaMina(1234, 7, 3) }, 'la misma veta siempre');
+  assert.deepEqual({ ...D.pisoMina(99, 10) }.agua, { ...D.pisoMina(99, 10) }.agua);
+  // más hondo, vetas más grandes y minerales más raros
+  const prom = (n, f) => { let s2 = 0; for (let i = 0; i < 200; i++) s2 += f(D.vetaMina(777, n, i)); return s2 / 200; };
+  assert.ok(prom(10, v => v.cant) > 2 * prom(1, v => v.cant), 'las vetas del piso 10 son más grandes');
+  assert.equal(prom(1, v => (v.res === 'gems' ? 1 : 0)), 0, 'arriba no hay gemas');
+  assert.ok(prom(14, v => (v.res === 'gems' ? 1 : 0)) > 0.35, 'en el fondo, muchas gemas');
+  assert.equal(prom(13, v => (v.esp ? 1 : 0)), 0, 'especiales solo desde el piso 14');
+  const esp = prom(16, v => (v.esp ? 1 : 0));
+  assert.ok(esp > 0.05 && esp < 0.25, 'especiales en medida justa (una de cada 8 vetas aprox.): ' + esp);
+  assert.ok(Math.abs(D.minaRitmo(10, false, false) - 1.45) < 1e-9 && D.minaMax(10) > D.minaMax(5));
+  assert.match(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /D\.minaMax\(era\)/, 'el servidor suma la mina a kindRate');
+  // una hora en pasos de 1 s y en pasos de 60 s da lo mismo
+  const guarda = {}, cambia = o => { for (const k in o) { guarda[k] = G[k]; G[k] = o[k]; } };
+  const ais0 = PK.Logi.campoAislado;
+  const corre = paso => {
+    const b = { id: 7, type: 'mina', owner: 'p', done: true, lvl: 12, def: D.BUILD.mina, x: 0, y: 0, w: 4, h: 3, cx: 2, cy: 1.5, workers: [], inv: {} };
+    const st = { era: 7, created: 1, res: { stone: 0, gold: 0, ore: 0, marble: 0, gems: 0 }, flags: {}, stats: {} };
+    let dado = {};
+    cambia({ state: st, buildings: [b], units: [], gatherRate: (o, r) => D.NODES[r].rate, cap: () => 1e12, metaNecesita: () => ({}), give: o => { for (const k in o) dado[k] = (dado[k] || 0) + o[k]; }, stat: () => {}, gained: () => {}, offline: true });
+    PK.Logi.campoAislado = () => false;
+    Mi.estado(b).mont = 3;
+    for (let n = 1; n <= 12; n++) { const pz = Mi.piso(b, n); pz.m.ventilacion = 1; pz.m.bomba = 1; pz.m.rieles = 1; }
+    for (let i = 0; i < 70; i++) { b.workers.push(100 + i); Mi.ubicar(b, { id: 100 + i, task: {} }); }
+    assert.ok(b.workers.length <= Mi.puestos(b));
+    for (let t = 0; t < 3600; t += paso) Mi.paso(paso);
+    const tot = PK.Libro.totalCampo(b);
+    return { tot, inv: Object.assign({}, b.inv), dado, cap: PK.Libro.capCampo(b), cuenta: Mi.cuenta(b) };
+  };
+  try {
+    const a = corre(1), c = corre(60);
+    assert.ok(a.tot > 1000, 'la mina saca algo: ' + a.tot);
+    assert.ok(Math.abs(a.tot - c.tot) / a.tot < 0.01, 'en vivo ' + a.tot + ' y sin conexión ' + c.tot);
+    assert.ok(a.tot <= a.cap + 1e-6, 'no pasa la bodega de la mina');
+    assert.ok(a.tot <= D.MINA.montacargas[3].sube * 60 + 1e-6, 'no pasa el montacargas');
+    assert.equal(a.cuenta.reduce((x, y) => x + y, 0), 70);
+  } finally { for (const k in guarda) G[k] = guarda[k]; PK.Logi.campoAislado = ais0; }
+  // un piso con gas sin ventilación no se trabaja
+  const b2 = { id: 9, type: 'mina', owner: 'p', done: true, lvl: 19, def: D.BUILD.mina, workers: [], inv: {}, mina: { sem: 5, pisos: [], asig: {}, mont: 0, mano: false } };
+  const gas = Array.from({ length: 19 }, (_, i) => i + 1).find(n => D.pisoMina(5, n).gas);
+  assert.ok(gas, 'hay algún piso con gas');
+  assert.ok(!Mi.trabajable(b2, gas)); Mi.piso(b2, gas).m.ventilacion = 1; assert.ok(Mi.trabajable(b2, gas));
+  // la mina es un campamento para la logística y en ella no descarga nadie
+  assert.ok(PK.Libro.CAMPOS.mina);
+  assert.match(JS('game.js'), /b\.def\.mina\) continue; \/\/ pk-84: en la mina no descarga nadie/);
 });

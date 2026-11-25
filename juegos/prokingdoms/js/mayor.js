@@ -16,7 +16,7 @@
 
   // ¿Recurso que ocupa lugar? (los tesoros especiales no: van sin edificio)
   Lb.fisico = r => !!(D.RES[r] && !D.RES[r].special);
-  Lb.CAMPOS = { lumber: 1, mining: 1 };
+  Lb.CAMPOS = { lumber: 1, mining: 1, mina: 1 }; // pk-84: la Mina Profunda guarda aparte como un campamento
   // ¿En una isla que no es la de casa? (el mar, pk-46: ahí todo lo que se junta va al Muelle de la colonia)
   const enColonia = b => !!(G().enMar && G().enMar() && PK.Arch && PK.Arch.islaDe(b.cx, b.cy) > 0);
   // Molino fuera de tu tierra: un campamento más (decisión 4). El Muelle de la colonia también guarda aparte (L6).
@@ -37,7 +37,7 @@
   Lb.inv = inv;
 
   // ---------- Campamentos ----------
-  Lb.capCampo = b => (b.type === 'colonia' && D.coloniaCap ? D.coloniaCap(b.lvl) : D.campoCap(b.lvl));
+  Lb.capCampo = b => (b.type === 'colonia' && D.coloniaCap ? D.coloniaCap(b.lvl) : b.type === 'mina' ? D.minaCap(b.lvl) : D.campoCap(b.lvl));
   Lb.totalCampo = b => { let n = 0; const o = inv(b); for (const r in o) n += o[r]; return n; };
   Lb.campoLleno = b => Lb.totalCampo(b) >= Lb.capCampo(b) - 0.5;
   // pk-60: cuánto de `r` cabe todavía. Un recurso que tu reino ya no puede recibir (su bodega está en el tope, por

@@ -83,6 +83,19 @@
     }
     return null;
   }
+  // pk-84: ¿la mina tiene un puesto libre en un piso que se pueda trabajar? (y está en la misma isla)
+  // Solo hasta la parte de la gente que tus prioridades le dan a la minería (piedra, oro, hierro, mármol y gemas):
+  // si no, el Capataz mandaba a la mina a todos los ociosos aunque faltara comida.
+  const MINERALES = ['stone', 'gold', 'ore', 'marble', 'gems'];
+  function minaLibre(u) {
+    const M = PK.Mina, m = M && M.mia(), st = S();
+    if (!m || M.libres(m) <= 0 || !M.mejorPiso(m)) return false;
+    if (u && otraIsla(u)(m.cx, m.cy)) return false;
+    const w = (st && st.auto && st.auto.w) || {}, sum = A.RES.reduce((s, r) => s + (w[r] || 0), 0);
+    if (!sum) return true;
+    const parte = MINERALES.reduce((s, r) => s + (w[r] || 0), 0) / sum, yendo = G().units.filter(o => o.task && o.task.t === 'mina' && !o.inside).length;
+    return m.workers.length + yendo < Math.max(2, Math.round(parte * A.villagers().length));
+  }
   function assignIdle(u, st) {
     const g = G();
     // primero, puestos libres en talleres que tengan insumos
@@ -90,6 +103,8 @@
       const b = openShop(u);
       if (b) { g.command([u], { kind: 'building', obj: b }, true); return true; }
     }
+    // pk-84: después, la Mina Profunda (los mineros no viajan: casi siempre rinden más que un campamento)
+    if (st.auto.work && minaLibre(u)) { g.command([u], { kind: 'building', obj: PK.Mina.mia() }, true); return true; }
     const w = st.auto.w, sum = A.RES.reduce((s, r) => s + (w[r] || 0), 0);
     if (!sum) return false;
     const { c, n } = A.counts();
@@ -243,8 +258,19 @@
           if (d < bd) { bd = d; best = u; }
         }
         if (best) g.command([best], { kind: 'building', obj: b }, true);
+      } else if (minaLibre()) {
+        // pk-84: sin talleres que llenar, un minero de campamento que puso el Capataz baja a la mina
+        const m = PK.Mina.mia(), MIN = ['stone', 'gold', 'ore', 'marble', 'gems'];
+        let best = null, bd = 1e9;
+        for (const u of g.units) {
+          if (u.owner !== 'p' || u.kind !== 'v' || u.inside || u.hold || !u.task || u.task.m || u.task.t !== 'gather' || !MIN.includes(u.task.res) || u.carry) continue;
+          const d = U.dist(u.x, u.y, m.cx, m.cy);
+          if (d < bd) { bd = d; best = u; }
+        }
+        if (best) g.command([best], { kind: 'building', obj: m }, true);
       }
     }
+    if (PK.Mina) PK.Mina.tick(el); // reparto de los mineros entre pisos
     // talleres parados (sin insumos, en reserva o con el almacén lleno): sus trabajadores salen a recolectar
     if (st.auto.work) {
       for (const b of g.buildings) {
@@ -372,6 +398,7 @@
     marble: { name: 'Mármol', icon: 'marble' },
     gems: { name: 'Gemas', icon: 'gems' },
     work: { name: 'Talleres', icon: 'tools', hint: 'puestos libres de los talleres' },
+    mina: { name: 'Mina', icon: 'ore', hint: 'puestos libres de la Mina Profunda', mina: true }, // pk-84
     dig: { name: 'Excavar', icon: 'scroll', hint: 'ruinas descubiertas' },
   };
   A.jobOf = function (u) {
@@ -380,6 +407,7 @@
     if (t.t === 'gather') return t.res;
     if (t.t === 'farm') return G().granjaRes(G().bById.get(t.b)); // las Salinas del mar dan salitre
     if (t.t === 'work') return 'work';
+    if (t.t === 'mina') return 'mina';
     if (t.t === 'dig') return 'dig';
     return 'other';
   };
@@ -394,6 +422,7 @@
     const g = G();
     if (job === 'work') return g.buildings.some(b => b.owner === 'p' && b.done && b.def.recipe && b.workers.length < g.slots(b) && PK.Logi.supplied(b));
     if (job === 'dig') return W.pois.some(p => p.kind === 'ruin' && g.poiState(p) && g.poiState(p).f && !g.poiState(p).d);
+    if (job === 'mina') { const m = PK.Mina && PK.Mina.mia(); return !!(m && PK.Mina.libres(m) > 0); }
     if (g.buildings.some(b => b.owner === 'p' && g.esGranja(b) && g.granjaRes(b) === job && b.done && (b.farmer === null || !g.uById.get(b.farmer)))) return true;
     // pk-42: hace falta un edificio con puesto libre y algo de eso en su radio (se recuerda 1 s: la ventana lo pregunta seguido)
     const k = job + ':' + Math.floor(g.time);
@@ -442,6 +471,12 @@
       }
       if (best) used.set('b' + best.id, (used.get('b' + best.id) || 0) + 1);
       return best ? { kind: 'building', obj: best } : null;
+    }
+    if (job === 'mina') { // pk-84
+      const m = PK.Mina && PK.Mina.mia();
+      if (!m || PK.Mina.libres(m) - (used.get('mina') || 0) <= 0) return null;
+      used.set('mina', (used.get('mina') || 0) + 1);
+      return { kind: 'building', obj: m };
     }
     if (job === 'dig') {
       let best = null, bd = 1e9;

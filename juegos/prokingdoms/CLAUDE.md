@@ -891,3 +891,35 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   only on land. One research at a time; it pauses without a finished Taller. The tala functions read `G.state`, not
   `S`, so the tests can fake a state; `G.talaTick` runs from `updateTimers`.
 - Golpe ≥ II draws the woodcutter with a two-man saw (`tool 'saw'`); Filo speeds the swing (drawing only).
+
+### P3 + P4 + P5: the Mina Profunda (`pk-83`)
+
+- **One formula** (`js/mina.js`, `PK.Mina.paso`, called first in `G.updateBuildings`, so live and offline are the same
+  code with any `dt`; a test compares one hour in 1 s and 60 s steps within 1 %). Per floor: the miners there
+  (`b.mina.asig[uid]`) work the first uncovered vein, `D.MINA.avance` of them dig the front (stone at half rate;
+  `avanceCosto(n)` of miner·seconds uncovers the next vein, at most `maxVetas` waiting). Everything is scaled by one
+  `k`: the lift (`montacargas[mont].sube` per minute) and the free room of the mine's store. A vein whose resource has
+  no room is skipped (miners dig instead). Nothing random: veins are `D.vetaMina(sem, n, i)`, hazards
+  `D.pisoMina(sem, n)` (water halves a floor without a pump, gas closes it without ventilation).
+- **The vein list is not saved**, only `b.mina = { sem, pisos: [{ v: [{ k, q, e }], i, fr, m }], asig, mont, mano }`.
+  `sem` comes from the building id and `S.created`: rebuilding the mine gives other veins. Not movable (`G.MOVE_NO`).
+- **It is a camp for logistics** (`Libro.CAMPOS.mina`, `capCampo` → `D.minaCap`; `L.camposDe(…, 'mining')` includes
+  it) **but nobody drops there**: `findDrop`, `autoTask` and the drop branch of `G.command` skip `def.mina`. Isolated
+  (no carromato reaches it): output goes to the town at half rate, like `L.campoAislado`.
+- **Miners** are villagers with `task { t: 'mina', b }` (`doMina` walks them in; `PK.Mina.entrar` pushes to
+  `b.workers`, sets `u.inside` and picks the floor; `G.release` calls `soltar`). Offline a walking miner enters at
+  once. Job `mina` in `A.JOBS`; the Capataz fills the mine **only up to the share of mining in `st.auto.w`**
+  (`minaLibre`): without that every idle villager went down even with food short. Floors are rebalanced every 10 s
+  (`Mi.repartir`) unless the player moved someone by hand (`b.mina.mano`).
+- **Server:** `kindRate` × `D.minaMax(era)` for stone, gold, ore, marble, gems (deepest floor of the era with rails and
+  lamps). New building type: needs `firebase deploy --only functions` (no `D.PROTO` bump, like L3).
+- **Specials** (owner's decision 2, fair measure): from floor 14, about one vein in eight carries crystal or star
+  iron, 1–3 per 1000 units mined; one vein in six ends in a gem pocket. Both through `G.give`.
+- **The cutaway view** (`js/ui/mina.js`, `UI.abrirMina`, `#minavista`) only draws: `main.js` skips the map while
+  `UI.minaAbierta()`. Rock per floor cached per `sem`; the shaft is drawn **after** the floors (the rock covered it).
+  `encuadre()` scales to the galleries, not the whole 360 px scene (on a phone the whole scene made miners 4 px tall).
+  Miners use `S.villager(..., 'minero', false)` — the 13th argument `soloCache` must be false or it returns null.
+- Miner look: `troop === 'minero'` (leather helmet with a carbide lamp, overalls, realm-coloured scarf, soot, pick on
+  the shoulder); villagers walking to the mine wear it on the map too (`render.js`).
+- Asesor rules `minaLlena`, `minaMont`, `minaAgua`, `minaPuestos`; missions `i14`–`i19`; the autopilot builds it in
+  Era III and buys lift, pumps, ventilation and rails with at most 15 % of each material.

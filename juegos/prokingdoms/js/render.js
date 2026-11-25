@@ -320,7 +320,7 @@
     // la suya muestra la de antes, nunca más de 3 cuadros seguidos (8 en el celular, donde cada figura cuesta más).
     const lejos = R.cam.z < 1.5, hair = lejos ? (u.id % 2) : u.hair, skin = lejos ? 0 : u.skin;
     const espera = vPres <= 0 && u._spr && (u._hambre || 0) < (MOBILE ? 8 : 3), n0 = Sp.vNuevas;
-    const spr = Sp.villager(col, hair, skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim, undefined, espera);
+    const spr = Sp.villager(col, hair, skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim, u.task && u.task.t === 'mina' && !u.carry ? 'minero' : undefined, espera); // pk-84: quien va a la mina, vestido de minero
     if (!spr) { u._hambre = (u._hambre || 0) + 1; return u._spr; }
     if (Sp.vNuevas !== n0) vPres--;
     u._hambre = 0; u._spr = spr;

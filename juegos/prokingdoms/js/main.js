@@ -92,7 +92,7 @@
       const steps = PK.Game.timeScale;
       for (let i = 0; i < steps; i++) PK.Game.update(dt);
       PK.Input.update(dt);
-      if (!(PK.Batalla && PK.Batalla.abierta())) PK.Render.draw(dt); // con la batalla a pantalla completa, el mapa no se ve
+      if (!(PK.Batalla && PK.Batalla.abierta()) && !(PK.UI.minaAbierta && PK.UI.minaAbierta())) PK.Render.draw(dt); // con la batalla (o la mina, pk-84) a pantalla completa, el mapa no se ve
       PK.UI.update(dt);
       requestAnimationFrame(frame);
     }

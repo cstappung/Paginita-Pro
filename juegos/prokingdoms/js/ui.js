@@ -1283,6 +1283,17 @@
     else if (b.type === 'wonder' && b.done && UI.maravillaEl) act.append(UI.maravillaEl(b));
     else if (b.def.marav && b.done && UI.maravillaInfo) act.append(UI.maravillaInfo(b));
     else if (b.type === 'library') act.append(UI.btn('Abrir investigación', () => UI.openResearch()));
+    else if (b.type === 'mina' && b.owner === 'p' && b.done && PK.Mina) { // pk-84: la Mina Profunda
+      const Mi = PK.Mina, r = Mi.resumen(b), ociosos = G().villagers().filter(u => !u.task && !u.inside);
+      act.append(el('p', null, Mi.pisos(b) + ' pisos · mineros ' + b.workers.length + '/' + Mi.puestos(b) + ' · saca aprox. ' + Math.round(Math.min(r.total, r.sube)) + ' por minuto (el montacargas sube ' + r.sube + ')'));
+      if (r.limita) act.append(el('p', { class: 'small warn-t' }, 'El montacargas no da abasto: mejóralo desde la mina.'));
+      if (!PK.Logi.rutasDesde(b).length && !Mi.aislada(b)) act.append(el('p', { class: 'small warn-t' }, 'Ningún carromato la vacía: lo que sacan se queda en su bodega.'));
+      act.append(el('div', { class: 'row' },
+        UI.btn('Bajar a la mina', () => UI.abrirMina(b), { cls: 'gold' }),
+        ociosos.length && Mi.libres(b) > 0 ? UI.btn('Mandar ociosos (' + Math.min(ociosos.length, Mi.libres(b)) + ')', () => { G().command(ociosos.slice(0, Mi.libres(b)), { kind: 'building', obj: b }); UI.refreshPanel(true); }, { small: true }) : null,
+        G().countB('establo') ? UI.btn('Ruta de carromato', () => UI.nuevaRutaDesde(b, false), { small: true }) : null));
+      act.append(el('p', { class: 'small muted' }, UI.hint('Selecciona aldeanos y haz clic derecho en la mina para que bajen.', 'Elige aldeanos y luego toca la mina para que bajen.')));
+    }
     else if (b.type === 'hachero' && b.owner === 'p') { // pk-83
       const t = G().talaSt(), m = G().talaMult();
       act.append(el('p', { class: 'small' }, 'Madera por minuto ×' + (m.f * m.g).toFixed(2) + ' · por árbol ×' + (m.g * m.a).toFixed(2) + (t.inv ? ' · investigando ' + D.HACHERO.ramas[t.inv.rama].niv[t.inv.n] : ' · sin investigar nada')));
@@ -1396,6 +1407,7 @@
   };
   UI.confirmDemolish = function (b) {
     UI.modal('demo', 'Demoler ' + b.def.name, body => {
+      if (b.done && b.def.mina) body.append(el('p', { class: 'warn-t' }, '¡Ojo! Se pierden sus ' + b.lvl + ' pisos y todo lo cavado. Una mina nueva empieza desde el primer piso, con otras vetas.')); // pk-84
       body.append(el('p', null, b.done ? 'El edificio desaparecerá sin devolver recursos.' : 'Se cancelará la obra y recuperarás parte de lo invertido.'),
         el('div', { class: 'row' }, UI.btn('Sí, demoler', () => { G().demolish(b); UI.closeModal(); UI.refreshPanel(true); }, { cls: 'danger' }), UI.btn('Cancelar', () => UI.closeModal())));
     });

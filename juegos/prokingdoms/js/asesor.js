@@ -164,6 +164,20 @@
       if (!post || st.flags.scoutDoneR !== g.exploreRange()) return null;
       return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su área (' + U.fmt(g.exploreArea()) + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
     },
+    // pk-84: la Mina Profunda: bodega llena sin quien la vacíe, montacargas al tope, piso con agua sin bomba, puestos libres
+    () => {
+      const Mi = PK.Mina, b = Mi && Mi.mia();
+      if (!b) return null;
+      const abrir = n => cerrarY(() => { PK.UI.abrirMina(b); if (n) PK.UI.minaVerPiso(n); });
+      if (PK.Libro.campoLleno(b) && !Mi.aislada(b)) return { id: 'minaLlena', prioridad: 58, texto: 'La bodega de la ' + b.def.name + ' está llena: los mineros no tienen dónde dejar lo que sacan.', acciones: [{ label: 'Ruta de carromato', fn: cerrarY(() => PK.UI.nuevaRutaDesde(b, false)) }] };
+      const r = Mi.resumen(b);
+      if (r.limita && Mi.montSig(b) && !Mi.montSig(b).why) return { id: 'minaMont', prioridad: 44, texto: 'El montacargas de la mina no da abasto: sube ' + r.sube + ' por minuto y tus mineros sacan ' + Math.round(r.total) + '.', acciones: [{ label: 'Bajar a la mina', fn: abrir() }] };
+      const c = Mi.cuenta(b);
+      for (let n = 1; n <= Mi.pisos(b); n++) if (c[n] && Mi.info(b, n).agua && !Mi.piso(b, n).m.bomba && G().canAfford(Mi.mejoraCosto('bomba', n))) return { id: 'minaAgua', prioridad: 36, texto: 'El piso ' + n + ' de la mina tiene agua: sin bomba rinde la mitad.', acciones: [{ label: 'Ver el piso', fn: abrir(n) }] };
+      const libres = Mi.libres(b), ociosos = G().villagers().filter(u => !u.task && !u.inside).length;
+      if (libres >= 3 && ociosos >= 2) return { id: 'minaPuestos', prioridad: 33, texto: 'La mina tiene ' + libres + ' puestos libres y hay ' + ociosos + ' aldeanos ociosos.', acciones: [{ label: 'Bajar a la mina', fn: abrir() }] };
+      return null;
+    },
     // pk-83: el Taller del Hachero quieto con una herramienta que ya se puede investigar
     () => {
       const g = G();

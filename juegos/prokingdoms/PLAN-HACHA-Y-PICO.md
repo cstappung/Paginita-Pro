@@ -16,7 +16,8 @@
   systems» de `CLAUDE.md`.
 - **Decisiones del dueño:** respondidas el 25 de noviembre de 2026 (§9). Mandan sobre cualquier otra parte del
   plan. Solo queda pendiente la 10 (acelerar con monedas), y el plan usa su recomendación.
-- **Avance:** P1 y P2 entregadas juntas en `pk-82` (hay que desplegar la función: `cleanBuildings` y `kindRate`).
+- **Avance:** P1 y P2 entregadas juntas en `pk-82`; P3, P4 y P5 (la mina entera) en `pk-83`. Las dos necesitan desplegar la
+  función (`cleanBuildings`, `kindRate`). Falta la Posada (P6 y P7).
 
 ---
 
@@ -293,10 +294,10 @@ Y una mejora de toda la mina, el **montacargas**, que pone tope a lo que sube po
 
 | Montacargas | Sube por minuto | Pide |
 |---|---|---|
-| Torno de mano | 60 | (viene con la mina) |
-| Malacate de caballos | 150 | Era IV, tablones + herramientas |
-| Jaula a vapor | 400 | Era VI, acero + maquinaria |
-| Doble jaula a vapor | 800 | Era VIII, más acero y maquinaria |
+| Torno de mano | 120 | (viene con la mina) |
+| Malacate de caballos | 360 | Era IV, tablones + herramientas |
+| Jaula a vapor | 900 | Era VI, acero + maquinaria |
+| Doble jaula a vapor | 1.800 | Era VIII, más acero y maquinaria |
 
 Con esto la mina tiene **tres cuellos de botella** que el jugador ve y decide: mineros (puestos), montacargas y la
 bodega de la mina (§4.4). Es lo que la hace un edificio para administrar y no solo para mejorar.
