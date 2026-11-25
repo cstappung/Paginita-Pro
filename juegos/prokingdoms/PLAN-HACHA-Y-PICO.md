@@ -14,9 +14,8 @@
 - **Cómo pedirlo:** «implementa la Fase P<N> del plan Hacha y Pico». Cada fase es una entrega (un PR, una versión
   `pk-N`). Siguen valiendo todas las reglas de la §1 de `PLAN-MEGA-ACTUALIZACION.md` y las de «Rules that cross
   systems» de `CLAUDE.md`.
-- **Decisiones del dueño:** respondidas el 25 de noviembre de 2026 las 1, 2, 3, 6 y 7, y el pedido de que la
-  tala llegue a ×4 (§9). Mandan sobre cualquier otra parte del plan. Las 4 y 5 siguen pendientes y el plan usa su
-  recomendación.
+- **Decisiones del dueño:** respondidas el 25 de noviembre de 2026 (§9). Mandan sobre cualquier otra parte del
+  plan. Solo queda pendiente la 10 (acelerar con monedas), y el plan usa su recomendación.
 - **Avance:** nada empezado.
 
 ---
@@ -139,78 +138,102 @@ Lo que hay que cuidar:
 
 ### 3.1 La idea
 
-Un edificio nuevo, **Taller del Hachero** (`hachero`, 2×2, Era II, `max: 1`), con su propia línea de investigación:
-**las herramientas de tala**. No usa la Biblioteca ni su cola, así que se puede investigar a la vez que las
-técnicas. Cada herramienta nueva hace que **cada árbol rinda más madera**: el leñador saca más por golpe, y el árbol
-pierde lo mismo que antes. Así el árbol da más madera en total y el campamento recibe más por minuto.
+Un edificio nuevo, **Taller del Hachero** (`hachero`, 2×2, Era II, `max: 1`), con su propia investigación: **las
+herramientas de tala**, en **tres ramas**. No usa la Biblioteca ni su cola, así que se investiga a la vez que las
+técnicas. Las herramientas **son mejoras permanentes: no se gastan** (pedido del dueño).
 
-Para que el aumento sea grande, el total llega a **+300 %**: con la última herramienta cada árbol da **cuatro
-veces** la madera (pedido del dueño: «un ×4 al nivel máximo»). Para que cueste, cada
-herramienta pide **cinco cosas a la vez**:
+| Rama | Qué mejora | Cómo se aplica | Al máximo |
+|---|---|---|---|
+| **Filo** | la velocidad: golpes por segundo | el leñador saca más rápido, y el árbol pierde más rápido | ×1,6 |
+| **Golpe** | cuánto da cada toque | el leñador recibe más por golpe, y el árbol pierde lo mismo que antes | ×2,5 |
+| **Aguante** | cuánto dura el árbol | el árbol pierde menos por golpe | ×1,6 |
 
-1. la herramienta anterior;
+**Con las tres al máximo da un ×4 de tala** (pedido del dueño):
+
+- **madera por minuto** = Filo × Golpe = 1,6 × 2,5 = **×4**;
+- **madera por árbol** = Golpe × Aguante = 2,5 × 1,6 = **×4**;
+- y el árbol **dura lo mismo que hoy**, porque Filo y Aguante se compensan. Las zonas de tala no se pelan más
+  rápido aunque se tale cuatro veces más.
+
+Cada rama sirve sola. Un jugador con pocos árboles en el radio de sus campamentos sube primero Aguante, y uno con
+muchos árboles pero pocos leñadores sube primero Filo y Golpe. Que el orden sea una decisión del jugador es parte de
+la gracia.
+
+### 3.2 Por qué cuesta
+
+Cada mejora pide **cinco cosas a la vez**:
+
+1. el nivel anterior de esa rama;
 2. una era mínima;
-3. un nivel mínimo del Taller del Hachero (`⌈nivel/2⌉ ≥ herramienta`), y ese nivel sube con Maestro de Obras como
-   cualquier otro edificio;
-4. materiales de taller cada vez más caros (herramientas, lingotes, acero, maquinaria, gemas);
-5. **una prueba de campo**: hay que talar cierta cantidad de madera con la herramienta actual
-   (`st.tala.cortado`, se cuenta al depositar). No se compra con monedas ni se acelera con monedas del reino.
+3. un nivel del Taller del Hachero: `2·nivel − 1` (1, 3, 5, 7, 9), que sube con Maestro de Obras como cualquier
+   edificio;
+4. materiales de taller cada vez más caros;
+5. **una prueba de campo**: talar cierta cantidad de madera desde la última mejora **de esa misma rama**
+   (`st.tala.cortado[rama]`, se cuenta al depositar). No se compra.
 
-Después viene un tiempo de investigación largo, que **se puede acelerar** como las mejoras (decisión 5).
+Además, **el taller investiga una cosa a la vez**. Las 15 mejoras van en fila: subir todo lleva cerca de dos semanas
+de investigación, además de las pruebas de campo.
 
-### 3.2 Las ocho herramientas
+### 3.3 Los quince niveles
 
-| # | Herramienta | Era | Costo | Tiempo | Talar antes | Madera por árbol |
-|---|---|---|---|---|---|---|
-| 1 | Hacha de hierro forjado | II | 300 madera, 150 oro, 40 tablones | 30 min | 1.500 | +15 % (×1,15) |
-| 2 | Cuñas y mazo de roble | III | 400 tablones, 60 herramientas | 1 h 30 | 6.000 | +35 % (×1,35) |
-| 3 | Sierra tronzadora (dos mangos) | III | 150 herramientas, 120 lingotes | 3 h | 20.000 | +65 % (×1,65) |
-| 4 | Hacha de acero templado | IV | 200 herramientas, 80 acero | 6 h | 60.000 | +100 % (×2) |
-| 5 | Sierra de bastidor | V | 300 herramientas, 150 acero, 40 libros | 12 h | 150.000 | +145 % (×2,45) |
-| 6 | Cabrias y polipastos | VI | 250 acero, 60 maquinaria | 24 h | 400.000 | +195 % (×2,95) |
-| 7 | Sierra de vapor | VII | 400 acero, 150 maquinaria, 50 gemas | 2 días | 1.000.000 | +250 % (×3,5) |
-| 8 | Sierra de cinta | VIII | 600 acero, 300 maquinaria, 150 gemas | 3 días | 2.500.000 | **+300 % (×4)** |
+Lo que cuesta cada nivel (igual en las tres ramas, salvo Golpe, que cuesta ×1,3 porque es la que más rinde):
 
-Los números de «Talar antes» se calibran con el piloto. La idea es que cada prueba tarde lo mismo que la
-investigación o más con los leñadores de esa era, para que no alcance con juntar materiales.
+| Nivel | Era | Costo | Tiempo | Talar antes (en esa rama) |
+|---|---|---|---|---|
+| 1 | II | 300 madera, 150 oro, 40 tablones | 30 min | 1.500 |
+| 2 | III | 400 tablones, 60 herramientas | 1 h 30 | 6.000 |
+| 3 | IV | 200 herramientas, 120 lingotes, 40 acero | 6 h | 40.000 |
+| 4 | VI | 300 acero, 80 maquinaria, 40 libros | 24 h | 250.000 |
+| 5 | VIII | 600 acero, 300 maquinaria, 150 gemas | 3 días | 1.500.000 |
 
-Un ×4 de madera en la Era VIII es mucho: los costos de era piden cientos de miles de madera desde la VII, así que
-sirve, pero hay que medir con el piloto que la madera no deje de importar. Si sobra, se sube la prueba de campo o
-el mantenimiento, **no** se baja el ×4.
+Lo que da y cómo se llama cada nivel:
 
-**Mantenimiento** (decisión 4, recomendado sí): desde la herramienta 3, los leñadores gastan 1 herramienta del
-pueblo cada 500 de madera talada (cada 300 desde la 6). Sin herramientas en la bodega, el rinde baja al de la herramienta 2 (y el panel
-dice por qué). Le da a la Herrería un uso que no se acaba nunca y hace que el bono no sea gratis.
+| Nivel | Filo (velocidad) | Golpe (por toque) | Aguante (duración del árbol) |
+|---|---|---|---|
+| 1 | Piedra de afilar ×1,10 | Cuñas y mazo de roble ×1,20 | Tala dirigida ×1,10 |
+| 2 | Hacha de hierro forjado ×1,20 | Sierra tronzadora de dos mangos ×1,45 | Poda de ramas gruesas ×1,20 |
+| 3 | Hacha de acero templado ×1,32 | Sierra de bastidor ×1,75 | Corte a ras del suelo ×1,32 |
+| 4 | Filo de doble bisel ×1,45 | Sierra de vapor ×2,10 | Aprovechar tocones y raíces ×1,45 |
+| 5 | Hacha de acero de crisol ×1,60 | Sierra de cinta ×2,50 | Cabrias y polipastos ×1,60 |
 
-### 3.3 Dónde se aplica
+Las pruebas de campo se calibran con el piloto. La idea es que cada una tarde lo mismo que su investigación o más
+con los leñadores de esa era, para que no alcance con juntar materiales. Si con el ×4 sobra madera, se endurecen las
+pruebas o los costos, **sin bajar el ×4**.
 
-- `G.gatherRate` para `res === 'wood'` (árboles y lo que en el mar dé madera): `× (1 + G.tala())`, **fuera** de
-  `Vida.recoleccion`, igual que la técnica Hachas afiladas. Es una técnica más, no un bono de vida.
-- **Lo que pierde el árbol** va sin el bono: el aldeano junta `rate × (1 + a)` y al árbol se le resta `rate`. Hay
-  que separar las dos cantidades en `doGather` y en el cálculo sin conexión (`tripRate`).
-- **Carga del leñador:** `G.carryCap` del leñador también `× (1 + a)`. Si no, con la carga de siempre el bono se va
-  en viajes más seguidos y rinde mucho menos de lo que dice.
+### 3.4 Dónde se aplica
+
+Con `f` (Filo), `g` (Golpe) y `a` (Aguante) como multiplicadores (1 sin mejoras):
+
+- **Lo que junta el leñador por segundo:** `G.gatherRate` para la madera `× f × g`, **fuera** de `Vida.recoleccion`,
+  igual que la técnica Hachas afiladas. Es una técnica más, no un bono de vida.
+- **Lo que pierde el árbol por segundo:** la tasa de antes `× f ÷ a`. Hay que separar las dos cantidades en
+  `doGather` y en el cálculo sin conexión (`tripRate`). Ahí está la trampa principal de esta fase (§7).
+- **Carga del leñador:** `G.carryCap` del leñador `× g`. Si no, con la carga de siempre el bono se va en viajes más
+  seguidos y rinde mucho menos de lo que dice.
 - Vale en los dos mundos (es saber del reino, como los maestros extra); el edificio solo se construye en tierra. En
   el mar se lee el estado de tierra (`S.otro`), como `G.maestrosComprados()`.
 - **Antitrampa, en la misma entrega:** `D.talaMax(era)` (data.js, la usan el cliente y el servidor) da el mejor
-  bono posible en esa era. `kindRate('tree', era)` lo multiplica. `tools/cheat-test.js` suma una cuenta honesta
-  con la herramienta 8 que no tiene que quedar registrada. Hay que desplegar la función.
+  `f × g` posible en esa era (×4 desde la VIII). `kindRate('tree', era)` lo multiplica. Aguante no cambia la madera
+  por minuto y no entra. `tools/cheat-test.js` suma una cuenta honesta con todo al máximo que no tiene que quedar
+  registrada. Hay que desplegar la función.
 - **No va en el Pase** (regla de siempre: ningún bono de recolección en el Pase).
 
-### 3.4 Interfaz, dibujo y sonido
+### 3.5 Interfaz, dibujo y sonido
 
-- **Ventana del Taller** (`js/ui/hachero.js`): las ocho herramientas como una fila de piezas (dibujadas en pixel art
-  por código, cada una con su silueta), la actual iluminada y la siguiente con sus cinco requisitos tachados uno por
-  uno, y la barra de la prueba de campo. Hay que probarla a 390×844 y en horizontal.
-- **El leñador cambia de herramienta en el mapa:** hacha chica → hacha grande → sierra de dos mangos (un solo
-  aldeano con una sierra larga, el compañero no se dibuja) → sierra de bastidor → desde la 7, una nubecita de vapor
-  en el campamento. Va en `S.villager` con el parámetro `tool`, guardado en caché.
+- **Ventana del Taller** (`js/ui/hachero.js`): tres columnas, una por rama, con cinco piezas cada una, dibujadas en
+  pixel art por código con su silueta. El nivel actual de cada rama va iluminado, y el siguiente muestra sus cinco
+  requisitos, que se tachan uno por uno, más la barra de su prueba de campo. Arriba, un resumen: «Madera por minuto
+  ×2,3 · Madera por árbol ×2,1». Hay que probarla a 390×844 (las columnas se apilan) y en horizontal.
+- **El leñador cambia de herramienta en el mapa** según la rama Golpe: hacha chica → mazo y cuña → sierra de dos
+  mangos (un solo aldeano con una sierra larga) → sierra de bastidor → desde el nivel 4, una nubecita de vapor en el
+  campamento. Con Filo alto, la animación de talar va más rápido. Con Aguante alto, el árbol talado deja troncos
+  apilados en vez de astillas. Va en `S.villager` con el parámetro `tool`, guardado en caché.
 - **Edificio:** cabaña con tronco, una piedra de afilar que gira mientras investiga, hachas colgadas y, por nivel,
   un cobertizo y un banco de sierra. Sonido de afilado (grabación en `sfx/` con su ganancia medida en `GAN`).
-- Misiones: «Primer filo» (herramienta 1), «Sierra de dos mangos» (3), «La sierra que no para» (8). El Asesor avisa
-  cuando la prueba de campo está lista y falta empezar la investigación. Al Consejo (investigación) se le suma la
-  opción de empezarla solo.
-- El piloto aprende a construir el Taller en la Era II e investiga cuando tiene los materiales.
+- Misiones: «Primer filo» (cualquier nivel 1), «Las tres ramas» (las tres en nivel 2), «Leñador de leyenda» (las
+  tres en 5). El Asesor avisa cuando una prueba de campo está lista y el taller está quieto. Al Consejo
+  (investigación) se le suma la opción de investigar solo, con la rama que el jugador elija como preferida.
+- El piloto aprende a construir el Taller en la Era II e investiga, primero Golpe y después las otras dos.
 
 ---
 
@@ -407,8 +430,8 @@ del mapa mientras la vista está abierta. Respeta M y el volumen compartido.
 - **`G.baseSucia()`** después de cada asignación de minero (la mina cuenta como lugar de trabajo).
 - **`u.inside`:** los mineros dentro no están en el mapa. `unstick`, lobos, bandidos y la cuenta de ociosos no
   pueden tratarlos como perdidos.
-- **El árbol pierde sin el bono del Hachero** (P2). Si se resta con el bono, el árbol se agota antes y el bono no
-  rinde nada.
+- **El árbol y el leñador cuentan distinto** (P2): el leñador junta `× f × g` y el árbol pierde `× f ÷ a`. Si el
+  árbol pierde lo mismo que junta el leñador, se agota cuatro veces antes y Golpe y Aguante no rinden nada.
 - **Estados CSS con nombres sueltos** (`.piso`, `.veta`): se cruzan con otras reglas. Usar `.mina.piso` y revisar que
   el nombre no exista.
 - **Toasts de la mina** («Nueva veta de oro en el piso 7») se agrupan («×N») y nunca más de 3 en pantalla.
@@ -438,16 +461,16 @@ Respondidas el 25 de noviembre de 2026:
    bajar del tope.
 2. **Materiales especiales en el fondo de la mina:** sí, en una medida justa (§4.2).
 3. **Bodegas grandes también en el mar** (muelle de colonia y barcaza): sí, en la misma proporción.
+4. **Las herramientas de tala no se gastan:** son mejoras permanentes, sin mantenimiento.
+5. **Herramientas de tala en tres ramas**, Filo (velocidad), Golpe (cuánto da cada toque) y Aguante (cuánto dura el
+   árbol), que con todo al máximo dan un ×4 de tala (§3.1).
 6. **La mina va en tu territorio**, y lo que hay debajo sale de una semilla, no del lugar.
 7. **Una sola mina por reino.**
-- **Topes de talleres:** los números de la tabla de §2.1 están bien.
-- **Herramientas de tala:** que lleguen a ×4 al nivel máximo (§3.2).
-- La propuesta «El Subsuelo» (prospección, mapa geológico y Vetas Madre) **quedó rechazada**: no se mezcla el
-  territorio con la mina.
+8. **Topes de talleres:** los números de la tabla de §2.1 están bien.
+9. Propuestas rechazadas: «El Subsuelo» (prospección, mapa geológico y Vetas Madre: no se mezcla el territorio con
+   la mina) y «La Casa Real» (linaje y sucesión).
 
-Pendientes (el plan usa la recomendación):
+Pendiente (el plan usa la recomendación):
 
-4. **Mantenimiento de las herramientas de tala** (gastan herramientas desde la 3). Recomendado: sí. Con el ×4 se
-   vuelve más importante, porque es lo que impide que el bono sea gratis.
-5. **¿Se acelera con monedas la investigación del Hachero?** Recomendado: sí el tiempo, como las mejoras, pero
-   **nunca** la prueba de campo.
+10. **¿Se acelera con monedas la investigación del Hachero?** Recomendado: sí el tiempo, como las mejoras, pero
+    **nunca** la prueba de campo.
