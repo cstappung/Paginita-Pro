@@ -1485,3 +1485,4 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 .po-cap { display: flex; gap: 14px; align-items: flex-start; margin: 8px 0; }
 .po-hist { font-size: 16px; line-height: 1.4; margin: 8px 0; }
 @media (max-width: 700px) { .po-grid { grid-template-columns: 1fr; } .po-card { grid-template-columns: 44px 1fr; } .po-card .po-ret { width: 44px; height: 44px; } .po-acc { grid-column: 1 / -1; flex-direction: row; } .po-cajas { grid-template-columns: repeat(2, minmax(0, 1fr)); } .po-feria { grid-template-columns: repeat(6, minmax(0, 1fr)); } .po-cap { flex-direction: column; align-items: center; } }
+@media (orientation: landscape) and (max-height: 500px) { #minavista .mv-top { padding: 2px 8px; gap: 2px 10px; } #minavista .mv-nombre { font-size: 14px; } #minavista .mv-dato { font-size: 12px; } #minavista .mv-panel { max-height: 30vh; padding: 4px 10px; } }
