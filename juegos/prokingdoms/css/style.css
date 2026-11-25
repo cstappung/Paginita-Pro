@@ -1400,3 +1400,24 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 /* pk-67: materiales de un traslado entre bodegas, en la fila de la ruta */
 .rt-mat { margin: 2px 0 4px; }
 .rt-mat summary { cursor: pointer; }
+
+/* pk-83 (plan Hacha y Pico, P2): ventana del Taller del Hachero */
+.hach-resumen { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 10px; padding: 6px 10px; background: rgba(0, 0, 0, 0.22); border-radius: 4px; }
+.hach-resumen b { color: #ffd76a; }
+.hach-inv { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; padding: 6px 8px; border: 1px solid rgba(255, 215, 106, 0.35); border-radius: 4px; }
+.hach-ico { width: 40px; height: 40px; image-rendering: pixelated; }
+.hach-ramas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hach.rama { padding: 6px; background: rgba(0, 0, 0, 0.18); border-radius: 4px; min-width: 0; }
+.hach-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-bottom: 4px; }
+.hach-h .hach-mult { margin-left: auto; color: #ffd76a; }
+.hach-lista { display: flex; flex-direction: column; gap: 3px; }
+.hach.pieza { display: grid; grid-template-columns: 28px 1fr auto; gap: 6px; align-items: center; padding: 2px 4px; border-radius: 3px; opacity: 0.55; }
+.hach.pieza .hach-ico { width: 28px; height: 28px; }
+.hach.pieza.hecho { opacity: 1; }
+.hach.pieza.sig, .hach.pieza.enCurso { opacity: 1; outline: 1px solid rgba(255, 215, 106, 0.6); }
+.hach.pieza.enCurso { background: rgba(122, 192, 255, 0.12); }
+.hach-nom { font-size: 13px; line-height: 1.15; min-width: 0; }
+.hach-mult { font-size: 13px; white-space: nowrap; }
+.hach-pide { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.hach-pide .bar { margin: 2px 0; }
+@media (max-width: 700px) { .hach-ramas { grid-template-columns: 1fr; } .hach-inv { grid-template-columns: 40px 1fr; } .hach-inv .row { grid-column: 1 / -1; } }

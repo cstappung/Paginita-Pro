@@ -186,7 +186,9 @@ async function main() {
     for (let i = 1; i <= 4; i++) {
       await wait(1000);
       const res = { food: 200 + 8 * i, wood: 200 + 6 * i, stone: 100 + 3 * i, gold: 100 + 2 * i };
-      const x = await api('POST', '/api/sync', { snap: snap({ res, total: 20 * i, pop: 12, army: 0, defense: 25 }) }, honest.token);
+      // pk-82: cuatro Aserraderos en la Era I (el tope de la era es 1): talleres de antes del tope, no es trampa
+      const buildings = [['tc', 10, 10, 1, 1], ['sawmill', 20, 10, 1, 1], ['sawmill', 24, 10, 1, 1], ['sawmill', 28, 10, 1, 1], ['sawmill', 32, 10, 1, 1]];
+      const x = await api('POST', '/api/sync', { snap: snap({ res, total: 20 * i, pop: 12, army: 0, defense: 25, buildings }) }, honest.token);
       okAll = okAll && x.status === 200;
     }
     check(okAll, 'cuatro syncs normales pasan sin rechazo');

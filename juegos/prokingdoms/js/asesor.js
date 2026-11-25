@@ -164,6 +164,14 @@
       if (!post || st.flags.scoutDoneR !== g.exploreRange()) return null;
       return { id: 'alcance', prioridad: 35, texto: 'Tu explorador terminó su área (' + U.fmt(g.exploreArea()) + ' casillas).', acciones: [{ label: 'Mejorar Puesto', fn: cerrarY(() => PK.UI.selectBuilding(post)) }] };
     },
+    // pk-83: el Taller del Hachero quieto con una herramienta que ya se puede investigar
+    () => {
+      const g = G();
+      if (g.enMar() || !g.countB('hachero') || g.talaSt().inv) return null;
+      const r = D.HACHERO.orden.find(k => { const s = g.talaSig(k); return s && s.ok; });
+      if (!r) return null;
+      return { id: 'hachero', prioridad: 31, texto: 'El ' + D.BUILD.hachero.name + ' está quieto y ya puede investigar ' + D.HACHERO.ramas[r].niv[g.talaSig(r).n] + '.', acciones: [{ label: 'Abrir el taller', fn: cerrarY(() => PK.UI.openHachero()) }] };
+    },
     // la Biblioteca sin investigar
     () => {
       const g = G(), st = S();

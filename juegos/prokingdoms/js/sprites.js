@@ -782,6 +782,33 @@
       p.box(2.75, 2.65, 0.25, 0.25, 0, 4, 'bark', 'bark', 'logend'); p.box(2.75, 2.3, 0.25, 0.25, 0, 4, 'plank', 'plank', 'plank');
       p.quad(b, 'R', 1.0, 1.2, 9, 15, col);
     },
+    // pk-83: Taller del Hachero. Cabaña de troncos con techo de tablas, tajo con un hacha clavada, piedra de afilar en su
+    // caballete y hachas colgadas al frente. Por nivel: leña apilada (tier 1) y un banco de sierra con su sierra (tier 2+).
+    hachero(p, col, m, tier) {
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.9, 0.5);
+      const b = { x: 0.15, y: 0.15, w: 1.25, h: 1.25 };
+      p.box(b.x, b.y, b.w, b.h, 0, 10, 'bark', 'bark', 'bark');
+      for (let z = 2; z < 10; z += 2.5) { p.line(p.P(b.x, b.y + b.h, z), p.P(b.x + b.w, b.y + b.h, z), '#4e3420'); p.line(p.P(b.x + b.w, b.y, z), p.P(b.x + b.w, b.y + b.h, z), '#4e3420'); }
+      p.door(b, 'L', 0.6, 0.36, 7);
+      p.roof(b.x - 0.05, b.y - 0.05, b.w + 0.1, b.h + 0.1, 10, 6, 'thatch', 0.4, 0.18, 'x');
+      // hachas colgadas en la pared derecha
+      for (const t of [0.35, 0.8]) { const a0 = p.P(b.x + b.w + 0.01, b.y + t, 8), a1 = p.P(b.x + b.w + 0.01, b.y + t, 3); p.line(a0, a1, '#8a5a30'); p.px(a1[0] + 1, a1[1], '#c8ccd4'); p.px(a1[0] + 1, a1[1] - 1, '#9aa0aa'); }
+      // tajo con el hacha clavada
+      p.box(1.55, 1.5, 0.32, 0.32, 0, 3, 'bark', 'logend', 'logend');
+      const h0 = p.P(1.71, 1.66, 3), h1 = p.P(1.85, 1.6, 7);
+      p.line(h0, h1, '#8a5a30'); p.px(h0[0], h0[1] - 1, '#c8ccd4'); p.px(h0[0] - 1, h0[1] - 1, '#e4e8ee');
+      // piedra de afilar en su caballete
+      p.post(1.55, 0.35, 4); p.post(1.85, 0.35, 4);
+      const c = p.P(1.7, 0.42, 5);
+      p.ctx.fillStyle = '#8c8a86'; p.ctx.fillRect(c[0] - 2, c[1] - 4, 4, 6); p.ctx.fillStyle = '#b2b0aa'; p.ctx.fillRect(c[0] - 1, c[1] - 3, 2, 4);
+      if (tier >= 1) logsPile(p, 0.25, 1.55, [2]);
+      if (tier >= 2) {
+        p.box(1.45, 0.85, 0.5, 0.45, 0, 4, 'plank', 'plank', 'plank');
+        const s0 = p.P(1.45, 1.05, 4.5), s1 = p.P(1.95, 1.05, 4.5);
+        p.line(s0, s1, '#c8ccd4'); for (let i = 1; i < 5; i++) { const q = p.P(1.45 + i * 0.1, 1.05, 4.5); p.px(q[0], q[1] + 1, '#8a8e96'); }
+      }
+      p.flag(0.3, 0.3, 17, col, 6);
+    },
     builder(p, col) {
       p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.95, 0.5);
       const b = { x: 0.2, y: 0.2, w: 1.3, h: 1.3 };
@@ -2292,6 +2319,7 @@
       const seg = (a, b, r) => Cp(a[0], a[1], b[0], b[1], r, zT + 0.03, ME);
       Cp(hand[0] - u[0] * 1.6, hand[1] - u[1] * 1.6, tip[0], tip[1], 0.28, zT, WO);
       if (tool === 'axe') { seg(at(-0.25, 0.15), at(-0.3, 1.0), 0.42); seg(at(-0.05, 1.05), at(-0.7, 1.2), 0.45); }
+      else if (tool === 'saw') { seg(at(0.2, -0.35), at(2.6, -0.35), 0.5); for (let i = 0; i < 6; i++) seg(at(0.45 + i * 0.38, -0.05), at(0.62 + i * 0.38, 0.12), 0.16); } // pk-83: sierra tronzadora
       else if (tool === 'pick') { seg(at(0, -1.0), at(0, 1.0), 0.32); seg(at(0, 1.0), at(-0.55, 1.8), 0.25); seg(at(0, -1.0), at(-0.55, -1.8), 0.25); }
       else if (tool === 'hammer') seg(at(0, -0.75), at(0, 0.75), 0.55);
       else if (tool === 'knife') seg(at(0, 0), at(-0.3, 0.55), 0.3);

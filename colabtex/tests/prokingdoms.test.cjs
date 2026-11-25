@@ -1908,3 +1908,87 @@ test('pk-77: cintas — el unidor no se traba con un divisor, el clasificador ma
     assert.equal(G.state.res.wood + (saw.inb.wood || 0), 1200, 'lo que sale de la bodega A llega al aserradero, nada más');
   } finally { G.state = st0; G.buildings = bs0; G.bById = by0; G.cap = cap0; G.capDe = capDe0; G.stat = stat0; L.bufCap = buf0; W.bAt.set(bAt0); W.belt.set(belt0); }
 });
+
+// ---------- Plan «Hacha y Pico» (PLAN-HACHA-Y-PICO.md) ----------
+
+test('HP1 (pk-82): cada taller tiene tope por era, que nunca baja, y los de más (de antes) se conservan', () => {
+  const tabla = { sawmill: [2, 2, 3, 3, 4, 4, 5, 5, 6], masonry: [2, 2, 3, 3, 4, 4, 5, 5, 6], smelter: [2, 2, 2, 3, 3, 4, 4, 5, 5],
+    forge: [1, 1, 2, 2, 2, 3, 3, 3, 4], scriptorium: [1, 1, 2, 2, 2, 3, 3, 3, 4], steelworks: [1, 1, 2, 2, 3, 3, 4, 4, 5], workshop: [0, 1, 1, 2, 2, 3, 3, 4, 4] };
+  for (const t in tabla) for (let e = 2; e <= 10; e++) {
+    // en eras anteriores al taller el número no importa (no se puede construir); se compara desde la suya
+    if (e >= D.BUILD[t].era) assert.equal(D.BUILD[t].max(e), tabla[t][e - 2], t + ' en la Era ' + e);
+  }
+  for (const t of Object.keys(D.BUILD).filter(k => D.BUILD[k].recipe)) {
+    assert.equal(typeof D.BUILD[t].max, 'function', t + ' no tiene tope');
+    for (let e = D.BUILD[t].era; e < 12; e++) assert.ok(D.BUILD[t].max(e + 1) >= D.BUILD[t].max(e), t + ' baja de la Era ' + e);
+    assert.ok(D.BUILD[t].max(D.BUILD[t].era) >= 1, t + ' no se puede construir en su era');
+  }
+  assert.equal(D.BSTATS.sawmill(11).slots, 3 + 5, 'un puesto cada 2 niveles');
+  const st0 = G.state, bs0 = G.buildings, mc0 = G.maxCount;
+  try {
+    G.state = { era: 3, res: {}, flags: {} };
+    G.maxCount = t => D.BUILD[t].max(3);
+    G.buildings = [1, 2, 3, 4].map(i => ({ id: i, type: 'sawmill', owner: 'p', done: true, lvl: 1, def: D.BUILD.sawmill }));
+    const t = G.topeInfo('sawmill');
+    assert.equal(t.max, 2); assert.ok(t.sobra, 'tiene más que el tope');
+    assert.equal(t.sig.era, 4); assert.equal(t.sig.max, 3);
+    assert.match(G.topeTexto('sawmill'), /siguen trabajando/);
+  } finally { G.state = st0; G.buildings = bs0; G.maxCount = mc0; }
+  assert.match(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /const max = def\.recipe \? undefined/, 'el servidor no descarta talleres de más');
+});
+
+test('HP1 (pk-82): campamentos, carromatos, carretas, muelle de colonia y barcaza llevan más', () => {
+  assert.equal(D.campoCap(1), 900); assert.equal(D.campoCap(11), 5400);
+  assert.equal(D.CARROMATO.cap, 600); assert.equal(D.CARROMATO.capLvl, 120);
+  assert.equal(D.BSTATS.cartwright(1).cartCap, 45); assert.equal(D.BSTATS.cartwright(11).cartCap, 165);
+  assert.equal(D.coloniaCap(1), 1500); assert.equal(D.coloniaCap(11), 6500);
+  assert.equal(D.BARCAZA.cap, 700); assert.equal(D.BARCAZA.capLvl, 140);
+  assert.ok(PK.Logi.MEDIA_MAX > 0 && PK.Logi.MEDIA_MAX < D.CARROMATO.cap / 2, 'un carromato grande no espera media carga entera');
+  assert.equal((JS('logistics.js').match(/cap \* 0\.5/g) || []).length, 1, 'toda «media carga» pasa por media()');
+});
+
+test('HP2 (pk-83): Taller del Hachero — tres ramas que al máximo dan ×4 por minuto y por árbol, y el árbol dura lo mismo', () => {
+  const H = D.HACHERO, R = H.ramas, M = r => R[r].mult[5];
+  assert.deepEqual([...H.orden], ['filo', 'golpe', 'aguante']);
+  assert.ok(Math.abs(M('filo') * M('golpe') - 4) < 1e-9, 'madera por minuto ×4');
+  assert.ok(Math.abs(M('golpe') * M('aguante') - 4) < 1e-9, 'madera por árbol ×4');
+  assert.ok(Math.abs(M('filo') / M('aguante') - 1) < 1e-9, 'el árbol dura lo mismo');
+  for (const r of H.orden) {
+    assert.equal(R[r].mult.length, 6); assert.equal(R[r].niv.length, 6);
+    for (let n = 1; n <= 5; n++) assert.ok(R[r].mult[n] > R[r].mult[n - 1], r + ' sube en cada nivel');
+  }
+  for (let n = 1; n < 5; n++) {
+    const a = H.niveles[n - 1], b = H.niveles[n];
+    assert.ok(b.era > a.era && b.time > a.time && b.prueba > a.prueba, 'cada nivel pide más que el anterior');
+  }
+  assert.equal(D.talaMax(1), 1); assert.equal(D.talaMax(7), R.filo.mult[4] * R.golpe.mult[4]); assert.ok(Math.abs(D.talaMax(8) - 4) < 1e-9);
+  for (let n = 1; n <= 5; n++) assert.equal(D.BSTATS.hachero(H.lvlTaller(n)).talaNivel, n, 'el nivel del taller abre el de la herramienta');
+  assert.match(fs.readFileSync(path.join(PKDIR, 'server', 'sim.js'), 'utf8'), /D\.talaMax\(era\)/, 'el servidor suma las herramientas a kindRate');
+  // investigar: requisitos, la prueba de campo, una cosa a la vez y el efecto
+  const st0 = G.state, bs0 = G.buildings, pay0 = G.pay, ca0 = G.canAfford, cb0 = G.countB, sta0 = G.stat;
+  try {
+    G.stat = () => {};
+    const taller = { id: 1, type: 'hachero', owner: 'p', done: true, lvl: 1, def: D.BUILD.hachero };
+    G.buildings = [taller];
+    G.state = { era: 2, res: {}, flags: {}, stats: {} };
+    G.pay = () => true; G.canAfford = () => true; G.countB = t => (t === 'hachero' ? 1 : 0);
+    assert.equal(G.talaRate(), 1); assert.equal(G.talaDesgaste(), 1);
+    assert.ok(!G.talaSig('golpe').ok, 'sin prueba de campo no se puede');
+    G.talaCorta(H.niveles[0].prueba);
+    assert.ok(G.talaSig('golpe').ok && G.talaEmpezar('golpe'));
+    assert.equal(G.state.tala.cortado.golpe, 0, 'la prueba del nivel siguiente empieza de cero');
+    assert.equal(G.state.tala.cortado.filo, H.niveles[0].prueba, 'las otras ramas siguen contando');
+    assert.ok(!G.talaEmpezar('filo'), 'una cosa a la vez');
+    G.talaTick(H.niveles[0].time + 1);
+    assert.equal(G.state.tala.n.golpe, 1);
+    assert.ok(Math.abs(G.talaRate() - R.golpe.mult[1]) < 1e-9);
+    assert.ok(Math.abs(1 / G.talaDesgaste() - R.golpe.mult[1]) < 1e-9, 'el árbol pierde menos de lo que junta el leñador');
+    assert.ok(!G.talaSig('golpe').ok, 'el nivel II pide la Era III y el taller en nivel 3');
+    G.state.tala.n = { filo: 5, golpe: 5, aguante: 5 };
+    assert.ok(Math.abs(G.talaRate() - 4) < 1e-9 && Math.abs(1 / G.talaDesgaste() - 4) < 1e-9);
+    assert.equal(G.talaSig('filo'), null, 'al máximo no hay siguiente');
+  } finally { G.state = st0; G.buildings = bs0; G.pay = pay0; G.canAfford = ca0; G.countB = cb0; G.stat = sta0; }
+  // el árbol pierde por desgaste, no por lo que junta (en vivo y sin conexión)
+  assert.match(JS('entities.js'), /n\.amount -= dg/);
+  assert.match(JS('game.js'), /n\.amount -= take \* dg/);
+});

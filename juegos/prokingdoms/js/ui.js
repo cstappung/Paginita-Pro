@@ -518,6 +518,10 @@
       const tc = g.buildings.find(b => b.owner === 'p' && b.type === 'tc');
       out.push({ k: 'era', icon: Sp.icon('scroll'), name: 'Era ' + U.roman(st.eraProg.to), left: st.eraProg.total - st.eraProg.t, pct: st.eraProg.t / st.eraProg.total, go: () => tc && UI.selectBuilding(tc) });
     }
+    if (st.tala && st.tala.inv) { // pk-83: el Taller del Hachero
+      const i = st.tala.inv;
+      out.push({ k: 'hach' + i.rama + i.n, icon: UI.hachaIcono ? UI.hachaIcono(i.rama, i.n) : Sp.icon('flask'), name: D.HACHERO.ramas[i.rama].niv[i.n], left: i.total - i.t, pct: i.t / i.total, go: () => UI.openHachero() });
+    }
     if (st.research) {
       out.push({ k: 'r' + st.research.id, icon: Sp.icon('flask'), name: g.researchName(st.research), left: (st.research.total - st.research.t) / g.researchMult(), pct: st.research.t / st.research.total, go: () => UI.openResearch() });
     }
@@ -1258,6 +1262,7 @@
       const inp = Object.keys(r.in).map(k => UI.amount(k, r.in[k])), out = Object.keys(r.out).map(k => UI.amount(k, r.out[k]));
       act.append(el('div', { class: 'recipe' }, inp, ' → ', out, el('span', { class: 'small muted' }, ' · ' + r.time + 's por trabajador')));
       act.append(el('p', null, 'Trabajadores: ' + b.workers.length + '/' + G().slots(b) + ' · ' + (b.status || '')));
+      if (b.owner === 'p') act.append(el('p', { class: 'small ' + (G().topeInfo(b.type).sobra ? 'warn-t' : 'muted') }, D.BUILD[b.type].name + ': ' + G().topeTexto(b.type)));
       act.append(UI.reservaRow(b));
       // depósitos y abastecimiento
       const near = PK.Logi.nearStore(b), belts = PK.Cintas.bocasDe(b).entran.length, carts = PK.Logi.rutasHacia(b).reduce((n, r) => n + PK.Logi.cartsDe(r).length, 0);
@@ -1278,6 +1283,11 @@
     else if (b.type === 'wonder' && b.done && UI.maravillaEl) act.append(UI.maravillaEl(b));
     else if (b.def.marav && b.done && UI.maravillaInfo) act.append(UI.maravillaInfo(b));
     else if (b.type === 'library') act.append(UI.btn('Abrir investigación', () => UI.openResearch()));
+    else if (b.type === 'hachero' && b.owner === 'p') { // pk-83
+      const t = G().talaSt(), m = G().talaMult();
+      act.append(el('p', { class: 'small' }, 'Madera por minuto ×' + (m.f * m.g).toFixed(2) + ' · por árbol ×' + (m.g * m.a).toFixed(2) + (t.inv ? ' · investigando ' + D.HACHERO.ramas[t.inv.rama].niv[t.inv.n] : ' · sin investigar nada')));
+      act.append(UI.btn('Abrir el taller', () => UI.openHachero(), { cls: 'gold' }));
+    }
     else if (b.type === 'market') act.append(UI.btn('Abrir mercado', () => PK.Social.openMarket()));
     else if (b.type === 'guild') act.append(UI.btn('Abrir gremio', () => PK.Social.openGuild()));
     else if (b.type === 'barracks') UI.barracksQuick(act);

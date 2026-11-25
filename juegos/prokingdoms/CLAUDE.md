@@ -21,8 +21,8 @@ owner outside this repo and dropped in.
   bottlenecks. §9 holds the owner's answered decisions (Nov 16). C1 done in `pk-58`.
 - `PLAN-HACHA-Y-PICO.md` (Nov 25 2026): «Hacha y Pico», phases P1–P5 («implementa la Fase P<N> del plan Hacha y
   Pico»): workshop caps and bigger camp/cart loads (P1), the Taller del Hachero's felling tools (P2), the Mina
-  Profunda with one floor per level, one per realm (P3 model, P4 cutaway view, P5 content). §9: owner's answers (Nov 25).
-  Not started.
+  Profunda with one floor per level, one per realm (P3 model, P4 cutaway view, P5 content), and the Posada de los
+  Viajeros (P6–P7, §10). §9: owner's answers (Nov 25). P1 + P2 done in `pk-82`.
 - `NOTAS-ENTREGAS.md`: the full notes of every delivery, with measurements and reasons. Not loaded
   automatically; read the section of the system you touch when a rule below is not enough.
 
@@ -867,3 +867,27 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - Two more Maestros de Obras bought with kingdom coins (`D.MAESTRO_EXTRA`: 1000 each, from Era VI and Era VIII, in
   order), in the Obras window. `st.flags.maestrosExtra` counts them on the land state; `G.maestrosComprados()` reads
   the land state (`S.otro` at sea), so they work in the archipelago too, but are bought only on land.
+
+## Plan «Hacha y Pico» (`PLAN-HACHA-Y-PICO.md`)
+
+### P1 + P2: workshop caps, bigger camps and carts, the Taller del Hachero (`pk-82`)
+
+- **Workshop caps** (owner: «que no se puedan construir de manera ilimitada»): every `recipe` building has `max(era)`
+  (table in the plan §2.1, sea ones too). Saves with more keep them (owner's decision 1): `G.topeInfo/topeTexto`
+  explain it in the panel and in Construir. **`cleanBuildings` skips `max` for `recipe` types** — without it a
+  player with grandfathered workshops is dropped from the snapshot and logged as a suspect on every sync (the
+  honest account in `cheat-test.js` sends 4 Aserraderos at Era I). Slots now `base + ⌊(L−1)/2⌋`.
+- **Capacities:** `D.campoCap` 900 + 450/level, carromato 600 + 120, cart `D.CART.cap` 45 + `capLvl` 12, colony dock
+  1500 + 500, barge 700 + 140. «Half a load» goes through `media(cap)` in `logistics.js` (never more than
+  `L.MEDIA_MAX`, 250): with 600-unit carromatos a new camp made them wait forever. A test counts `cap * 0.5`.
+- **Taller del Hachero** (`hachero`, `D.HACHERO`, `js/ui/hachero.js`): three branches × 5 levels. Filo multiplies
+  gathering speed, Golpe what each hit gives, Aguante how long the tree lasts. **The villager gathers
+  `rate × f × g` but the tree loses `1 / (g × a)` per unit** (`G.talaDesgaste`, in `doGather` and in the offline
+  `take`): wood per minute ×4 and per tree ×4 at the top, and the tree lasts what it lasted. The woodcutter's
+  `carryCap` is ×g. Not through `Vida.recoleccion`: like the `axes` tech, it is in the server's `kindRate`
+  (`D.talaMax(era)`, the best `f × g` the era allows). Tools never wear out (owner's decision 4).
+- Its state is **land state** (`G.state.tala`, `S.otro.tala` at sea): the bonus works in both worlds, research and
+  the field test (wood felled since that branch's last level, `cortado[rama]`, reset when the next level starts)
+  only on land. One research at a time; it pauses without a finished Taller. The tala functions read `G.state`, not
+  `S`, so the tests can fake a state; `G.talaTick` runs from `updateTimers`.
+- Golpe ≥ II draws the woodcutter with a two-man saw (`tool 'saw'`); Filo speeds the swing (drawing only).

@@ -283,7 +283,7 @@
   }
 
   // Golpes por segundo de cada herramienta. Cuadros: preparar (largo), medio, impacto (se sostiene) y rebote.
-  const SWING = { axe: 1.0, pick: 0.95, hammer: 1.5, sickle: 1.25, knife: 1.4, hand: 1.1 };
+  const SWING = { axe: 1.0, saw: 1.3, pick: 0.95, hammer: 1.5, sickle: 1.25, knife: 1.4, hand: 1.1 };
   function unitSprite(u) {
     const col = Sp.ownerColor(u.owner);
     // vehículos: 8 direcciones según hacia dónde se mueven (Sp.rumboDe); los animales y las velas se mueven aun quietos
@@ -295,8 +295,9 @@
     else if (mode === 'work') {
       const t = u.task && u.task.t, n = t === 'gather' && W.nodes[u.task.node];
       tool = t === 'dig' ? 'pick' : t === 'build' ? 'hammer' : t === 'farm' ? 'sickle' : !n ? 'pick'
-        : n.kind === 'tree' ? 'axe' : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
-      const ph = (u.anim * SWING[tool] + u.id * 0.37) % 1;
+        : n.kind === 'tree' ? (u.owner === 'p' && G().talaMult().g >= D.HACHERO.ramas.golpe.mult[2] ? 'saw' : 'axe') : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
+      // pk-83: con Filo del Hachero el leñador golpea más seguido
+      const ph = (u.anim * SWING[tool] * (n && n.kind === 'tree' && u.owner === 'p' ? G().talaMult().f : 1) + u.id * 0.37) % 1;
       frame = tool === 'hand' ? Math.floor(ph * 4) : ph < 0.4 ? 0 : ph < 0.52 ? 1 : ph < 0.8 ? 2 : 3;
       // punto de contacto en pantalla: el borde del objetivo que da al aldeano, a la altura del golpe. T4: lejos no se
       // nota (y multiplicaba las figuras), y cerca se recalcula solo si se movió 0,3 casillas o cambió de objetivo:
@@ -337,7 +338,7 @@
     const puff = (k, c) => { for (let i = 0; i < k; i++) P.push({ x: x + (rnd() - 0.5) * 4, y: y + 1, vx: (rnd() - 0.5) * 10, vy: -3 - rnd() * 4, life: 0, max: 0.6 + rnd() * 0.4, s: 1, puff: c }); };
     let snd = null;
     if (n) n.shk = n.kind === 'tree' ? 0.22 : 0.14;
-    if (tool === 'axe') {
+    if (tool === 'axe' || tool === 'saw') {
       bits(4, [[204, 160, 104], [232, 200, 146], [120, 84, 50]], 20, 26, 90, 0.55);
       for (let i = 0; i < 2; i++) if (rnd() < 0.7) P.push({ x: x + (rnd() - 0.5) * 14, y: y - 10 - rnd() * 10, vx: (rnd() - 0.5) * 8, vy: 3 + rnd() * 4, life: 0, max: 1.3, s: 1, rgb: rnd() < 0.5 ? [70, 130, 50] : [118, 166, 62] });
       snd = 'chop';

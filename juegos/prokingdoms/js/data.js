@@ -88,6 +88,8 @@
     farm: { name: 'Granja', w: 3, h: 3, cost: { wood: 50 }, time: 15, era: 1, walkable: true, flat: true, upT: 0.6, desc: 'Comida inagotable, más lenta que las bayas. Un granjero por granja.' },
     granary: { name: 'Granero', w: 2, h: 2, cost: { wood: 120, stone: 30 }, time: 25, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánta comida puedes guardar.' },
     warehouse: { name: 'Almacén', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 30, era: 1, upT: 0.8, max: e => 1 + e, desc: 'Aumenta cuánto puedes guardar de todo lo demás.' },
+    // pk-83 (plan Hacha y Pico, P2): las herramientas de tala, en tres ramas (D.HACHERO). Su nivel abre los niveles de herramienta.
+    hachero: { name: 'Taller del Hachero', w: 2, h: 2, cost: { wood: 220, stone: 60, gold: 40 }, time: 40, era: 2, max: 1, upT: 0.9, desc: 'Investiga herramientas de tala en tres ramas: Filo (más rápido), Golpe (más madera por toque) y Aguante (el árbol dura más). Todo al máximo, ×4 de madera.' },
     builder: { name: 'Casa del Maestro de Obras', w: 2, h: 2, cost: { wood: 150, stone: 80, gold: 60 }, time: 30, era: 1, noUp: true, max: 4, desc: '+1 Maestro de Obras: podrás mejorar un edificio más a la vez.' },
     scout: { name: 'Puesto de Exploradores', w: 2, h: 2, cost: { wood: 100, food: 50 }, time: 25, era: 1, max: 1, trains: 'scout', upT: 0.9, desc: 'Entrena exploradores que revelan el mapa. Su nivel define cuántas casillas alrededor de tu reino pueden explorar (en el nivel 19 o antes, el mapa entero).' },
     cartwright: { name: 'Carretería', w: 3, h: 3, cost: { wood: 250, stone: 100 }, time: 45, era: 2, max: 2, upT: 0.9, desc: 'Construye carretas que llevan insumos a los talleres y sacan lo que producen. Con caminos van mucho más rápido.' },
@@ -101,22 +103,22 @@
     fuerte: { name: 'Fuerte fronterizo', w: 3, h: 3, cost: { stone: 900, wood: 500, gold: 300 }, time: 240, era: 3, upT: 1.2, max: e => 1 + Math.floor(e / 3), desc: 'Guarnición de frontera: suma mucha defensa a tus parcelas hasta 2 parcelas a la redonda. Es la segunda etapa de un asedio.' },
     tower: { name: 'Torre de Vigía', w: 1, h: 1, cost: { stone: 100, wood: 25 }, time: 30, era: 1, upT: 0.8, max: e => 2 + e * 2, desc: 'Defiende tu reino y ve muy lejos en la niebla.' },
     market: { name: 'Mercado', w: 3, h: 3, cost: { wood: 175 }, time: 45, era: 2, max: 1, desc: 'Compra y vende recursos. Con más nivel, mejores precios.' },
-    sawmill: { name: 'Aserradero', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 40, era: 2, recipe: 'planks', slots: 3, desc: 'Convierte madera en tablones.' },
+    sawmill: { name: 'Aserradero', w: 3, h: 3, cost: { wood: 150, stone: 50 }, time: 40, era: 2, recipe: 'planks', slots: 3, max: e => 1 + Math.floor(e / 2), desc: 'Convierte madera en tablones.' },
     library: { name: 'Biblioteca', w: 3, h: 3, cost: { wood: 150, stone: 100 }, time: 50, era: 2, max: 1, desc: 'Permite investigar. Su nivel es el nivel máximo de las tecnologías.' },
     barracks: { name: 'Cuartel', w: 3, h: 3, cost: { wood: 175 }, time: 40, era: 2, max: 2, desc: 'Entrena tropas. Cada nivel desbloquea tropas y entrena más rápido. Termina tu tregua de novato.' },
     consejo: { name: 'Salón del Consejo', w: 3, h: 3, cost: { wood: 300, stone: 200, gold: 120 }, time: 60, era: 2, max: 1, desc: 'Cada nivel suma un consejero que maneja solo una parte del reino (investigación, exploración, ejército, comercio, obras y fiestas). Se encienden y apagan uno por uno.' },
     guild: { name: 'Salón del Gremio', w: 3, h: 3, cost: { wood: 200, stone: 150, gold: 50 }, time: 60, era: 2, max: 1, desc: 'Únete a un gremio. Cada nivel da recolección extra mientras seas miembro.' },
-    masonry: { name: 'Cantería', w: 2, h: 2, cost: { wood: 150, planks: 40 }, time: 40, era: 3, recipe: 'blocks', slots: 2, desc: 'Talla piedra en sillares.' },
-    smelter: { name: 'Fundición', w: 3, h: 3, cost: { stone: 250, planks: 80 }, time: 60, era: 3, recipe: 'ingots', slots: 3, desc: 'Funde hierro bruto con madera en lingotes.' },
-    forge: { name: 'Herrería', w: 2, h: 2, cost: { stone: 150, planks: 60, ingots: 10 }, time: 60, era: 3, recipe: 'tools', slots: 2, desc: 'Forja herramientas con tablones y lingotes.' },
-    scriptorium: { name: 'Taller de Copistas', w: 2, h: 2, cost: { wood: 200, planks: 60, gold: 80 }, time: 50, era: 3, recipe: 'books', slots: 2, desc: 'Copia libros con tablones y oro. Hacen falta para las mejoras altas.' },
+    masonry: { name: 'Cantería', w: 2, h: 2, cost: { wood: 150, planks: 40 }, time: 40, era: 3, recipe: 'blocks', slots: 2, max: e => 1 + Math.floor(e / 2), desc: 'Talla piedra en sillares.' },
+    smelter: { name: 'Fundición', w: 3, h: 3, cost: { stone: 250, planks: 80 }, time: 60, era: 3, recipe: 'ingots', slots: 3, max: e => 1 + Math.floor((e - 1) / 2), desc: 'Funde hierro bruto con madera en lingotes.' },
+    forge: { name: 'Herrería', w: 2, h: 2, cost: { stone: 150, planks: 60, ingots: 10 }, time: 60, era: 3, recipe: 'tools', slots: 2, max: e => 1 + Math.floor((e - 1) / 3), desc: 'Forja herramientas con tablones y lingotes.' },
+    scriptorium: { name: 'Taller de Copistas', w: 2, h: 2, cost: { wood: 200, planks: 60, gold: 80 }, time: 50, era: 3, recipe: 'books', slots: 2, max: e => 1 + Math.floor((e - 1) / 3), desc: 'Copia libros con tablones y oro. Hacen falta para las mejoras altas.' },
     monastery: { name: 'Monasterio', w: 3, h: 3, cost: { stone: 400, planks: 100, gold: 200 }, time: 90, era: 3, max: 1, desc: 'Guarda las reliquias que encuentres explorando. Cada reliquia da oro sin parar.' },
     university: { name: 'Universidad', w: 3, h: 3, cost: { blocks: 250, planks: 200, gold: 400, marble: 60 }, time: 120, era: 4, max: 2, desc: 'Acelera todas las investigaciones.' },
-    steelworks: { name: 'Acería', w: 3, h: 3, cost: { blocks: 200, ingots: 120, marble: 40 }, time: 120, era: 4, recipe: 'steel', slots: 3, desc: 'Convierte lingotes y carbón de madera en acero.' },
-    workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, desc: 'Arma maquinaria con acero, tablones y herramientas.' },
+    steelworks: { name: 'Acería', w: 3, h: 3, cost: { blocks: 200, ingots: 120, marble: 40 }, time: 120, era: 4, recipe: 'steel', slots: 3, max: e => 1 + Math.floor((e - 2) / 2), desc: 'Convierte lingotes y carbón de madera en acero.' },
+    workshop: { name: 'Taller de Ingeniería', w: 3, h: 3, cost: { blocks: 400, steel: 60, tools: 60 }, time: 150, era: 5, recipe: 'machinery', slots: 3, max: e => 1 + Math.floor((e - 3) / 2), desc: 'Arma maquinaria con acero, tablones y herramientas.' },
     wonder: { name: 'Maravilla', w: 4, h: 4, cost: { blocks: 3000, marble: 1500, gems: 300, steel: 400, machinery: 150 }, time: 900, era: 6, max: 1, upT: 2.5, noCap: true, desc: 'Obra sin fin: cada nivel da prestigio, +3% a todo y monedas.' },
   };
-  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
+  D.BUILD_ORDER = ['house', 'lumber', 'mining', 'mill', 'hachero', 'establo', 'farm', 'granary', 'warehouse', 'builder', 'scout', 'tower', 'fuerte', 'granporton', 'granportonv', 'market', 'sawmill', 'cartwright', 'library', 'barracks', 'consejo', 'guild', 'masonry', 'smelter', 'forge', 'scriptorium', 'monastery', 'university', 'steelworks', 'workshop', 'wonder', 'tc'];
   for (const k in D.BUILD) {
     const b = D.BUILD[k];
     if (b.recipe) b.upT = b.upT || 1.1;
@@ -161,7 +163,8 @@
   };
 
   const capR = v => Math.round(v / 50) * 50;
-  const recipeStats = base => L => ({ prod: 0.15 * (L - 1), slots: base + Math.floor((L - 1) / 3) });
+  // pk-82 (plan Hacha y Pico, P1): con tope de talleres por era, cada uno suma un puesto cada 2 niveles (antes cada 3)
+  const recipeStats = base => L => ({ prod: 0.15 * (L - 1), slots: base + Math.floor((L - 1) / 2) });
   const campStats = L => ({ gather: 0.1 * (L - 1), carry: L - 1 });
   // Efecto de cada edificio según su nivel.
   D.BSTATS = {
@@ -173,12 +176,13 @@
     granary: L => ({ capFood: capR(1200 * Math.pow(1.6, L - 1)) }),
     warehouse: L => ({ capGoods: capR(1000 * Math.pow(1.6, L - 1)) }),
     builder: () => ({ builders: 1 }),
+    hachero: L => ({ talaNivel: Math.min(5, Math.ceil(L / 2)) }),
     scout: L => ({ scouts: 1 + Math.floor((L - 1) / 2), range: 18 + 7 * (L - 1), scoutSpeed: 0.06 * (L - 1) }),
     tower: L => ({ defense: Math.round(30 * (1 + 0.4 * (L - 1))), sight: 7 + L }),
     fuerte: L => ({ defense: Math.round(140 * (1 + 0.4 * (L - 1))), sight: 9 + L }),
     establo: L => ({ carromatos: 2 + L, carroCap: D.CARROMATO.cap + D.CARROMATO.capLvl * (L - 1), carroSpeed: 0.05 * (L - 1) }),
     granporton: () => ({}), granportonv: () => ({}),
-    cartwright: L => ({ carts: 2 + 2 * L, cartCap: D.CART.cap + 5 * (L - 1), cartSpeed: 0.06 * (L - 1) }),
+    cartwright: L => ({ carts: 2 + 2 * L, cartCap: D.CART.cap + D.CART.capLvl * (L - 1), cartSpeed: 0.06 * (L - 1) }),
     // pk-40: la venta nunca alcanza a la compra menos 10 puntos. En Nv 8–9 se vendía al 92–95% y se compraba al
     // 90–92%: comprar y vender lo mismo daba oro infinito. Ahora la compra baja hasta 0,90 (Nv 8) y la venta sube
     // hasta 0,80 (Nv 7).
@@ -204,6 +208,7 @@
     techMax: ['Nivel máx. de tecnologías', v => String(v)], research: ['Velocidad de investigación', pct], armyTrain: ['Velocidad de entrenamiento', pct],
     consejeros: ['Consejeros', v => v + ' de 6'], guildBonus: ['Recolección (en gremio)', pct], relics: ['Reliquias', v => String(v)], relicGold: ['Oro por reliquia/min', v => v.toFixed(1)],
     prestige: ['Prestigio', v => String(v)], allBonus: ['Bono a todo', pct],
+    talaNivel: ['Herramientas hasta el nivel', v => String(v)],
     carts: ['Carretas', v => String(v)], cartCap: ['Carga por carreta', v => String(v)], cartSpeed: ['Velocidad de carretas', pct],
   };
 
@@ -908,7 +913,8 @@
   // Caminos (aceleran a todos), carretas (llevan insumos y productos entre almacenes y talleres) y, ya muy
   // avanzado, cintas transportadoras que unen dos edificios y mueven todo sin que nadie lo cargue.
   D.ROAD = { cost: { stone: 3 }, era: 1, walk: 1.4, cart: 1.8 };
-  D.CART = { cost: { wood: 80, gold: 10 }, time: 20, speed: 1.3, offRoad: 0.65, cap: 20 };
+  // pk-82 (P1): carga 20 + 5 por nivel → 45 + 12 por nivel (pedido del dueño: que las carretas lleven más)
+  D.CART = { cost: { wood: 80, gold: 10 }, time: 20, speed: 1.3, offRoad: 0.65, cap: 45, capLvl: 12 };
   // pk-43: el carromato. Más lento que la carreta fuera del camino, pero carga diez veces más y sale de tu tierra.
   // road: en camino; highway: en autopista (L5); ajeno: la tierra de otro reino sin muralla cuesta ×4 (decisión 5).
   // L5 (pk-47): la Calzada Real (en el código, autopista). Franja de piedra de 2 casillas que trazan los jugadores en
@@ -932,11 +938,41 @@
   D.MAESTRO_EXTRA = [{ era: 6, precio: 1000 }, { era: 8, precio: 1000 }];
   // pk-78: mover un recurso del mapa cuesta monedas del reino: 1 cada 3 casillas, por cada recurso
   D.MOVER_RECURSO = { cada: 3, min: 1, max: 40 };
+  // pk-83 (plan Hacha y Pico, P2, pedido del dueño): herramientas de tala en tres ramas que con todo al máximo dan un ×4:
+  // madera por minuto = Filo × Golpe (1,6 × 2,5) y madera por árbol = Golpe × Aguante (2,5 × 1,6), y el árbol dura lo
+  // mismo que hoy (Filo y Aguante se compensan). Son mejoras: no se gastan. Cada nivel pide el anterior, su era, el Taller
+  // en nivel 2·n − 1, materiales y una prueba de campo (madera talada desde la última mejora de esa rama). El taller
+  // investiga una cosa a la vez. D.talaMax(era) lo usa también el servidor (kindRate).
+  D.HACHERO = {
+    ramas: {
+      filo: { name: 'Filo', que: 'velocidad de tala', mult: [1, 1.1, 1.2, 1.32, 1.45, 1.6], costo: 1,
+        niv: ['Hacha de siempre', 'Piedra de afilar', 'Hacha de hierro forjado', 'Hacha de acero templado', 'Filo de doble bisel', 'Hacha de acero de crisol'] },
+      golpe: { name: 'Golpe', que: 'madera por toque', mult: [1, 1.2, 1.45, 1.75, 2.1, 2.5], costo: 1.3,
+        niv: ['Hacha de siempre', 'Cuñas y mazo de roble', 'Sierra tronzadora de dos mangos', 'Sierra de bastidor', 'Sierra de vapor', 'Sierra de cinta'] },
+      aguante: { name: 'Aguante', que: 'cuánto dura el árbol', mult: [1, 1.1, 1.2, 1.32, 1.45, 1.6], costo: 1,
+        niv: ['Tala de siempre', 'Tala dirigida', 'Poda de ramas gruesas', 'Corte a ras del suelo', 'Aprovechar tocones y raíces', 'Cabrias y polipastos'] },
+    },
+    orden: ['filo', 'golpe', 'aguante'],
+    // nivel 1 a 5 (índice 0 a 4)
+    niveles: [
+      { era: 2, cost: { wood: 300, gold: 150, planks: 40 }, time: 1800, prueba: 1500 },
+      { era: 3, cost: { planks: 400, tools: 60 }, time: 5400, prueba: 6000 },
+      { era: 4, cost: { tools: 200, ingots: 120, steel: 40 }, time: 6 * 3600, prueba: 40000 },
+      { era: 6, cost: { steel: 300, machinery: 80, books: 40 }, time: 24 * 3600, prueba: 250000 },
+      { era: 8, cost: { steel: 600, machinery: 300, gems: 150 }, time: 3 * 86400, prueba: 1500000 },
+    ],
+    lvlTaller: n => 2 * n - 1,
+  };
+  D.talaCosto = (rama, n) => { const c = {}, b = D.HACHERO.niveles[n - 1].cost, k = D.HACHERO.ramas[rama].costo; for (const r in b) c[r] = Math.round(b[r] * k / 5) * 5; return c; };
+  D.talaNivelMax = era => D.HACHERO.niveles.reduce((m, nv, i) => (nv.era <= era ? i + 1 : m), 0);
+  // el mejor Filo × Golpe posible en esa era (lo que sube la madera por minuto): el servidor lo suma a kindRate
+  D.talaMax = era => { const n = D.talaNivelMax(era), R = D.HACHERO.ramas; return R.filo.mult[n] * R.golpe.mult[n]; };
   D.moverRecursoCosto = dist => Math.max(D.MOVER_RECURSO.min, Math.ceil(dist / D.MOVER_RECURSO.cada));
-  D.CARROMATO = { cost: { wood: 150, gold: 10 }, time: 45, speed: 1.6, offRoad: 0.7, road: 1.5, highway: 3.2, ajeno: 4, cap: 250, capLvl: 50 };
+  D.CARROMATO = { cost: { wood: 150, gold: 10 }, time: 45, speed: 1.6, offRoad: 0.7, road: 1.5, highway: 3.2, ajeno: 4, cap: 600, capLvl: 120 }; // pk-82 (P1): era 250 + 50 por nivel
   D.carromatoCost = era => (era <= 1 ? D.CARROMATO.cost : { wood: 150 + 60 * (era - 1), gold: 10 + 15 * (era - 1) });
   // Tope de lo que guarda un campamento (todo junto): lo que pasa de ahí espera a un carromato.
-  D.campoCap = L => 300 + 150 * (L - 1);
+  // pk-82 (P1, pedido del dueño): 300 + 150 por nivel → 900 + 450 por nivel
+  D.campoCap = L => 900 + 450 * (L - 1);
   D.BELT = { cost: { steel: 3, machinery: 1 }, era: 5, need: { b: 'workshop', lvl: 3 }, speed: 2.4, rate: 3 }; // las de antes de pk-58 (solo para convertirlas)
   // pk-58: red de cintas (PLAN-CINTAS.md). rate: ítems por segundo; vel: casillas por segundo (los ítems van separados
   // vel / rate casillas). cost: lo que cuesta cada casilla al subir a ese nivel. maxFase: hasta qué nivel se construye
@@ -1471,6 +1507,10 @@
   q('i7', 'ind', 'Tinta y pergamino', 'Construye un Taller de Copistas y produce 20 libros.', all(B('scriptorium'), st('p_books', 20)), { gold: 400, coins: 10 }, ['i2']);
   q('i8', 'ind', 'Acero templado', 'Construye una Acería (Era IV) y produce 30 de acero.', all(B('steelworks'), st('p_steel', 30)), { coins: 20, ingots: 100 }, ['i6']);
   q('i9', 'ind', 'Engranajes', 'Construye un Taller de Ingeniería (Era V) y produce 10 de maquinaria.', all(B('workshop'), st('p_machinery', 10)), { coins: 30, steel: 50 }, ['i8']);
+  // pk-83 (plan Hacha y Pico, P2): el Taller del Hachero
+  q('i11', 'ind', 'Primer filo', 'Construye el Taller del Hachero (Era II) y termina una herramienta de tala.', all(B('hachero'), st('tala_niveles', 1)), { coins: 15, planks: 80 }, ['i1']);
+  q('i12', 'ind', 'Herramientas de oficio', 'Termina 6 herramientas de tala (en cualquier rama).', st('tala_niveles', 6), { coins: 25, tools: 60 }, ['i11']);
+  q('i13', 'ind', 'Leñador de leyenda', 'Lleva las tres ramas del Taller del Hachero al nivel V.', st('tala_niveles', 15), { coins: 80, gems: 60 }, ['i12']);
   q('i10', 'ind', 'Talleres de primera', 'Ten 3 edificios de producción en nivel 5 o más.', { t: 'level', lvl: 5, n: 3, recipe: true }, { coins: 20, tools: 50 }, ['i6']);
   escalera('it', 'ind', 'Maestro Artesano', [1e3, 1e4, 1e5, 1e6, 1e7, 1e8], n => 'Produce ' + U.fmt(n) + ' bienes elaborados.', n => st('p_total', n), (n, i) => ({ coins: 15 * (i + 1), tools: Math.round(n * 0.02) }), 'i9');
 

@@ -276,10 +276,13 @@
     // L4 (pk-45): cada jugador tiene sus zonas comunes; los reinos simulados se ven juntar ahí, pero no gastan lo tuyo
     const virtual = u.owner !== 'p' && W.isShared(n);
     let took = 0;
+    // pk-83: con las herramientas del Hachero el árbol pierde 1 / (Golpe × Aguante) por cada unidad (G.talaDesgaste)
+    const lena = u.owner === 'p' && D.NODES[n.kind].res === 'wood', dg = lena ? g.talaDesgaste() : 1;
     while (u.acc >= 1 && n.amount > 0 && u.carry < cap) {
       u.acc -= 1; u.carry += 1; u.carryRes = t.res; u.carryZone = n.zone; u.hunt = n.kind === 'deer';
-      if (!virtual) { n.amount -= 1; took++; }
+      if (!virtual) { n.amount -= dg; took++; }
     }
+    if (lena && took) g.talaCorta(took);
     if (n.amount <= 0 && !n.dead) { W.depleteNode(n); if (n.temp && u.owner === 'p' && PK.Life) PK.Life.tempDone(n); }
     if (u.carry >= cap) u.phase = 'return';
   }

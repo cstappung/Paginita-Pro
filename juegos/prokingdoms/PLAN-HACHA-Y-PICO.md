@@ -16,7 +16,7 @@
   systems» de `CLAUDE.md`.
 - **Decisiones del dueño:** respondidas el 25 de noviembre de 2026 (§9). Mandan sobre cualquier otra parte del
   plan. Solo queda pendiente la 10 (acelerar con monedas), y el plan usa su recomendación.
-- **Avance:** nada empezado.
+- **Avance:** P1 y P2 entregadas juntas en `pk-82` (hay que desplegar la función: `cleanBuildings` y `kindRate`).
 
 ---
 

@@ -43,9 +43,9 @@
   // `agua`: tiene que tocar el agua (como el muelle). `farmRes`: una «granja» que da otra cosa que comida.
   Object.assign(D.BUILD, {
     salinas: { name: 'Salinas', w: 3, h: 3, cost: { wood: 90, stone: 40 }, time: 25, era: 1, walkable: true, flat: true, upT: 0.6, max: e => 1 + e, agua: true, farmRes: 'salitre', mar: true, desc: 'Estanques junto al mar donde el sol deja salitre. Un salinero por salina, sin agotar nada.' },
-    velas: { name: 'Taller de Velas', w: 2, h: 2, cost: { wood: 150, fibra: 60 }, time: 40, era: 2, recipe: 'lona', slots: 2, mar: true, desc: 'Teje la fibra de palma en lona y cordaje: los piden los barcos y las mejoras.' },
-    astillero: { name: 'Astillero', w: 3, h: 3, cost: { wood: 220, stone: 80, lona: 20 }, time: 60, era: 2, recipe: 'tablazon', slots: 3, agua: true, mar: true, desc: 'Cura la teca con salitre y la convierte en tablazón. Va pegado al agua.' },
-    polvorin: { name: 'Polvorín', w: 2, h: 2, cost: { stone: 200, tablazon: 40 }, time: 60, era: 3, recipe: 'polvora', slots: 2, mar: true, desc: 'Mezcla salitre y carbón de teca: pólvora para los cañones y las mejoras altas.' },
+    velas: { name: 'Taller de Velas', w: 2, h: 2, cost: { wood: 150, fibra: 60 }, time: 40, era: 2, recipe: 'lona', slots: 2, mar: true, max: e => 1 + Math.floor(e / 2), desc: 'Teje la fibra de palma en lona y cordaje: los piden los barcos y las mejoras.' },
+    astillero: { name: 'Astillero', w: 3, h: 3, cost: { wood: 220, stone: 80, lona: 20 }, time: 60, era: 2, recipe: 'tablazon', slots: 3, agua: true, mar: true, max: e => 1 + Math.floor((e - 1) / 2), desc: 'Cura la teca con salitre y la convierte en tablazón. Va pegado al agua.' },
+    polvorin: { name: 'Polvorín', w: 2, h: 2, cost: { stone: 200, tablazon: 40 }, time: 60, era: 3, recipe: 'polvora', slots: 2, mar: true, max: e => 1 + Math.floor((e - 1) / 3), desc: 'Mezcla salitre y carbón de teca: pólvora para los cañones y las mejoras altas.' },
     faromar: { name: 'Faro', w: 2, h: 2, cost: { stone: 180, wood: 60 }, time: 45, era: 2, max: e => e, mar: true, desc: 'Ve muy lejos y despeja la bruma a su alrededor.' },
     embarcadero: { name: 'Embarcadero de colonos', w: 3, h: 3, cost: { wood: 260, lona: 30 }, time: 60, era: 2, max: 1, agua: true, mar: true, desc: 'Arma barcos de colonos para fundar colonias en otras islas. Cada nivel par permite una colonia más.' },
     comercio: { name: 'Casa de comercio', w: 3, h: 3, cost: { wood: 200, stone: 120, tablazon: 30 }, time: 60, era: 3, max: 1, mar: true, desc: 'Compra y vende lo de las islas por oro. Las especias se pagan muy bien.' },
@@ -86,9 +86,9 @@
   D.ISLAS_ORDEN = ['palmas', 'coral', 'volcan', 'naufragios', 'especias'];
   // pk-44 (plan de logística L6): la barcaza de carga trae a casa lo que juntan las colonias. Solo navega; el viento
   // del archipiélago la apura o la frena y con tormenta tarda 1,4 veces (D.TORMENTA.viaje).
-  D.BARCAZA = { cost: { wood: 200, lona: 20 }, time: 60, speed: 1.5, cap: 300, capLvl: 60 };
+  D.BARCAZA = { cost: { wood: 200, lona: 20 }, time: 60, speed: 1.5, cap: 700, capLvl: 140 }; // pk-82 (P1): era 300 + 60 por nivel
   // Lo que guarda el Muelle de la colonia (todo junto) hasta que llega una barcaza.
-  D.coloniaCap = L => 600 + 200 * (L - 1);
+  D.coloniaCap = L => 1500 + 500 * (L - 1); // pk-82 (P1): era 600 + 200 por nivel
   // Una colonia: el barco lleva colonos y materiales. Cuesta más cada vez, y la travesía tarda según la distancia.
   D.colonia = {
     colonos: 3,

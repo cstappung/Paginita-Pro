@@ -159,7 +159,9 @@ const guildStageOf = p => { const g = guildOf(p); return g ? g.stage : 0; };
 // máximo, gremio real y un margen para todo lo demás.
 function kindRate(kind, era, stage) {
   const L = techMax(era), tech = kind === 'deer' ? 1 + 0.2 * L : 1 + 0.15 * L;
-  return D.NODES[kind].rate * tech * (1 + 0.1 * (L - 1)) * (1 + 0.03 * stage + 0.02 * L) * LIM.slack * LIM.vida;
+  // pk-83: las herramientas del Taller del Hachero (Filo × Golpe, hasta ×4 desde la Era VIII) suben la madera por minuto
+  const tala = D.NODES[kind].res === 'wood' && D.talaMax ? D.talaMax(era) : 1;
+  return D.NODES[kind].rate * tech * (1 + 0.1 * (L - 1)) * (1 + 0.03 * stage + 0.02 * L) * LIM.slack * LIM.vida * tala;
 }
 const RES_KINDS = {};
 for (const k in D.NODES) (RES_KINDS[D.NODES[k].res] = RES_KINDS[D.NODES[k].res] || []).push(k);
@@ -223,7 +225,9 @@ function cleanBuildings(p, list, era) {
   for (const b of list.slice(0, 800)) {
     const def = Array.isArray(b) && D.BUILD[b[0]];
     if (!def || !Number.isFinite(+b[1]) || !Number.isFinite(+b[2])) { bad++; continue; }
-    const max = typeof def.max === 'function' ? def.max(era) : def.max;
+    // pk-82: los talleres tienen tope por era, pero quien tenía más de antes se queda con ellos (decisión 1 del dueño, plan
+    // Hacha y Pico). Lo que hacen los talleres no está en TRACKED, así que su cantidad no se controla aquí.
+    const max = def.recipe ? undefined : typeof def.max === 'function' ? def.max(era) : def.max;
     if (max !== undefined && (count[b[0]] = (count[b[0]] || 0) + 1) > max) { bad++; continue; }
     const lvl = clamp(Math.floor(+b[4] || 1), 1, D.maxLevel(b[0], era));
     if (lvl !== Math.floor(+b[4] || 1)) bad++;

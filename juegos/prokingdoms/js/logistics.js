@@ -898,19 +898,23 @@
     }
     if (lleva) descargar(u, to); else cargar(u, r, from, to);
   };
+  // pk-82 (P1): con carromatos de 600 «media carga» eran 300, y un campamento nuevo tardaba mucho en juntarlas: sale
+  // con la mitad, pero nunca espera más de L.MEDIA_MAX.
+  L.MEDIA_MAX = 250;
+  const media = cap => Math.min(cap * 0.5, L.MEDIA_MAX);
   function cargar(u, r, from, to) {
     const cap = L.capDe(u.kind);
     if (L.esTraslado(r)) { cargarTraslado(u, r, from, to, cap); return; } // pk-67
     if (!r.res && L.esCampo(from)) { cargarVarios(u, r, from, to, cap); return; }
     const q = queCargar(r, from, to, cap, true);
     // pk-54: «cualquier campamento»: si aquí hay poco y otro tiene al menos media carga, va a ese
-    if (r.de === 'campo' && (!q || q.n < cap * 0.5)) {
+    if (r.de === 'campo' && (!q || q.n < media(cap))) {
       const otro = mejorCampo(r, u, from.id);
-      if (otro && stockRuta(otro, r) >= cap * 0.5 && stockRuta(otro, r) > (q ? q.n : 0)) { u.rDe = otro.id; u.wait = 0.3; u.estado = 'Va a ' + otro.def.name + ', que tiene más'; return; }
+      if (otro && stockRuta(otro, r) >= media(cap) && stockRuta(otro, r) > (q ? q.n : 0)) { u.rDe = otro.id; u.wait = 0.3; u.estado = 'Va a ' + otro.def.name + ', que tiene más'; return; }
     }
     const lleno = q ? Math.min(cap, q.need) : 0;
     u.mode = 'idle';
-    if (q && q.n >= 1 && (q.n >= lleno - 0.5 || q.n >= cap * 0.5 || (u.espera || 0) >= 60)) {
+    if (q && q.n >= 1 && (q.n >= lleno - 0.5 || q.n >= media(cap) || (u.espera || 0) >= 60)) {
       const n = take(from, q.res, q.n);
       if (n >= 1) {
         u.carry = n; u.carryRes = q.res; u.espera = 0; u.wait = 0.6;
@@ -936,7 +940,7 @@
   function cargarTraslado(u, r, from, to, cap) {
     const lista = queTraslado(r, from, to, cap), tot = lista.reduce((n, o) => n + o.n, 0);
     u.mode = 'idle';
-    if (tot >= 1 && (tot >= cap * 0.5 || (u.espera || 0) >= 30)) {
+    if (tot >= 1 && (tot >= media(cap) || (u.espera || 0) >= 30)) {
       const c = {};
       for (const o of lista) { const n = take(from, o.res, o.n); if (n > 0) c[o.res] = (c[o.res] || 0) + n; }
       fijarCarga(u, c);
@@ -949,15 +953,15 @@
   // pk-55: carga mezclada desde un campamento
   function cargarVarios(u, r, from, to, cap) {
     const lista = queCargarVarios(from, to, cap, true), tot = lista.reduce((n, o) => n + o.n, 0);
-    if (r.de === 'campo' && tot < cap * 0.5) {
+    if (r.de === 'campo' && tot < media(cap)) {
       const otro = mejorCampo(r, u, from.id), so = otro ? stockRuta(otro, r) : 0;
-      if (otro && so >= cap * 0.5 && so > tot) { u.rDe = otro.id; u.wait = 0.3; u.estado = 'Va a ' + otro.def.name + ', que tiene más'; return; }
+      if (otro && so >= media(cap) && so > tot) { u.rDe = otro.id; u.wait = 0.3; u.estado = 'Va a ' + otro.def.name + ', que tiene más'; return; }
     }
     let falta = 0;
     for (const k of Object.keys(from.inv || {})) if (acepta(to, k)) falta += necesita(to, k, true);
     const lleno = Math.min(cap, falta);
     u.mode = 'idle';
-    if (tot >= 1 && (tot >= lleno - 0.5 || tot >= cap * 0.5 || (u.espera || 0) >= 60)) {
+    if (tot >= 1 && (tot >= lleno - 0.5 || tot >= media(cap) || (u.espera || 0) >= 60)) {
       const c = {};
       for (const o of lista) { const n = take(from, o.res, o.n); if (n > 0) c[o.res] = (c[o.res] || 0) + n; }
       fijarCarga(u, c);

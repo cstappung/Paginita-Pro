@@ -305,7 +305,7 @@
     const nk = kind || RES_NODE[res], base = D.NODES[nk].rate;
     if (owner !== 'p') return base;
     const tech = nk === 'deer' ? (1 + 0.2 * G.lvl('hunting')) * (1 + hp('hunt')) : 1 + 0.15 * G.lvl(TECH_FOR[res]);
-    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk, (u ? comarca(u.x, u.y, res) : 0) + fortB(res));
+    return base * tech * dropMult(u) * G.globalMult() * (1 + ley(res)) * vr(res, nk, (u ? comarca(u.x, u.y, res) : 0) + fortB(res)) * (D.NODES[nk].res === 'wood' ? G.talaRate() : 1);
   };
   // Muelle de pesca (V9): rinde según el agua que lo rodea; la Cosecha eficiente no le suma, Pesca con redes sí.
   G.MUELLE_RATE = 0.3;
@@ -346,7 +346,9 @@
     }
     return out;
   };
-  G.carryCap = (owner, u) => (owner === 'p' ? 10 + 3 * G.lvl('carts') + (((u && u.dl) || 1) - 1) : 10);
+  // pk-83: el leñador carga ×Golpe (si no, el bono se iba en viajes más seguidos)
+  const talaCarga = u => (u && u.task && u.task.t === 'gather' && u.task.res === 'wood' ? G.talaMult().g : 1);
+  G.carryCap = (owner, u) => (owner === 'p' ? Math.round((10 + 3 * G.lvl('carts') + (((u && u.dl) || 1) - 1)) * talaCarga(u)) : 10);
   G.speed = function (owner, u) {
     if (u && u.kind === 'scout') return 2.3 * (1 + best('scout', 'scoutSpeed') + 0.1 * G.lvl('cartography'));
     if (u && u.kind === 'cart') return D.CART.speed * (1 + PK.Logi.cartSpeed());
@@ -649,6 +651,19 @@
   G.maxCount = function (type) {
     if (D.BUILD[type].marav && D.WONDERS.some(t => t !== type && G.countAll(t))) return 0; // una sola Maravilla
     const m = D.BUILD[type].max; return m === undefined ? Infinity : typeof m === 'function' ? m(S.era) : m; };
+  // pk-82 (plan Hacha y Pico, P1): cuántos tienes, cuántos permite tu era y desde qué era se permite uno más. Los
+  // talleres tienen tope desde pk-82; quien tenía más de antes se queda con ellos (decisión 1 del dueño), pero no hace otro.
+  G.topeInfo = function (type) {
+    const def = D.BUILD[type], max = G.maxCount(type), have = G.countAll(type);
+    let sig = null;
+    if (typeof def.max === 'function') for (let e = G.state.era + 1; e <= G.state.era + 6; e++) { const m = def.max(e); if (m > max) { sig = { era: e, max: m }; break; } }
+    return { have, max, sig, sobra: have > max };
+  };
+  G.topeTexto = function (type) {
+    const t = G.topeInfo(type);
+    if (t.max === Infinity) return '';
+    return (t.sobra ? 'Tienes ' + t.have + ' y tu era permite ' + t.max + ': los de más son de antes del tope y siguen trabajando, pero no puedes hacer otro.' : 'Tienes ' + t.have + ' de ' + t.max + ' para tu era.') + (t.sig ? ' La Era ' + U.roman(t.sig.era) + ' permite ' + t.sig.max + '.' : '');
+  };
   G.levelCount = (lvl, type, recipe) => G.buildings.reduce((s, b) => s + (b.owner === 'p' && b.done && b.lvl >= lvl && (!type || b.type === type) && (!recipe || b.def.recipe) ? 1 : 0), 0);
   G.villagers = () => G.units.filter(u => u.owner === 'p' && u.kind === 'v');
   G.villagerCount = () => G.units.reduce((s, u) => s + (u.owner === 'p' && u.kind === 'v' ? 1 : 0), 0);
@@ -682,6 +697,86 @@
     toast('¡Nuevo Maestro de Obras! Ahora tienes ' + G.builders() + '.', 'good');
     if (PK.Sfx) PK.Sfx.play('level');
     return true;
+  };
+  // ---------- Taller del Hachero (pk-83, plan Hacha y Pico P2; D.HACHERO en data.js) ----------
+  // Es saber del reino: vive en el estado de la tierra (S.otro en el mar) y vale en los dos mundos. Se investiga y se
+  // cuenta la prueba de campo solo en la tierra, donde está el taller.
+  // (usa G.state y no S para que las pruebas puedan armar un estado de mentira)
+  const talaSt = () => {
+    const t = G.state && (G.enMar() ? G.state.otro : G.state);
+    if (!t) return null;
+    if (!t.tala) t.tala = { n: { filo: 0, golpe: 0, aguante: 0 }, cortado: { filo: 0, golpe: 0, aguante: 0 }, inv: null };
+    return t.tala;
+  };
+  G.talaSt = talaSt;
+  const SIN_TALA = { f: 1, g: 1, a: 1 };
+  G.talaMult = function () {
+    const t = talaSt(), R = D.HACHERO.ramas;
+    if (!t) return SIN_TALA;
+    return { f: R.filo.mult[t.n.filo || 0], g: R.golpe.mult[t.n.golpe || 0], a: R.aguante.mult[t.n.aguante || 0] };
+  };
+  // madera por segundo del leñador (Filo × Golpe) y lo que pierde el árbol por cada unidad que junta (1 / (Golpe × Aguante))
+  G.talaRate = () => { const m = G.talaMult(); return m.f * m.g; };
+  G.talaDesgaste = () => { const m = G.talaMult(); return 1 / (m.g * m.a); };
+  G.talaCorta = function (q) {
+    if (!(q > 0) || G.enMar()) return;
+    const t = talaSt();
+    for (const r of D.HACHERO.orden) if ((t.n[r] || 0) < 5) t.cortado[r] = (t.cortado[r] || 0) + q;
+  };
+  // qué pide el próximo nivel de una rama: { n, nv, cost, pide: [{ txt, ok }], ok } o null si ya está al máximo
+  G.talaSig = function (rama) {
+    const t = talaSt(), n = (t.n[rama] || 0) + 1;
+    if (n > 5) return null;
+    const nv = D.HACHERO.niveles[n - 1], cost = D.talaCosto(rama, n), lt = D.HACHERO.lvlTaller(n);
+    const taller = G.buildings.find(b => b.owner === 'p' && b.type === 'hachero' && b.done);
+    const pide = [
+      { txt: 'Era ' + U.roman(nv.era), ok: G.state.era >= nv.era },
+      { txt: D.BUILD.hachero.name + ' en nivel ' + lt, ok: !!taller && taller.lvl >= lt },
+      { txt: 'Talar ' + U.fmt(nv.prueba) + ' de madera desde la última mejora de esta rama (' + U.fmt(Math.min(nv.prueba, Math.floor(t.cortado[rama] || 0))) + ')', ok: (t.cortado[rama] || 0) >= nv.prueba, prueba: true },
+      { txt: 'Materiales', ok: G.canAfford(cost), costo: true },
+    ];
+    return { n, nv, cost, pide, ok: pide.every(p => p.ok) && !t.inv && !G.enMar() };
+  };
+  G.talaEmpezar = function (rama) {
+    const t = talaSt(), sig = G.talaSig(rama);
+    if (G.enMar()) { toast('Las herramientas se investigan en el ' + D.BUILD.hachero.name + ' de tu reino.', 'warn'); return false; }
+    if (t.inv) { toast('El taller ya está investigando: una cosa a la vez.', 'warn'); return false; }
+    if (!sig) return false;
+    const falta = sig.pide.find(p => !p.ok);
+    if (falta) { toast(falta.costo ? 'Recursos insuficientes.' : 'Falta: ' + falta.txt + '.', 'warn'); return false; }
+    if (!G.pay(sig.cost)) { toast('Recursos insuficientes.', 'warn'); return false; }
+    t.inv = { rama, n: sig.n, t: 0, total: sig.nv.time };
+    t.cortado[rama] = 0; // la prueba del nivel siguiente empieza ahora
+    toast('El taller empezó a trabajar en ' + D.HACHERO.ramas[rama].niv[sig.n] + '.', 'info');
+    return true;
+  };
+  G.talaCancelar = function () {
+    const t = talaSt();
+    if (!t.inv) return;
+    G.give(D.talaCosto(t.inv.rama, t.inv.n), 0.5);
+    t.inv = null;
+    toast('Investigación cancelada: recuperaste la mitad de los materiales (la prueba de campo vuelve a empezar).', 'info');
+  };
+  G.talaAcelerarCosto = () => { const t = talaSt(); return t && t.inv ? Math.max(1, Math.ceil((t.inv.total - t.inv.t) / 600)) : 0; };
+  G.talaAcelerar = function () {
+    const n = G.talaAcelerarCosto();
+    if (!n) return;
+    if (!PK.Platform.spendCoins(n, 'speedup')) { toast('No tienes monedas suficientes.', 'warn'); return; }
+    talaSt().inv.t = talaSt().inv.total;
+    G.updateTimers(0);
+  };
+  G.talaTick = function (dt) {
+    const st = G.state;
+    if (G.enMar() || !st.tala || !st.tala.inv || !G.countB('hachero')) return;
+    const t = st.tala, i = t.inv;
+    i.t += dt;
+    if (i.t < i.total) return;
+    t.n[i.rama] = i.n; t.inv = null;
+    const nom = D.HACHERO.ramas[i.rama].niv[i.n];
+    G.finished.push(nom);
+    toast('¡' + nom + ' lista! ' + D.HACHERO.ramas[i.rama].name + ' ' + U.roman(i.n) + ': madera por minuto ×' + G.talaRate().toFixed(2) + ', por árbol ×' + (1 / G.talaDesgaste()).toFixed(2) + '.', 'good');
+    G.stat('tala_niveles', 1);
+    if (!G.offline && PK.Sfx) PK.Sfx.play('level');
   };
   // el Astillero del Maestro de Ribera del archipiélago (pk-30) da un maestro más en la tierra
   G.maestroMar = () => (!G.enMar() && S.otro && (S.otro.buildings || []).some(b => b.type === 'maestro' && b.done) ? 1 : 0);
@@ -1735,6 +1830,7 @@
         S.research = null;
       }
     }
+    G.talaTick(dt);
     for (const b of G.buildings) {
       if (b.owner !== 'p' || !b.upg) continue;
       b.upg.t += dt;
@@ -1863,9 +1959,12 @@
           const alm = u.owner === 'p' && PK.Libro ? PK.Libro.almacenDe(base) : base; // pk-46: en una colonia, su Muelle
           const campo = u.owner === 'p' && PK.Libro && PK.Libro.esCampo(alm) && !aislado;
           const room = u.owner !== 'p' ? Infinity : campo ? PK.Libro.lugarCampo(alm, t.res) : Math.max(0, G.cap(t.res) - (S.res[t.res] || 0));
-          const take = Math.min(n.amount, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
+          // pk-83: con las herramientas del Hachero el árbol pierde menos de lo que junta el leñador (G.talaDesgaste)
+          const dg = u.owner === 'p' && D.NODES[n.kind].res === 'wood' ? G.talaDesgaste() : 1;
+          const take = Math.min(n.amount / dg, eff * dt * (u.owner === 'p' ? 1 : 0.3), room);
           if (take <= 0) continue;
-          if (u.owner === 'p' || !W.isShared(n)) n.amount -= take; // L4: los simulados no gastan tus zonas comunes
+          if (u.owner === 'p' || !W.isShared(n)) n.amount -= take * dg; // L4: los simulados no gastan tus zonas comunes
+          if (dg !== 1) G.talaCorta(take);
           if (n.amount <= 0.5) { W.depleteNode(n); if (u.owner === 'p') depleted++; } // solo los tuyos: contaba los de los 15 reinos simulados
           if (u.owner === 'p' && take > 0) gained(t.res, campo ? PK.Libro.ponerCampo(alm, t.res, take) : G.addRes(t.res, take), n.zone, n.kind === 'deer');
         } else if (t.t === 'farm') {
