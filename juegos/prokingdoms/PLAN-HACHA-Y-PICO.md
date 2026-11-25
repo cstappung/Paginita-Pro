@@ -58,9 +58,11 @@ recursos. P2 sirve de ensayo para P3: un bono nuevo de recolección que pasa por
 
 ## 2. Fase P1: topes de talleres y bodegas de campamento más grandes (`pk-82`)
 
-### 2.1 Tope de cada taller
+### 2.1 Tope de cada taller: cuántos puedes construir
 
-El tope crece con la era, como el de Granero, Almacén o Establo. Los números salen de lo que el piloto construye
+Hoy se pueden construir talleres sin límite: nada impide tener 15 Aserraderos. Con esta fase, **cada tipo de taller
+tiene un número máximo de edificios**: con el tope alcanzado, Construir lo muestra bloqueado («Ya tienes el
+máximo: 3 de 3») y solo queda subir de nivel los que tienes. El tope crece con la era, como el de Granero, Almacén o Establo. Los números salen de lo que el piloto construye
 hoy (`tools/piloto.js`, lista por era: Cantería 3 y Fundición 2 en la Era IV) con un poco de margen, y de lo que
 piden los costos de era (sillares y lingotes son lo que más pide; maquinaria lo que menos).
 
