@@ -29,7 +29,7 @@
 | 2 | Taller del Hachero | Sí | Es un bono de recolección de madera, que **sí** controla el servidor: hay que sumarlo a `kindRate` en la misma entrega | P2 |
 | 3 | Mina Profunda | Sí, es lo más grande del plan | Que lo calculado sin conexión dé lo mismo que en vivo, el antitrampa (piedra y oro los ve el servidor), y que dibujar 60 mineros no cueste cuadros por segundo | P3, P4, P5 |
 
-Orden recomendado: **P1 → P2 → P3 → P4 → P5**. P1 es chica y deja medido el ritmo nuevo antes de sumar fuentes de
+Orden recomendado: **P1 → P2 → P3 → P4 → P5 → P6 → P7** (la Posada, §10, se agregó después). P1 es chica y deja medido el ritmo nuevo antes de sumar fuentes de
 recursos. P2 sirve de ensayo para P3: un bono nuevo de recolección que pasa por el servidor.
 
 ---
@@ -447,6 +447,8 @@ del mapa mientras la vista está abierta. Respeta M y el volumen compartido.
 | P3 Mina: cálculo | `pk-84` | grande (modelo, logística, Capataz, sin conexión, antitrampa) | desplegar la función |
 | P4 Mina: vista | `pk-85` | grande (vista en corte, mineros, sonido, fichas) | no |
 | P5 Mina: cierre | `pk-86` | mediana (guía, misiones, Asesor, piloto, medir) | no |
+| P6 Posada: tablero y Diligencia | `pk-87` | mediana | no |
+| P7 Posada: Feria, álbum e historias | `pk-88` | mediana (mucho texto) | ayuda del gremio |
 
 P3 y P4 pueden ir en paralelo si P3 deja hecho primero el estado (`b.mina`) y `D.pisoMina`, porque la vista solo
 los lee.
@@ -474,3 +476,52 @@ Pendiente (el plan usa la recomendación):
 
 10. **¿Se acelera con monedas la investigación del Hachero?** Recomendado: sí el tiempo, como las mejoras, pero
     **nunca** la prueba de campo.
+
+---
+
+## 10. Fases P6 y P7: la Posada de los Viajeros (`pk-87`, `pk-88`)
+
+Propuesta aceptada por el dueño el 25 de noviembre de 2026. Viajeros con nombre y retrato llegan a una **Posada** con
+**pedidos** (combinaciones de bienes). Cumplirlos da recompensas, fama e historias. La idea es que siempre haya algo
+chico que hacer, **sin castigar a quien se va**.
+
+### 10.1 Reglas de diseño (mandan sobre lo demás)
+
+- **No se castiga la ausencia:** mientras no estás, los viajeros llegan hasta llenar el tablero y esperan. Ningún
+  pedido caduca, no hay rachas que se pierdan, nada dice «te lo perdiste».
+- **La recompensa se ve antes de entregar.** No hay cajas sorpresa pagadas; la «propina» a veces es mayor, siempre
+  gratis y con semilla.
+- **Semilla por pedido** (`U.rng(st.posada.n, …)`, `n` = número de pedido creado): recargar nunca cambia un pedido.
+  Los que llegan sin conexión usan `G.ahora()`.
+- **Recompensas fuera de lo que vigila el servidor:** monedas del reino (con tope diario), cofres que entran con
+  `G.give`, decoraciones y aspectos de la Posada, y fama. Oro y comida solo en cantidades chicas, dentro de
+  `LIM.resSlack` como las misiones.
+- **Los pedidos salen de lo que el reino ya hace** (lo que tienes, lo que tus talleres producen y lo que tu era
+  permite), con más peso a lo que te sobra.
+
+### 10.2 Fase P6: la Posada, el tablero y la Diligencia (`pk-87`)
+
+- **Posada** (`posada`, 3×3, Era II, `max: 1`): su nivel da lugares en el tablero (6 + ⌊nivel/3⌋, hasta 9) y acorta
+  la espera entre viajeros (un viajero cada 12 min en nivel 1, cada 6 en nivel 10).
+- **Pedido:** un viajero (retrato con `PK.Retratos`, nombre, oficio), 1 a 3 bienes con cantidades según la era, y su
+  premio. «Entregar» paga al instante (cajas a la carreta, sonido, el viajero se va por el camino). «Despedir»
+  descarta y el lugar se llena a los 10 min.
+- **La Diligencia** (cada 4 h de reloj real, con semilla por bloque de 4 h): 9 cajas de un pedido grande; se llenan de
+  a una; premio por caja y un premio extra si se llenan las 9 antes de que parta. Si no, se va con lo hecho y paga
+  esas cajas. Sin conexión: parte sola con lo que tenía.
+- **Fama** (`st.posada.fama`): cada entrega suma; niveles de fama desbloquean viajeros nuevos y pedidos mejores.
+- Toasts agrupados, ventana probada a 390×844 y en horizontal, botón en el menú (grupo Reino) con una insignia con
+  los pedidos que ya puedes cumplir.
+- El piloto cumple pedidos que no le quitan lo que pide su meta de era.
+
+### 10.3 Fase P7: la Feria, el álbum y las historias (`pk-88`)
+
+- **La Feria** (semanal, por semana UTC): una barra de 30 escalones que avanza con la fama de esa semana; premios de
+  aspecto, decoraciones de la Posada y monedas del reino.
+- **Álbum de viajeros** (unos 40): cada uno con una historia de 5 capítulos que avanza al cumplirle pedidos. Un capítulo
+  es un diálogo corto con su retrato (como Tobías), con humor. Al completar su historia, el viajero deja un regalo
+  permanente chico (decoración única o aspecto).
+- **Visitante ilustre** (con semilla, uno cada uno o dos días): un pedido especial con un premio mayor.
+- **En línea:** los compañeros del gremio pueden mandar una caja a tu Diligencia (por el tablón de ayuda que ya
+  existe, con sus topes del servidor).
+- Misiones nuevas, Asesor («tienes 3 pedidos listos para entregar»), novedades y notas en `CLAUDE.md`.
