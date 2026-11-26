@@ -918,14 +918,37 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **The cutaway view** (`js/ui/mina.js`, `UI.abrirMina`, `#minavista`) only draws: `main.js` skips the map while
   `UI.minaAbierta()`. Redone in `pk-85` (owner: «mejora muy drástica»): x = 0 is the shaft, each floor is 100 px tall
   and much wider the deeper it is (`alcance`: base 60 + 16·n per side, veins every `sep(n)` = 64 + 5·n). The camera
-  pans in both axes with an integer scale (`medir`: a floor ≈ 40 % of the height). Per floor, the rock, the carved
-  gallery (the back wall is written with ImageData), the niches and the timbering are cached in `V.fondos[n]` keyed by
-  revealed/exhausted veins and the world width; veins, water, gas, pumps, lanterns and miners are drawn live. Light:
-  one offscreen canvas per visible floor filled dark and cut with `destination-out` gradients (lanterns, helmet lamps,
-  open veins, the shaft landing); vein glints and the water surface are drawn **after** the shade so they always read.
-- Miners in the mine are their own 20×30 figures (`figura(pose, frame, …)`: picar, barrenar, palear, empujar, cargar,
-  caminar), not `S.villager`; drawn at 26×36. The frame is normalised (`((fr | 0) % 4 + 4) % 4`): a NaN frame
-  crashed the whole view once.
+  pans in both axes with an integer scale (`medir`: a floor ≈ half the height; a `ResizeObserver` re-measures keeping
+  the centre, because the panel fills after opening and the browser was stretching the canvas into uneven pixels).
+  Per floor, the rock, the carved gallery (the back wall is written with ImageData), the niches, cobwebs and the
+  timbering are cached in `V.fondos[n]` keyed by revealed/exhausted veins and the world width; veins, the front,
+  props, water, gas, pumps, lanterns, critters and miners are drawn live. Light: one offscreen canvas per visible floor
+  filled dark and cut with `destination-out` gradients (lanterns, helmet lamps, open veins, the shaft landing, event
+  flashes); vein glints, the water surface, dust motes and event labels are drawn **after** the shade so they read.
+- **pk-86 (owner: «mineros con más píxeles… que cualquier evento se vea, que se sienta vivo»).** All view-only;
+  nothing feeds back into `PK.Mina`:
+  - Miners are 48×72 sprites drawn at 24×36 (double resolution, auto-outlined by `contorno`), built on a two-bone IK
+    skeleton (`ik`) per pose: picar, barrenar, palear, empujar, cargar, caminar, descansar (sitting on a crate),
+    festejar, esperar (hand lantern). Face, beard, skin, hair, clothes and build come from the villager id through
+    `U.rng` — **not `U.hash`**: it gives near-equal values for consecutive ids and neighbours came out identical.
+    Sprites live in small LRU caches (`cache`).
+  - Each miner is an actor (`V.act`, synced with `b.workers` and `b.mina.asig` in `sincronizar`) that walks to its
+    job, so a new active vein makes the crew walk over. A new worker walks in at the surface, waits at the headframe
+    and rides the cage down; one who leaves or changes floor walks to the landing and waits. The cage (`jaulaPaso`)
+    carries people first, then ore runs floor by floor; unloading at the hopper shows «+N mineral» from the vein `q`
+    diffs of that floor (`V.prod`). With the storage full it stays up, more miners rest, ore piles up by the hopper
+    and a sign blinks.
+  - Events are diffs against the previous frame (`eventos`; none on the first frame): new vein (blast at the old
+    front, shake, debris, dust, the crew cheers), exhausted vein (niche collapse; gem burst if `hall`), special (`a.e`
+    went down), upgrade bought (rails laid and lanterns lit outwards, the pump lowers the water, ventilation clears the
+    gas: `progObra`, `V.agua`, `V.gasA`), new floor (fades in), new lift (headframe glow).
+  - Life: rats that flee walking miners, bats on floors ≤ 6, the canary on ventilated gas floors, dust from the
+    ceiling, embers on floor 14+, bubbles in deep water, the front cracking with `p.fr` and charged drill holes past
+    80 %, props (`propsDe`: barrels, crates, tool racks, shrines with candles, a slate counting exhausted veins…), the
+    malacate horse (lift 1), the steam cylinder (lift ≥ 2), the ox cart that leaves full and returns, porters with
+    sacks when the mine is isolated.
+  - Sounds `campana` (cage arrives), `torno` (cage starts, surface on screen), `gota`, `rata`: ElevenLabs recordings
+    in `sfx/`, gains measured against `pick`/`deposit`, synthesized fallbacks in `sfx.js`.
 - Miner look: `troop === 'minero'` (leather helmet with a carbide lamp, overalls, realm-coloured scarf, soot, pick on
   the shoulder); villagers walking to the mine wear it on the map too (`render.js`).
 - Asesor rules `minaLlena`, `minaMont`, `minaAgua`, `minaPuestos`; missions `i14`–`i19`; the autopilot builds it in

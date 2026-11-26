@@ -47,6 +47,7 @@
   const GAN = { chop: 0.0226, pick: 0.0337, hammer: 0.0331, dig: 0.0127, reap: 0.0185, deposit: 0.0334, build: 0.0928, level: 0.0732,
     era: 0.0781, quest: 0.0718, coin: 0.1296, event: 0.1114, cuerno: 0.0554, arrow: 0.0382, hit: 0.038, espada: 0.0252, boom: 0.0465,
     fuego: 0.0363, magia: 0.0346, victoria: 0.1128, derrota: 0.0382, howl: 0.0593, porton: 0.0324,
+    campana: 0.08, torno: 0.09, gota: 0.022, rata: 0.1, // pk-86, la mina (ElevenLabs; medidos contra pick y deposit)
     'amb-olas': 0.0073, 'amb-viento': 0.0092, 'amb-grillo': 0.0081, 'amb-pajaro': 0.014, 'amb-gaviota': 0.0085, 'amb-obra': 0.0092,
     'amb-yunque': 0.0216, 'amb-sierra': 0.0081, 'amb-gente': 0.0066, 'amb-hacha': 0.0129, 'amb-pico': 0.0093 };
   // (sierra y gente, ×1.5 y ×2 sobre lo medido: el murmullo de antes casi no se oía)
@@ -55,7 +56,7 @@
   // medida igual que las demás.
   const ARCHIVO = { 'amb-hacha': 'chop', 'amb-pico': 'pick' }; // el ambiente reusa los golpes de los aldeanos
   // los que se repiten mucho cambian un poco de altura en cada golpe, para que 20 aldeanos no suenen como uno
-  const VARIA = { chop: 1, pick: 1, hammer: 1, dig: 1, reap: 1, deposit: 1, hit: 1, espada: 1, arrow: 1, coin: 1, 'amb-hacha': 1, 'amb-pico': 1, 'amb-yunque': 1, 'amb-pajaro': 1, 'amb-grillo': 1 };
+  const VARIA = { gota: 1, rata: 1, campana: 1, chop: 1, pick: 1, hammer: 1, dig: 1, reap: 1, deposit: 1, hit: 1, espada: 1, arrow: 1, coin: 1, 'amb-hacha': 1, 'amb-pico': 1, 'amb-yunque': 1, 'amb-pajaro': 1, 'amb-grillo': 1 };
   const VOCES = 4; // tope de copias sonando a la vez de un mismo archivo (la hoz dura 1,3 s y se golpea más seguido)
   const bufs = {}, sonando = {};
   const VER = ((document.currentScript && /[?&]v=([^&]+)/.exec(document.currentScript.src)) || [])[1] || '';
@@ -93,7 +94,7 @@
   X.muestra = (name, destino, vol, cuando) => !!(ctx && muestra(name, destino, vol, cuando));
   X.duracion = name => { const b = bufs[ARCHIVO[name] || name]; return b ? b.duration : 0; };
 
-  const GAP = { porton: 1.2, level: 0.6, deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4 };
+  const GAP = { porton: 1.2, level: 0.6, deposit: 0.15, arrow: 0.12, hit: 0.1, chop: 0.09, pick: 0.09, hammer: 0.08, dig: 0.12, reap: 0.12, espada: 0.08, boom: 0.15, magia: 0.25, fuego: 0.4, campana: 0.5, torno: 1.2, gota: 0.25, rata: 2 };
 
   // pk-37: un sonido con lugar (PK.Render.sonarEn): vol 0..1 y pan -1..1. El tope de repetición no deja que uno
   // lejano y bajito le quite el turno a uno cerca: si el nuevo suena más fuerte que el último, pasa igual.
@@ -145,6 +146,10 @@
       case 'magia': [1319, 1568, 1976].forEach((f, i) => tone(f, i * 0.05, 0.16, 'triangle', 0.025)); break;
       case 'victoria': [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.22, 'square', 0.045)); tone(784, 0.55, 0.2, 'square', 0.045); tone(1047, 0.72, 0.7, 'square', 0.05); noise(0.7, 0.4, 0.04, 6000); break;
       case 'derrota': [392, 349, 311, 262].forEach((f, i) => tone(f, i * 0.22, 0.35, 'triangle', 0.05)); break;
+      case 'campana': tone(1760, 0, 0.5, 'triangle', 0.035); tone(1760, 0.22, 0.6, 'triangle', 0.03); break; // la mina (pk-86)
+      case 'torno': noise(0, 0.5, 0.02, 400); tone(140, 0, 0.5, 'sawtooth', 0.012, 120); break;
+      case 'gota': tone(1400, 0, 0.08, 'sine', 0.02, 700); break;
+      case 'rata': tone(2600, 0, 0.06, 'square', 0.01, 3200); tone(2800, 0.1, 0.06, 'square', 0.01, 3400); break;
       case 'howl': tone(300, 0, 0.5, 'sine', 0.06, 620); tone(620, 0.5, 0.9, 'sine', 0.06, 380); break;
     }
   }
