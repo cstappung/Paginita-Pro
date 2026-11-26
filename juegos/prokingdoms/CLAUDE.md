@@ -916,9 +916,16 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
 - **Specials** (owner's decision 2, fair measure): from floor 14, about one vein in eight carries crystal or star
   iron, 1–3 per 1000 units mined; one vein in six ends in a gem pocket. Both through `G.give`.
 - **The cutaway view** (`js/ui/mina.js`, `UI.abrirMina`, `#minavista`) only draws: `main.js` skips the map while
-  `UI.minaAbierta()`. Rock per floor cached per `sem`; the shaft is drawn **after** the floors (the rock covered it).
-  `encuadre()` scales to the galleries, not the whole 360 px scene (on a phone the whole scene made miners 4 px tall).
-  Miners use `S.villager(..., 'minero', false)` — the 13th argument `soloCache` must be false or it returns null.
+  `UI.minaAbierta()`. Redone in `pk-85` (owner: «mejora muy drástica»): x = 0 is the shaft, each floor is 100 px tall
+  and much wider the deeper it is (`alcance`: base 60 + 16·n per side, veins every `sep(n)` = 64 + 5·n). The camera
+  pans in both axes with an integer scale (`medir`: a floor ≈ 40 % of the height). Per floor, the rock, the carved
+  gallery (the back wall is written with ImageData), the niches and the timbering are cached in `V.fondos[n]` keyed by
+  revealed/exhausted veins and the world width; veins, water, gas, pumps, lanterns and miners are drawn live. Light:
+  one offscreen canvas per visible floor filled dark and cut with `destination-out` gradients (lanterns, helmet lamps,
+  open veins, the shaft landing); vein glints and the water surface are drawn **after** the shade so they always read.
+- Miners in the mine are their own 20×30 figures (`figura(pose, frame, …)`: picar, barrenar, palear, empujar, cargar,
+  caminar), not `S.villager`; drawn at 26×36. The frame is normalised (`((fr | 0) % 4 + 4) % 4`): a NaN frame
+  crashed the whole view once.
 - Miner look: `troop === 'minero'` (leather helmet with a carbide lamp, overalls, realm-coloured scarf, soot, pick on
   the shoulder); villagers walking to the mine wear it on the map too (`render.js`).
 - Asesor rules `minaLlena`, `minaMont`, `minaAgua`, `minaPuestos`; missions `i14`–`i19`; the autopilot builds it in
