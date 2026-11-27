@@ -46,6 +46,22 @@
   }
   UI.hachaIcono = hachaIcono;
 
+  // pk-87: cómo se ve hoy tu leñador en el mapa (camina con el hacha al hombro, hachea y, con Golpe II, aserra)
+  function lenadorVista(g) {
+    const Sp = PK.Sprites, lk = g.talaLook(), col = Sp.ownerColor('p');
+    const c = document.createElement('canvas'), z = 3;
+    c.width = 3 * 22 * 2 * z / 2 + 24; c.height = 22 * 2 * z / 2 + 4;
+    c.className = 'hach-lenador';
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    const poses = [['walk', 1, null], ['work', 2, 'axe'], ['work', 2, lk && lk.g >= 2 ? 'saw' : 'axe']];
+    poses.forEach(([mode, fr, tool], i) => {
+      const s = Sp.villager(col, i % 4, (i + 1) % 3, mode, fr, null, false, tool, false, false, null, undefined, false, undefined, lk);
+      if (s) x.drawImage(s.c, i * (22 * z + 8), 0, s.c.width * z / 2, s.c.height * z / 2);
+    });
+    const tot = lk ? lk.f + lk.g + lk.a : 0;
+    return el('div', { class: 'hach-vista' }, c, el('span', { class: 'small muted' }, tot ? 'Así se ven tus leñadores en el mapa: el equipo cambia con cada herramienta (hacha del Filo, sierras del Golpe, cuerda, gorro y polea del Aguante).' : 'Tus leñadores todavía usan el hacha de siempre. Cada herramienta que investigues se les verá en el mapa.'));
+  }
+
   UI.openHachero = function () {
     UI.modal('hachero', D.BUILD.hachero.name, body => {
       const g = G(), t = g.talaSt(), m = g.talaMult(), R = D.HACHERO.ramas;
@@ -54,6 +70,7 @@
         el('span', null, 'Madera por minuto ', el('b', null, '×' + (m.f * m.g).toFixed(2))),
         el('span', null, 'Madera por árbol ', el('b', null, '×' + (m.g * m.a).toFixed(2))),
         el('span', null, 'Carga del leñador ', el('b', null, '×' + m.g.toFixed(2)))));
+      body.append(lenadorVista(g));
       if (g.enMar()) body.append(el('p', { class: 'small warn-t' }, 'Las herramientas valen también en el archipiélago, pero se investigan en el taller de tu reino.'));
       if (!g.buildings.some(b => b.owner === 'p' && b.type === 'hachero' && b.done) && !g.enMar()) body.append(el('p', { class: 'small warn-t' }, 'Sin un ' + D.BUILD.hachero.name + ' terminado no se investiga nada (y una investigación empezada queda en pausa).'));
       if (t.inv) {

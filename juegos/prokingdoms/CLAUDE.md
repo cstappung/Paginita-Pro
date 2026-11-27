@@ -891,6 +891,21 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
   only on land. One research at a time; it pauses without a finished Taller. The tala functions read `G.state`, not
   `S`, so the tests can fake a state; `G.talaTick` runs from `updateTimers`.
 - Golpe ≥ II draws the woodcutter with a two-man saw (`tool 'saw'`); Filo speeds the swing (drawing only).
+- **pk-87 (owner: «que se note que el aldeano tiene mejoras»):** `G.talaLook()` (`{ f, g, a, k }`, same object while
+  the levels do not change, `k` goes into the sprite-cache key) is passed as the 15th argument of `Sp.villager` for
+  your villagers whose task gathers wood (walking too). From any level: red plaid shirt; Aguante I rope across the
+  chest, III realm-coloured knit cap, V pulley at the belt; Golpe I mallet and wedge at the belt, III/V one/two more
+  logs carried; total 6+ leather gloves. The axe follows Filo (bright edge, forged iron ×1.3, tempered steel, double
+  bit, crucible steel with a gold ferrule) and goes on the shoulder while walking. With Golpe ≥ II only even ids saw
+  (so Filo still shows): crosscut (II), bow saw with a frame (III), steam saw with an engine and smoke (IV), band saw
+  (V). Impacts: more chips with Golpe, a glint with Filo ≥ III. The Taller's window shows the current woodcutter
+  (`lenadorVista`). Your villagers only: remote/bot ones keep the realm tunic.
+- **Camps redrawn (pk-87, owner: «se ven muy parecidos»):** `BDRAW.lumber` is a log cabin with a log pile drawn log
+  by log (`tronco`: bark strip plus a ringed end facing front-right), a stump with an axe stuck in it, split
+  firewood and a sawbuck with a half-sawn log (a tripod crane from tier 3); `BDRAW.mining` is a rock outcrop (flat
+  colours: the `rock` texture has mortar joints and read as a stone building) with a timbered adit and a lantern,
+  rails, a loaded mine cart, an ore heap with pick and shovel, a hand windlass over a test pit and the flag on the
+  summit. `BTOP` lumber 28, mining 36. The sea keeps its own (`sprites-mar.js`).
 
 ### P3 + P4 + P5: the Mina Profunda (`pk-83`)
 
@@ -949,6 +964,10 @@ This file keeps only the rules and traps. New notes go here, in a few lines, und
     sacks when the mine is isolated.
   - Sounds `campana` (cage arrives), `torno` (cage starts, surface on screen), `gota`, `rata`: ElevenLabs recordings
     in `sfx/`, gains measured against `pick`/`deposit`, synthesized fallbacks in `sfx.js`.
+- **pk-87 (owner: «las vetas en el techo se ven raras»):** veins are picked in the back wall at chest height
+  (`VY` = 58 from the floor top), never above the gallery: `fondo()` darkens an alcove (`horn`) per uncovered vein
+  in the back-wall ImageData and only lifts the ceiling a little; `veta()` draws a thin broken seam inside the wall,
+  nuggets on the wall face around `VY` and the broken-out ore heaped at its foot. Event effects of a vein use `VY`.
 - Miner look: `troop === 'minero'` (leather helmet with a carbide lamp, overalls, realm-coloured scarf, soot, pick on
   the shoulder); villagers walking to the mine wear it on the map too (`render.js`).
 - Asesor rules `minaLlena`, `minaMont`, `minaAgua`, `minaPuestos`; missions `i14`–`i19`; the autopilot builds it in

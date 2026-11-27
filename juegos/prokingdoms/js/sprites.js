@@ -330,24 +330,121 @@
       p.roof(b.x, b.y, b.w, b.h, 13, 12, 'thatch', 0.3, 0.25, 'x');
       p.box(1.1, 0.6, 0.22, 0.22, 20, 28, 'stone'); m.smoke.push(p.P(1.21, 0.71, 28));
     },
-    lumber(p) {
-      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.9, 0.5);
-      p.post(0.15, 0.15, 12); p.post(1.7, 0.15, 12); p.post(0.15, 1.7, 12);
-      logsPile(p, 0.45, 0.5, [3, 2]);
-      p.box(1.55, 1.55, 0.3, 0.3, 0, 3, 'bark', 'logend', 'logend');
-      p.post(1.7, 1.7, 12);
-      p.roof(0.05, 0.05, 1.9, 1.9, 12, 7, 'plank', 0.6, 0.12, 'y');
+    // pk-87 (pedido del dueño: «se ven muy parecidos y no se ven como lo que son»): el maderero es una cabaña de troncos
+    // con su pila de troncos, el tocón con el hacha clavada, leña partida y el caballete con la sierra; el minero, un
+    // cerro de roca con la boca del socavón entibada, rieles, la vagoneta cargada, el montón de mineral y el torno.
+    lumber(p, col, m, tier) {
+      const c = p.ctx;
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.95, 0.5);
+      for (let i = 0; i < 80; i++) { // aserrín, astillas y pasto
+        const u = U.hash(i, 1, 31) * 1.9 + 0.05, v = U.hash(i, 2, 31) * 1.9 + 0.05, q = p.P(u, v, 0), h = U.hash(i, 3, 31);
+        p.px(q[0], q[1], h < 0.45 ? '#d6b27a' : h < 0.7 ? '#e8cc96' : h < 0.85 ? '#5e8a36' : '#76a044');
+      }
+      // un tronco acostado a lo largo de x, con su cabeza (anillos) mirando a la derecha
+      const tronco = (x0, x1, v, z, r) => {
+        for (let k = 0; k <= 2 * r; k++) p.line(p.P(x0, v, z + k), p.P(x1, v, z + k), k >= 2 * r - 1 ? '#8a6038' : k <= 1 ? '#3e2814' : k % 3 ? '#5e3e22' : '#4e3218');
+        const e = p.P(x1, v, z + r);
+        c.fillStyle = '#3e2814'; c.fillRect(e[0] - r + 1, e[1] - r, 2 * r - 1, 2 * r + 1); c.fillRect(e[0] - r, e[1] - r + 1, 2 * r + 1, 2 * r - 1);
+        c.fillStyle = '#d8b07a'; c.fillRect(e[0] - r + 1, e[1] - r + 1, 2 * r - 1, 2 * r - 1);
+        if (r >= 3) { c.fillStyle = '#b08850'; c.fillRect(e[0] - 1, e[1] - 1, 3, 3); c.fillStyle = '#e8c890'; c.fillRect(e[0], e[1], 1, 1); }
+        else { c.fillStyle = '#a07848'; c.fillRect(e[0], e[1], 1, 1); }
+      };
+      // un tocón (cilindro de pie) con los anillos arriba
+      const tocon = (u, v, ht, r) => {
+        const q = p.P(u, v, 0);
+        c.fillStyle = '#4e3218'; c.fillRect(q[0] - r, q[1] - ht, 2 * r + 1, ht + 1); c.fillStyle = '#6a4626'; c.fillRect(q[0] - r, q[1] - ht, r, ht + 1);
+        c.fillStyle = '#3e2814'; c.fillRect(q[0] - r, q[1] - ht - 2, 2 * r + 1, 4);
+        c.fillStyle = '#d8b07a'; c.fillRect(q[0] - r + 1, q[1] - ht - 2, 2 * r - 1, 3);
+        c.fillStyle = '#b08850'; c.fillRect(q[0] - 1, q[1] - ht - 1, 3, 1);
+        return [q[0], q[1] - ht - 1];
+      };
+      // cabaña de troncos (atrás a la izquierda)
+      const b = { x: 0.1, y: 0.1, w: 0.9, h: 0.72 };
+      p.box(b.x, b.y, b.w, b.h, 0, 9, 'bark');
+      for (const sd of ['L', 'R']) {
+        const len = sd === 'L' ? b.w : b.h;
+        for (let z = 2; z <= 9; z += 2) p.line(p.wp(b, sd, 0, z), p.wp(b, sd, len, z), '#2e1c0e');
+      }
+      for (let z = 1; z <= 8; z += 2) { const q = p.P(b.x + b.w, b.y + b.h, z); c.fillStyle = '#d8b07a'; c.fillRect(q[0] - 1, q[1] - 1, 3, 2); } // esquina de troncos cruzados
+      p.door(b, 'L', 0.6, 0.26, 6);
+      p.win(b, 'R', 0.36, 4, 0.2, 3);
+      p.roof(b.x, b.y, b.w, b.h, 9, 7, 'plank', 0.4, 0.08, 'y');
+      p.box(0.2, 0.2, 0.16, 0.16, 11, 18, 'stone'); m.smoke.push(p.P(0.28, 0.28, 18));
+      // pila de troncos (a la derecha), cabezas al frente-derecha
+      const filas = tier >= 2 ? [4, 3, 2] : [3, 2, 1];
+      for (let r = 0; r < filas.length; r++) for (let i = 0; i < filas[r]; i++) tronco(1.12, 1.88, 0.25 + i * 0.36 + r * 0.18, r * 6, 3);
+      for (const v of [0.08, 0.1 + filas[0] * 0.36]) { const q = p.P(1.92, v, 0); c.fillStyle = '#3e2814'; c.fillRect(q[0], q[1] - 7, 2, 8); } // estacas que sujetan la pila
+      // tocón con el hacha clavada y la leña partida (adelante a la izquierda)
+      const tp = tocon(0.45, 1.5, 4, 3);
+      p.line([tp[0] + 1, tp[1] - 1], [tp[0] + 5, tp[1] - 8], '#9a6a3a'); p.line([tp[0] + 2, tp[1] - 1], [tp[0] + 6, tp[1] - 8], '#6a4424');
+      c.fillStyle = '#9aa0aa'; c.fillRect(tp[0] - 2, tp[1] - 3, 4, 3); c.fillStyle = '#e8ecf2'; c.fillRect(tp[0] - 2, tp[1] - 1, 4, 1);
+      for (let r = 0; r < 2; r++) for (let i = 0; i < 3 - r; i++) tronco(0.78 + r * 0.06, 1.05 + r * 0.06, 1.62 - i * 0.16 - r * 0.08, r * 3, 1); // leña partida
+      // caballete con un tronco a medio aserrar
+      const sx = 1.2, sy = 1.62;
+      for (const dx of [0, 0.5]) { p.line(p.P(sx + dx, sy - 0.14, 0), p.P(sx + dx, sy + 0.14, 8), '#5a3a22'); p.line(p.P(sx + dx, sy + 0.14, 0), p.P(sx + dx, sy - 0.14, 8), '#5a3a22'); }
+      tronco(sx - 0.18, sx + 0.72, sy, 5, 2);
+      const s0 = p.P(sx + 0.3, sy, 10);
+      c.fillStyle = '#b8bec8'; c.fillRect(s0[0] - 4, s0[1] - 2, 9, 2); c.fillStyle = '#e8ecf2'; c.fillRect(s0[0] - 4, s0[1] - 2, 9, 1);
+      c.fillStyle = '#6a4424'; c.fillRect(s0[0] - 6, s0[1] - 4, 2, 4); c.fillRect(s0[0] + 5, s0[1] - 4, 2, 4);
+      const s1 = p.P(sx + 0.3, sy, 0); c.fillStyle = '#e8cc96'; c.fillRect(s1[0] - 2, s1[1], 5, 1); c.fillRect(s1[0] - 1, s1[1] - 1, 3, 1); // aserrín bajo el corte
+      if (tier >= 3) { // cabria de tres palos para levantar troncos
+        const top = p.P(1.55, 0.95, 26);
+        for (const [u, v] of [[1.3, 0.8], [1.9, 0.75], [1.6, 1.3]]) p.line(p.P(u, v, 0), top, '#4a3018');
+        p.line(top, [top[0], top[1] + 10], '#c8b080'); c.fillStyle = '#6a6e76'; c.fillRect(top[0] - 1, top[1] + 1, 3, 2);
+      }
     },
-    mining(p) {
-      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'soil', 0.8, 0.5);
-      p.post(0.15, 0.15, 12); p.post(1.7, 0.15, 12); p.post(0.15, 1.7, 12);
-      rockPile(p, 0.35, 0.35, ['rock', 'stone', 'rust']);
-      p.box(1.15, 1.25, 0.55, 0.35, 2, 6, 'darkwood', 'darkwood', '#3a2a1c');
-      p.box(1.2, 1.3, 0.45, 0.25, 6, 7, 'rock', 'rock', 'rock');
-      const wh = p.P(1.3, 1.6, 1), wh2 = p.P(1.6, 1.6, 1);
-      p.px(wh[0], wh[1], '#1c140e'); p.px(wh2[0], wh2[1], '#1c140e');
-      p.post(1.7, 1.7, 12);
-      p.roof(0.05, 0.05, 1.9, 1.9, 12, 7, 'thatch', 0.6, 0.12, 'x');
+    mining(p, col, m, tier) {
+      const c = p.ctx;
+      p.fill([p.P(0, 0, 0), p.P(2, 0, 0), p.P(2, 2, 0), p.P(0, 2, 0)], 'rock', 0.78, 0.5);
+      for (let i = 0; i < 60; i++) { // grava y cascajo
+        const u = U.hash(i, 1, 47) * 1.9 + 0.05, v = U.hash(i, 2, 47) * 1.9 + 0.05, q = p.P(u, v, 0), h = U.hash(i, 3, 47);
+        p.px(q[0], q[1], h < 0.4 ? '#a8a49a' : h < 0.7 ? '#6a665e' : h < 0.85 ? '#8a5a3a' : '#5e8a36');
+      }
+      // el cerro de roca (atrás), con la boca del socavón en su cara del frente: roca lisa (la textura 'rock' tiene juntas y
+      // parecía un edificio de piedra), con grietas, vetas y matas
+      const RK = [126, 118, 106], RK2 = [108, 102, 94], RKT = [150, 142, 128];
+      const b = { x: 0.04, y: 0.04, w: 1.3, h: 1.0 };
+      p.box(1.0, 0.45, 0.5, 0.5, 0, 6, RK2, RK2, RKT);           // laja baja a la derecha
+      p.box(b.x, b.y, b.w, b.h, 0, 12, RK, RK, RKT);
+      p.box(0.08, 0.06, 0.78, 0.62, 12, 19, RK, RK, RKT);        // la cima
+      p.box(0.7, 0.12, 0.5, 0.45, 12, 15, RK2, RK2, RKT);
+      p.box(0.18, 0.12, 0.42, 0.34, 19, 23, RK, RK, RKT);
+      for (let i = 0; i < 40; i++) { // motas y grietas en las caras
+        const sd = i % 2 ? 'L' : 'R', bb = i % 5 === 0 ? { x: 0.08, y: 0.06, w: 0.78, h: 0.62 } : b, len = sd === 'L' ? bb.w : bb.h, z0 = bb === b ? 0 : 12, z1 = bb === b ? 12 : 19;
+        const q = p.wp(bb, sd, 0.05 + U.hash(i, 1, 13) * (len - 0.1), z0 + 1 + U.hash(i, 2, 13) * (z1 - z0 - 2)), h = U.hash(i, 3, 13);
+        if (h < 0.35) { p.line(q, [q[0] + (sd === 'L' ? 1 : -1), q[1] + 2], 'rgba(40,34,30,0.55)'); p.px(q[0], q[1] + 3, 'rgba(40,34,30,0.45)'); }
+        else p.px(q[0], q[1], h < 0.7 ? 'rgba(255,250,235,0.28)' : 'rgba(30,26,22,0.35)');
+      }
+      for (let i = 0; i < 16; i++) { const q = p.P(0.1 + U.hash(i, 5, 9) * 1.1, 0.08 + U.hash(i, 6, 9) * 0.6, 12 + Math.round(U.hash(i, 7, 9) * 7)); p.px(q[0], q[1], U.hash(i, 8, 9) > 0.5 ? '#6a9a3e' : '#4e7a2e'); p.px(q[0] + 1, q[1], '#4e7a2e'); } // matas en el cerro
+      for (let i = 0; i < 8; i++) { const q = p.wp(b, i % 2 ? 'L' : 'R', 0.1 + U.hash(i, 4, 3) * 0.85, 2 + U.hash(i, 5, 3) * 8); p.px(q[0], q[1], i % 3 ? '#c0783c' : '#f0d060'); p.px(q[0] + 1, q[1] + 1, i % 3 ? '#8a4a24' : '#b89a30'); } // vetas que asoman
+      // boca del socavón: hueco negro con entibado de madera y un farol
+      p.quad(b, 'L', 0.42, 0.86, 0, 9, '#0e0a08');
+      p.quad(b, 'L', 0.48, 0.8, 0, 6, '#1a120c');
+      p.quad(b, 'L', 0.36, 0.43, 0, 10, 'darkwood'); p.quad(b, 'L', 0.85, 0.92, 0, 10, 'darkwood');
+      p.quad(b, 'L', 0.33, 0.95, 9, 11, 'darkwood');
+      const fa = p.wp(b, 'L', 0.98, 8); c.fillStyle = '#3a2a1a'; c.fillRect(fa[0], fa[1] - 1, 1, 2); c.fillStyle = '#ffc850'; c.fillRect(fa[0] - 1, fa[1] + 1, 3, 3); c.fillStyle = '#fff4b0'; c.fillRect(fa[0], fa[1] + 2, 1, 1);
+      // rieles que salen del socavón hacia el frente
+      for (let v = 1.1; v < 1.98; v += 0.16) p.line(p.P(0.47, v, 0), p.P(0.87, v, 0), '#4a3420');
+      p.line(p.P(0.53, 1.04, 0), p.P(0.53, 1.98, 0), '#9aa0aa'); p.line(p.P(0.81, 1.04, 0), p.P(0.81, 1.98, 0), '#9aa0aa');
+      // la vagoneta cargada
+      p.box(0.5, 1.4, 0.34, 0.42, 2, 7, '#5a5e66', '#44484e', '#2a2420');
+      p.box(0.52, 1.44, 0.3, 0.36, 7, 9, 'rust', 'rock', 'rust');
+      for (const [u, v] of [[0.55, 1.82], [0.55, 1.46], [0.84, 1.82]]) { const q = p.P(u, v, 1); c.fillStyle = '#1c1814'; c.fillRect(q[0] - 1, q[1] - 1, 3, 3); }
+      const g = p.P(0.66, 1.6, 9); p.px(g[0], g[1] - 1, '#ffe080');
+      // montón de mineral, con un pico y una pala clavados (adelante a la derecha)
+      rockPile(p, 1.2, 1.2, ['rust', 'rock', 'stone']);
+      for (let i = 0; i < 4; i++) { const q = p.P(1.3 + U.hash(i, 1, 5) * 0.5, 1.3 + U.hash(i, 2, 5) * 0.5, 3 + U.hash(i, 3, 5) * 4); p.px(q[0], q[1], '#ffe070'); }
+      const pk0 = p.P(1.75, 1.8, 0), pk1 = p.P(1.75, 1.8, 11); p.line(pk0, pk1, '#8a5a30'); c.fillStyle = '#8a8e96'; c.fillRect(pk1[0] - 3, pk1[1], 7, 1); c.fillRect(pk1[0] - 4, pk1[1] + 1, 1, 1); c.fillRect(pk1[0] + 3, pk1[1] + 1, 1, 1);
+      const pa0 = p.P(1.9, 1.55, 3), pa1 = p.P(1.9, 1.55, 12); p.line(pa0, pa1, '#8a5a30'); c.fillStyle = '#7a7e86'; c.fillRect(pa0[0] - 1, pa0[1] - 1, 3, 4);
+      // torno de mano sobre un pozo de cateo (atrás a la derecha)
+      p.box(1.5, 0.2, 0.4, 0.4, 0, 2, 'plank', 'plank', '#120c08');
+      p.post(1.5, 0.3, 10); p.post(1.82, 0.3, 10);
+      const t0 = p.P(1.55, 0.37, 10), t1 = p.P(1.88, 0.37, 10); p.line(t0, t1, '#6a4424'); p.line([t0[0], t0[1] - 1], [t1[0], t1[1] - 1], '#8a5a30');
+      const mz = p.P(1.92, 0.37, 10); c.fillStyle = '#4a3018'; c.fillRect(mz[0], mz[1] - 3, 1, 4);
+      const cu = p.P(1.7, 0.4, 10); p.line(cu, [cu[0], cu[1] + 6], '#c8b080'); c.fillStyle = '#6a4a2a'; c.fillRect(cu[0] - 1, cu[1] + 6, 3, 2);
+      if (tier >= 2) { p.box(1.15, 0.65, 0.3, 0.3, 6, 9, 'darkwood', 'darkwood', 'plank'); } // cajón de pólvora sobre la laja
+      // la bandera del reino en la cima
+      p.flag(0.4, 0.3, 23, col, 9);
     },
     mill(p, col, m) {
       const b = { x: 0.3, y: 0.3, w: 1.4, h: 1.4 };
@@ -1410,7 +1507,7 @@
   };
   const PTOP = { chest: 14, ruin: 34, camp: 30, relic: 22, watch: 46, cave: 30, lair: 26, crypt: 36, crater: 24, nest: 60, swamp: 36, giants: 44, temple: 36, legend: 40 };
 
-  const BTOP = { fuerte: 66, granporton: 58, granportonv: 58, establo: 40, tc: 68, house: 32, lumber: 24, mining: 24, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
+  const BTOP = { fuerte: 66, granporton: 58, granportonv: 58, establo: 40, tc: 68, house: 32, lumber: 28, mining: 36, mill: 38, farm: 8, market: 22, sawmill: 34, cartwright: 32, tavern: 48, wishwell: 34, arena: 30, beasthouse: 34, observatory: 70, sanctum: 50, runeforge: 46, dragontower: 92, herbolario: 34, titanforge: 52, faro: 96, library: 42, barracks: 36, tower: 58, guild: 52, masonry: 24, smelter: 50, forge: 36, university: 60, granary: 34, warehouse: 36, builder: 30, scout: 46, scriptorium: 34, monastery: 62, steelworks: 52, workshop: 40, wonder: 92, gardens: 46, archive: 62, colossus: 84, muelle: 32, farol: 26, banca: 12, pozo: 24, frutal: 26, estandarte: 34, hoguera: 12, fuente: 24, jardin: 8, plaza: 8, estanque: 10, estatua: 32, glorieta: 40, escenario: 36, columna: 46, arco: 48, m_faro: 112, m_coloso: 112, m_jardines: 60, m_catedral: 84 };
   // Tramos de nivel: 1-3, 4-6, 7-9, 10-12, 13-15, 16-19 y 20+ (cada era sube 2 niveles el tope).
   S.tier = lvl => (lvl >= 20 ? 6 : lvl >= 16 ? 5 : lvl >= 13 ? 4 : lvl >= 10 ? 3 : lvl >= 7 ? 2 : lvl >= 4 ? 1 : 0);
   // Alto extra del lienzo cuando el edificio crece (campanario, linterna, chapitel, pendones, fases de la Maravilla).
@@ -2148,8 +2245,11 @@
   // cuerpo es el mismo y la clase pone el traje (looks 'hpal', 'hgua', 'hcle', 'hing', 'hhec', 'hjug', 'hcor').
   const HERO_LOOK = { paladin: 'hpal', guarda: 'hgua', clerigo: 'hcle', ingeniera: 'hing', hechicero: 'hhec', juglar: 'hjug', corsaria: 'hcor' };
   const PELO_LARGO = { largo: 1, trenzas: 1, cola: 1, 'moño': 1 };
-  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop, soloCache, hero) {
-    const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '') + (hero ? '|' + hero.k : '');
+  // pk-87: `tala` = G.talaLook() ({ f, g, a, k }: niveles del Taller del Hachero) viste al leñador según sus mejoras
+  // (pedido del dueño: «que se note que el aldeano tiene mejoras»): camisa a cuadros, cuerda, gorro de lana, guantes,
+  // cuñas y mazo; el hacha cambia con el Filo (hierro, acero, doble filo, acero de crisol) y la sierra con el Golpe.
+  S.villager = function (col, hair, skin, mode, frame, carry, flip, tool, scout, back, aim, troop, soloCache, hero, tala) {
+    const key = col.join(',') + '|' + hair + skin + mode + frame + (carry || '') + (flip ? 1 : 0) + (tool || '') + (scout ? 's' : '') + (back ? 'b' : '') + (aim ? aim.join(',') : '') + (troop || '') + (hero ? '|' + hero.k : '') + (tala ? '|T' + tala.k : '');
     const ya = VC.get(key);
     if (ya) { VC.delete(key); VC.set(key, ya); return ya; }
     if (soloCache) return null; // sin presupuesto este cuadro: quien llama usa la de antes
@@ -2158,7 +2258,8 @@
     const PW = VW * VR, PH = VH * VR, pb = new PB(PW, PH);
     const HE = hero || null;
     if (HE) troop = HERO_LOOK[HE.clase] || 'hjug';
-    const female = HE ? !!HE.mujer : !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage' || troop === 'hcle' || troop === 'hhec';
+    const TL = !troop && !HE && tala && tala.f + tala.g + tala.a > 0 ? tala : null, TLt = TL ? TL.f + TL.g + TL.a : 0;
+    const female = HE ? !!HE.mujer : !troop && (hair * 3 + skin) % 2 === 1, hat = scout || troop || (TL && TL.a >= 3) ? 0 : (hair + skin * 2) % 4, robe = troop === 'cleric' || troop === 'monk' || troop === 'mage' || troop === 'hcle' || troop === 'hhec';
     const largo = HE ? !!PELO_LARGO[HE.peinado] : female, calvo = !!HE && HE.peinado === 'calvo';
     const tapado = troop === 'hgua' || troop === 'hcle' || (HE && HE.capucha); // capucha o velo: el pelo no asoma
     const walk = mode === 'walk', ph = walk ? (frame % 6) / 6 * Math.PI * 2 : 0;
@@ -2168,12 +2269,14 @@
     const working = mode === 'work' && tool;
     // materiales
     const HERO_TUNIC = { hpal: [168, 174, 188], hgua: [118, 82, 50], hcle: [236, 230, 214], hing: [222, 204, 170] };
-    const tcol = HE ? HERO_TUNIC[troop] || HE.col : troop ? TROOP_TUNIC[troop] || col : scout ? [86, 108, 56] : col;
+    const tcol = HE ? HERO_TUNIC[troop] || HE.col : troop ? TROOP_TUNIC[troop] || col : scout ? [86, 108, 56] : TL ? [178, 46, 38] : col; // pk-87: el leñador mejorado, a cuadros rojos
     const SK = vRamp(HE ? HE.piel : SKIN[skin]), HR = vRamp(HE ? HE.pelo : troop === 'mage' ? [196, 196, 204] : HAIR[hair]), BRD = vRamp(HE ? sc(HE.pelo, 0.85) : troop === 'mage' ? [214, 214, 220] : sc(HAIR[hair], 0.85));
     const TU = vRamp(tcol), TU2 = vRamp(sc(tcol, 0.78)), LIN = vRamp([212, 196, 160]), LIN2 = vRamp([176, 160, 126]);
     const PA = vRamp([104, 80, 54]), WRAP = vRamp([150, 128, 92]), BO = vRamp([78, 54, 36]), BE = vRamp([92, 58, 30]);
     const WO = vRamp([150, 102, 58]), ME = vRamp([160, 166, 180]), ST = vRamp([216, 180, 98]), BAND = vRamp([150, 72, 40]);
     const HOOD = vRamp([70, 88, 46]), KER = vRamp([232, 222, 196]), SACK = vRamp([178, 142, 90]), BASK = vRamp([176, 128, 66]), BASK2 = vRamp([136, 94, 46]);
+    const ROPE = vRamp([196, 170, 112]), GLV = vRamp([140, 96, 54]), TUD = vRamp(sc(tcol, 0.42)), IRON = vRamp([96, 100, 110]), STEEL = vRamp([168, 192, 222]), CRIS = vRamp([236, 240, 250]), BRASS = vRamp([212, 168, 76]);
+    const MANO = TL && TLt >= 6 ? GLV : SK; // guantes de cuero
     const LOG = vRamp(CARRY.wood), LOGEND = vRamp([214, 178, 122]), RED = vRamp([206, 52, 56]), GRN = vRamp([104, 162, 62]);
     // ---- piezas: elipsoides (e), cápsulas (c) y conos (k). z ordena por capas. ----
     const P = [];
@@ -2183,7 +2286,7 @@
     const hx = 8.3, hy = 4.3 + yo, inFront = back ? 7 : 0;
     const shY = 6.9 + yo, waist = 10.9 + yo, hipY = 11.9 + yo;
     // carga a la espalda (de espaldas va adelante)
-    if (carry === 'wood') for (let i = 0; i < 3; i++) {
+    if (carry === 'wood') for (let i = 0; i < 3 + (TL && TL.g >= 3 ? 1 : 0) + (TL && TL.g >= 5 ? 1 : 0); i++) {
       const x0 = 3.6 + i * 0.35, y0 = 10.4 - i * 0.95 + yo;
       Cp(x0, y0, 8.4 + i * 0.35, 6.0 - i * 0.95 + yo, 0.62, inFront + 0.2 + i * 0.01, (px, py) => (Math.hypot(px - x0, py - y0) < 0.65 ? LOGEND : LOG));
     } else if (carry && carry !== 'food') {
@@ -2246,7 +2349,7 @@
       Cp(sx, shY + 0.2, eX, eY, female ? 0.6 : 0.78, z, female ? TU : TU2);       // brazo (manga)
       if (!female) E(sx + (eX - sx) * 0.45, shY + 0.2 + (eY - shY - 0.2) * 0.45, 0.82, 1.0, z + 0.005, TU2); // bíceps
       Cp(eX, eY, hX, hY, female ? 0.48 : 0.6, z + 0.01, female ? (px, py) => (Math.hypot(px - hX, py - hY) < 0.6 ? LIN : TU) : SK); // antebrazo (descubierto en ellos)
-      E(hX, hY + 0.15, female ? 0.46 : 0.56, 0.56, z + 0.02, SK);                  // mano
+      E(hX, hY + 0.15, female ? 0.46 : 0.56, 0.56, z + 0.02, MANO);                // mano
     };
     const sw = -sv;
     let grip = null;
@@ -2261,6 +2364,7 @@
     const COLR = HE ? vRamp(HE.col) : troop ? vRamp(col) : null;
     const torsoM = (px, py) => {
       if (py >= beltY && py < beltY + 0.55) return troop === 'monk' ? LIN2 : troop === 'cleric' ? ST : BE;
+      if (TL && TL.a >= 1 && Math.abs((py - shY) - (hx + 1.7 - px) * 1.05) < 0.42) return Math.floor((px + py) * 2.2) % 2 ? ROPE : WRAP; // cuerda de tala dirigida, en bandolera
       if (troop && !back) {
         if (troop === 'knight' && Math.abs(px - (hx + 0.35)) < 0.95 && py > shY + 0.5) return Math.abs(px - (hx + 0.35)) < 0.18 || Math.abs(py - (shY + 2.1)) < 0.18 ? ST : COLR; // sobreveste con cruz
         if (troop === 'cleric' && (Math.abs(px - (hx - 0.15)) < 0.2 || Math.abs(px - (hx + 0.95)) < 0.2)) return ST; // estola
@@ -2277,6 +2381,7 @@
         if (troop === 'hgua' && Math.abs((py - shY) - (hx + 1.6 - px) * 1.1) < 0.3) return BE; // correa del carcaj
       }
       if (!back && py < shY + 1.2 && px > hx + 0.05 && px < hx + 0.75 + (py - shY) * 0.3) return py < shY + 0.9 ? SK : LIN; // escote
+      if (TL) { const a = Math.floor(px * 1.35) % 2, b = Math.floor(py * 1.35) % 2; return a && b ? TUD : a || b ? TU2 : TU; } // camisa a cuadros de leñador
       if (py > shY + 2.4 && py < beltY && Math.abs(px - (hx + 0.7)) < 0.25 && !back) return TU2;        // costura
       return TU;
     };
@@ -2318,6 +2423,19 @@
     if (scout) {
       E(hx - 0.15, hy - 0.1, 1.75, 1.95, 4.6, HOOD, (px, py) => back || !(px > hx - 0.25 && py > hy - 0.75));
       Cp(12.4, 1.2, 12.4, 18.4, 0.32, 6.5, WO); E(12.4, 0.9, 0.5, 0.5, 6.6, WO);
+    }
+    if (TL) {
+      if (TL.a >= 3) { // gorro de lana del color del reino, con el borde doblado y pompón
+        const GOR = vRamp(col), GOR2 = vRamp(sc(col, 0.7));
+        E(hx - 0.1, hy - 0.7, 1.58, 1.25, 4.65, (px, py) => (Math.floor(px * 2.4) % 2 ? GOR : GOR2), (px, py) => py < hy - 0.3);
+        E(hx - 0.1, hy - 0.42, 1.66, 0.3, 4.66, GOR2);
+        E(hx - 0.55, hy - 2.05, 0.5, 0.48, 4.7, KER);
+      }
+      if (TL.g >= 1 && !back) { // cuñas y mazo de roble colgando del cinto
+        Cp(hx - 1.1, beltY + 0.3, hx - 1.5, beltY + 2.2, 0.2, 3.45, WO); E(hx - 1.55, beltY + 2.4, 0.6, 0.42, 3.46, vRamp([128, 86, 48]));
+        K(hx + 1.25, beltY + 0.5, beltY + 1.7, 0.45, 0.12, 3.45, BRASS);
+      }
+      if (TL.a >= 5 && !back) { E(hx - 1.7, beltY + 0.6, 0.55, 0.55, 3.47, (px, py) => (Math.hypot(px - hx + 1.7, py - beltY - 0.6) < 0.25 ? BE : ME)); } // polea de la cabria
     }
     if (troop === 'minero') { // pk-84: casco de cuero con lámpara de carburo y el pañuelo del color del reino
       E(hx - 0.05, hy - 0.55, 1.68, 1.32, 4.65, vRamp([128, 90, 50]), (px, py) => py < hy - 0.2);
@@ -2393,10 +2511,30 @@
       const ul = Math.hypot(tip[0] - hand[0], tip[1] - hand[1]) || 1, u = [(tip[0] - hand[0]) / ul, (tip[1] - hand[1]) / ul];
       let p = [-u[1], u[0]]; if (p[0] < 0) p = [-p[0], -p[1]];
       const at = (a, b) => [tip[0] + u[0] * a + p[0] * b, tip[1] + u[1] * a + p[1] * b];
-      const seg = (a, b, r) => Cp(a[0], a[1], b[0], b[1], r, zT + 0.03, ME);
+      const seg = (a, b, r, m) => Cp(a[0], a[1], b[0], b[1], r, zT + 0.03, m || ME);
       Cp(hand[0] - u[0] * 1.6, hand[1] - u[1] * 1.6, tip[0], tip[1], 0.28, zT, WO);
-      if (tool === 'axe') { seg(at(-0.25, 0.15), at(-0.3, 1.0), 0.42); seg(at(-0.05, 1.05), at(-0.7, 1.2), 0.45); }
-      else if (tool === 'saw') { seg(at(0.2, -0.35), at(2.6, -0.35), 0.5); for (let i = 0; i < 6; i++) seg(at(0.45 + i * 0.38, -0.05), at(0.62 + i * 0.38, 0.12), 0.16); } // pk-83: sierra tronzadora
+      const fN = TL ? TL.f : 0, gN = TL ? TL.g : 0;
+      if (tool === 'axe') {
+        // Filo: piedra de afilar (filo brillante), hierro forjado (cabeza más grande), acero templado, doble filo, crisol
+        const AX = fN >= 5 ? CRIS : fN >= 3 ? STEEL : fN >= 2 ? IRON : ME, k = fN >= 2 ? 1.3 : 1;
+        for (const sd of fN >= 4 ? [1, -1] : [1]) {
+          seg(at(-0.25, 0.15 * sd), at(-0.3, 1.0 * k * sd), 0.42 * k, AX); seg(at(-0.05, 1.05 * k * sd), at(-0.7, 1.2 * k * sd), 0.45 * k, AX);
+          if (fN >= 1) seg(at(0.15, (1.3 * k + 0.2) * sd), at(-0.95, (1.45 * k + 0.2) * sd), 0.2, fN >= 5 ? vRamp([255, 250, 230]) : LIN);
+        }
+        if (fN >= 5) Cp(hand[0] - u[0] * 0.6, hand[1] - u[1] * 0.6, hand[0] + u[0] * 0.9, hand[1] + u[1] * 0.9, 0.34, zT + 0.01, ST); // mango con virola de oro
+      } else if (tool === 'saw') {
+        // Golpe: tronzadora de dos mangos (II), de bastidor (III), de vapor (IV), de cinta (V)
+        const BL = gN >= 4 ? STEEL : ME, lg = gN >= 4 ? 3.2 : 2.6;
+        seg(at(0.2, -0.35), at(lg, -0.35), 0.5, BL);
+        for (let i = 0; i < Math.round(lg * 2.3); i++) seg(at(0.45 + i * 0.38, -0.05), at(0.62 + i * 0.38, 0.12), 0.16, BL);
+        if (gN === 3) { const W2 = vRamp([176, 120, 62]); seg(at(0.1, -0.3), at(0.1, -2.4), 0.32, W2); seg(at(0.1, -2.4), at(2.7, -2.4), 0.32, W2); seg(at(2.7, -2.4), at(2.7, -0.3), 0.32, W2); seg(at(0.6, -1.4), at(2.2, -1.4), 0.14, ROPE); }
+        if (gN >= 5) { seg(at(0.2, -1.25), at(lg, -1.25), 0.32, BL); seg(at(lg, -1.25), at(lg + 0.4, -0.8), 0.3, BL); seg(at(lg + 0.4, -0.8), at(lg, -0.35), 0.3, BL); }
+        if (gN >= 4) { // el motor junto a las manos, con su chimenea
+          const mx = hand[0] + u[0] * 1.1, my = hand[1] + u[1] * 1.1;
+          E(mx, my, 1.15, 0.95, zT + 0.04, gN >= 5 ? vRamp([176, 52, 44]) : IRON); E(mx + 0.2, my - 0.2, 0.45, 0.4, zT + 0.05, BRASS);
+          Cp(mx - 0.4, my - 0.7, mx - 0.5, my - 2.0, 0.24, zT + 0.04, IRON);
+        }
+      }
       else if (tool === 'pick') { seg(at(0, -1.0), at(0, 1.0), 0.32); seg(at(0, 1.0), at(-0.55, 1.8), 0.25); seg(at(0, -1.0), at(-0.55, -1.8), 0.25); }
       else if (tool === 'hammer') seg(at(0, -0.75), at(0, 0.75), 0.55);
       else if (tool === 'knife') seg(at(0, 0), at(-0.3, 0.55), 0.3);
@@ -2405,7 +2543,7 @@
       else { let q = at(0, 0); for (let i = 1; i <= 5; i++) { const a = i / 5 * Math.PI, n = at(-Math.sin(a) * 0.9, 0.9 - Math.cos(a) * 0.9); seg(q, n, 0.24); q = n; } }
       const e = elbow(10.0, shY + 0.2, hand[0], hand[1]);
       arm(10.0, 1, zA, hand[0], hand[1], e[0], e[1]);
-      E(hand[0], hand[1] + 0.1, 0.5, 0.5, zT + 0.5, SK);
+      E(hand[0], hand[1] + 0.1, 0.5, 0.5, zT + 0.5, MANO);
     } else if (working) { // a mano (bayas): el brazo de adelante va y vuelve del arbusto
       const e = elbow(10.0, shY + 0.2, hand[0], hand[1]);
       arm(10.0, 1, zA, hand[0], hand[1], e[0], e[1]);
@@ -2435,6 +2573,14 @@
       else if (robe) { Cp(11.6, 1.8 + yo, 11.6, 18.2, 0.32, z, WO); E(11.6, 1.2 + yo, 0.95, 0.95, z + 0.1, (px, py) => (Math.hypot(px - 11.6, py - 1.2 - yo) < 0.45 ? vRamp([255, 236, 150]) : ST)); } // báculo con el sol
       else { Cp(11.0, 10.8 + yo, 12.8, 6.0 + yo, 0.4, z, WO); E(12.9, 5.8 + yo, 0.8, 0.85, z + 0.05, (px, py) => (U.hash(Math.round(px * 4), Math.round(py * 4), 3) > 0.8 ? ME : WO)); } // garrote con clavos
       E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, SK);
+    } else if (TL && !carry && !scout) { // pk-87: el leñador va con su hacha al hombro (la del Filo que tenga)
+      const hX = 10.6, hY = 10.2 + yo, z = 6.5, fN = TL.f, AX = fN >= 5 ? CRIS : fN >= 3 ? STEEL : fN >= 2 ? IRON : ME, k = fN >= 2 ? 1.25 : 1;
+      arm(9.9, 1, 5, hX, hY, 10.3, 8.9 + yo);
+      Cp(10.4, 11.4 + yo, 12.0, 3.6 + yo, 0.3, z, WO);
+      Cp(11.9, 3.9 + yo, 13.4 * (k > 1 ? 1.02 : 1), 4.5 + yo, 0.55 * k, z + 0.05, AX); Cp(13.3, 3.6 + yo, 13.6, 5.2 + yo, 0.42 * k, z + 0.06, AX);
+      if (fN >= 4) Cp(11.9, 3.9 + yo, 10.6, 3.3 + yo, 0.5 * k, z + 0.05, AX);
+      if (fN >= 1) Cp(13.9, 3.4 + yo, 14.0, 5.6 + yo, 0.18, z + 0.07, fN >= 5 ? vRamp([255, 250, 230]) : LIN);
+      E(hX, hY + 0.1, 0.55, 0.55, z + 0.5, MANO);
     } else arm(9.9, 1, 5, 10.1 - sw * 1.0, 11.6 + yo, 10.2 - sw * 0.45, 9.3 + yo);
 
     // ---- render por píxel (al doble de resolución, con tramado entre tonos) ----

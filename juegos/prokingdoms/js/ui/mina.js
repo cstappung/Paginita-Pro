@@ -30,7 +30,7 @@
   const G = () => PK.Game, M = () => PK.Mina;
 
   // ---------- Escena (píxeles virtuales; x = 0 es el centro del pozo) ----------
-  const SKY = 120, FH = 100, TECHO = 34, SUELO = 84, PW = 30, JH = 42, YS = SKY - 14;
+  const SKY = 120, FH = 100, TECHO = 34, SUELO = 84, VY = 58, PW = 30, JH = 42, YS = SKY - 14;
   const VELJ = [45, 70, 100, 140]; // la jaula, en píxeles por segundo, según el montacargas
   const RESCOL = Object.assign({}, Sp.CARRY, { stone: [176, 174, 166], gold: [255, 206, 64], ore: [196, 98, 60], marble: [240, 238, 230], gems: [90, 200, 255], crystal: [150, 236, 255], starIron: [196, 170, 255] });
   const rgb = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (a === undefined ? 1 : a) + ')';
@@ -470,19 +470,28 @@
     // nichos de las vetas destapadas (las agotadas, cámaras más grandes)
     const agotada = k => !p.v.some(a => a.k === k);
     for (let k = 0; k < p.i; k++) {
-      const vx = Math.round(vetaX(n, k) + O), ag = agotada(k), w = ag ? 22 : 17, h = ag ? 22 : 14;
+      const vx = Math.round(vetaX(n, k) + O), ag = agotada(k), w = ag ? 24 : 19, h = ag ? 8 : 5;
       for (let i = -w; i <= w; i++) { const t = i / w, ci = vx + i; if (ci >= 0 && ci < W) techo[ci] = Math.min(techo[ci], Math.round(TECHO - h * Math.sqrt(Math.max(0, 1 - t * t)) + (r() - 0.5) * 2)); }
     }
     // la pared del fondo: roca en lajas (píxel por píxel, con ImageData)
     const i0 = Math.max(0, izq), i1 = Math.min(W - 1, der);
     if (i1 > i0) {
       const img = x.getImageData(i0, 0, i1 - i0 + 1, SUELO), d = img.data, ww = i1 - i0 + 1, bk = sc(base, 0.5);
+      // hornacinas: la veta se pica en la pared del fondo, a la altura del pecho (pk-87: arriba parecía que minaban el techo)
+      const horn = [];
+      for (let k = 0; k < p.i; k++) { const ag = agotada(k); horn.push({ cx: vetaX(n, k) + O, rx: ag ? 23 : 18, cy: VY - 4, ry: SUELO - VY + 6 + (ag ? 2 : 0), ag }); }
       for (let i = 0; i < ww; i++) {
         const t0 = techo[i + i0], sem = U.hash(i + i0, n, 3);
         for (let y = t0; y < SUELO; y++) {
           const laja = Math.floor((y + 3 * Math.sin((i + i0) * 0.05 + sem * 6)) / 7), junta = Math.abs(((y + 3 * Math.sin((i + i0) * 0.05 + sem * 6)) % 7)) < 0.9;
           const h = U.hash(Math.floor((i + i0 + laja * 5) / 9), laja, n), ruido = U.hash(i + i0, y, n + 7);
-          const k = (0.78 + 0.32 * h + 0.12 * ruido) * (junta ? 0.62 : 1) * (y - t0 < 3 ? 0.75 : 1);
+          let k = (0.78 + 0.32 * h + 0.12 * ruido) * (junta ? 0.62 : 1) * (y - t0 < 3 ? 0.75 : 1);
+          for (const q of horn) {
+            if (Math.abs(i + i0 - q.cx) > q.rx + 1) continue;
+            const dx = (i + i0 - q.cx) / q.rx, dy = (y - q.cy) / q.ry, dd = dx * dx + dy * dy;
+            if (dd >= 1) continue;
+            k *= dd > 0.8 ? (y < q.cy ? 1.22 : 0.85) : (q.ag ? 0.42 : 0.5) + 0.38 * dd; // borde con luz arriba, hondo al centro
+          }
           const o = (y * ww + i) * 4;
           d[o] = Math.min(255, bk[0] * k); d[o + 1] = Math.min(255, bk[1] * k); d[o + 2] = Math.min(255, bk[2] * k); d[o + 3] = 255;
         }
@@ -749,12 +758,12 @@
   }
   function evAgotada(n, k, def) {
     const y0 = yPiso(n), vx = vetaX(n, k), col = RESCOL[def.res] || [200, 200, 200];
-    cascotes(vx, y0 + TECHO - 4, y0 + SUELO - 1, D.estratoDe(n).col, 14);
-    nube(vx, y0 + TECHO + 10, sc(D.estratoDe(n).col, 1.3), 8, 30);
+    cascotes(vx, y0 + VY - 14, y0 + SUELO - 1, D.estratoDe(n).col, 14);
+    nube(vx, y0 + VY, sc(D.estratoDe(n).col, 1.3), 8, 30);
     aviso(vx, y0 + TECHO - 2, 'Veta de ' + D.RES[def.res].name.toLowerCase() + ' agotada', sc(col, 0.8), 2.6);
     if (def.hall) {
-      brillos(vx, y0 + TECHO + 6, RESCOL.gems, 46, 70);
-      destello(vx, y0 + TECHO + 8, 50, [110, 210, 255], 0.8);
+      brillos(vx, y0 + VY, RESCOL.gems, 46, 70);
+      destello(vx, y0 + VY, 50, [110, 210, 255], 0.8);
       aviso(vx, y0 + TECHO + 10, '¡Bolsón de gemas! +' + def.hall, RESCOL.gems, 3.4);
       V.fiesta[n] = V.t + 3;
       sonar(n, 'coin');
@@ -762,8 +771,8 @@
   }
   function evEspecial(n, k, def) {
     const y0 = yPiso(n), vx = vetaX(n, k), col = RESCOL[def.esp] || [220, 220, 255];
-    destello(vx, y0 + TECHO - 6, 44, col, 0.9);
-    brillos(vx, y0 + TECHO - 6, col, 24, 40);
+    destello(vx, y0 + VY, 44, col, 0.9);
+    brillos(vx, y0 + VY, col, 24, 40);
     aviso(vx, y0 + TECHO - 12, '¡' + D.RES[def.esp].name + '!', col, 3);
     sonar(n, 'magia');
   }
@@ -1295,37 +1304,62 @@
 
   // filón + nicho + pepitas; el que se trabaja, con más luz; una veta recién destapada brilla un rato
   function veta(ctx, n, y0, a, def, vx, activa, luces) {
+    // el filón cruza la roca en diagonal y aflora en la hornacina de la pared, a la altura del pico; abajo, el mineral
+    // ya arrancado espera la pala
     const col = RESCOL[def.res] || [200, 200, 200], frac = U.clamp(a.q / def.cant, 0, 1), r = U.rng((V.b.mina.sem + n * 131 + a.k * 17) >>> 0);
-    r();
-    const ancho = 4 + Math.round(5 * frac), pts = [];
-    let px = vx + (r() - 0.5) * 50, py = y0 + 2;
-    while (py < y0 + TECHO - 10) { pts.push([px, py]); px += (vx - px) * 0.35 + (r() - 0.5) * 8; py += 5 + r() * 4; }
-    pts.push([vx, y0 + TECHO - 12]);
-    for (let i = 1; i < pts.length; i++) {
-      const [ax, ay] = pts[i - 1], [bx, by] = pts[i], w = Math.max(2, Math.round(ancho * (0.55 + 0.45 * i / pts.length)));
-      linea(ctx, ax, ay, bx, by, rgb(sc(col, 0.62)), w + 2);
-      linea(ctx, ax, ay, bx, by, rgb(sc(col, 0.95)), w);
-    }
-    const m = 6 + Math.round(22 * frac);
+    const s = r() < 0.5 ? -1 : 1, ancho = 2 + Math.round(1.5 * frac), cy = y0 + VY;
+    // el filón: una línea quebrada y fina que baja en diagonal por la pared del fondo, con dos ramitas
+    const filon = (x, y, dx, hasta, w, ramas) => {
+      const pts = [[x, y]];
+      while (y < hasta) { x += dx * (3 + r() * 4) + (r() - 0.5) * 4; y += 3 + r() * 3; pts.push([x, y]); }
+      for (let i = 1; i < pts.length; i++) {
+        const [ax, ay] = pts[i - 1], [bx, by] = pts[i], enRoca = by < y0 + TECHO + 3, ww = Math.max(1, Math.round(w * (0.6 + 0.4 * Math.sin(i * 1.7 + ax))));
+        ctx.globalAlpha = enRoca ? 0.4 : 0.95;
+        linea(ctx, ax, ay, bx, by, rgb(sc(col, 0.42)), ww + 2);
+        linea(ctx, ax, ay, bx, by, rgb(sc(col, enRoca ? 0.7 : 0.88)), ww);
+        if (!enRoca && ww > 1) { ctx.fillStyle = rgb(sc(col, 1.35)); ctx.fillRect(Math.round(bx), Math.round(by), 1, 1); }
+        if (ramas && i % 4 === 2 && !enRoca) filon(bx, by, -dx * 0.6, by + 8 + r() * 6, Math.max(1, w - 1), false);
+      }
+      ctx.globalAlpha = 1;
+    };
+    filon(vx - s * (14 + r() * 6), y0 + TECHO + 5, s, cy + 16, ancho, true); // todo dentro de la pared: arriba, en el techo, parecía que minaban hacia arriba
+    // la masa del afloramiento: pepitas en la cara de la pared (se achican y ralean al agotarse)
+    const m = 8 + Math.round(26 * frac);
     for (let i = 0; i < m; i++) {
-      const ang = r() * Math.PI, rad = 4 + r() * 11, x = Math.round(vx + Math.cos(ang) * rad * 1.3), y = Math.round(y0 + TECHO - 4 - Math.sin(ang) * rad * 0.8), s = 1 + Math.floor(r() * (1 + 3 * frac));
-      ctx.fillStyle = rgb(sc(col, 0.6)); ctx.fillRect(x - 1, y - 1, s + 2, s + 2);
-      ctx.fillStyle = rgb(sc(col, 0.85 + r() * 0.3)); ctx.fillRect(x, y, s, s);
-      ctx.fillStyle = rgb(sc(col, 1.45)); ctx.fillRect(x, y, 1, 1);
+      const ang = r() * Math.PI * 2, rad = Math.sqrt(r()), x = Math.round(vx + Math.cos(ang) * rad * 13), y = Math.round(cy - 2 + Math.sin(ang) * rad * 11), sz = 1 + Math.floor(r() * (1 + 3 * frac));
+      if (r() > 0.35 + 0.65 * frac) continue;
+      ctx.fillStyle = rgb(sc(col, 0.45)); ctx.fillRect(x - 1, y - 1, sz + 2, sz + 2);
+      ctx.fillStyle = rgb(sc(col, 0.8 + r() * 0.35)); ctx.fillRect(x, y, sz, sz);
+      ctx.fillStyle = rgb(sc(col, 1.5)); ctx.fillRect(x, y, 1, 1);
+    }
+    // picaduras recientes: marcas claras en la roca alrededor
+    for (let i = 0; i < 6; i++) { const x = Math.round(vx + (r() - 0.5) * 30), y = Math.round(cy - 8 + r() * 18); ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.fillRect(x, y, 2, 1); }
+    // el montón al pie de la pared
+    const mon = Math.round(2 + 6 * frac), bx0 = vx + s * 4, suelo = y0 + SUELO;
+    for (let j = 0; j < mon * 3; j++) {
+      const t = (r() - 0.5) * 2, hh = Math.max(0, Math.round(mon * (1 - t * t) * (0.6 + r() * 0.5))), x = Math.round(bx0 + t * (mon + 5));
+      ctx.fillStyle = rgb(sc(col, 0.55)); ctx.fillRect(x - 1, suelo - hh - 1, 3, hh + 1);
+      ctx.fillStyle = rgb(sc(col, 0.85 + r() * 0.3)); ctx.fillRect(x, suelo - hh - 1, 2, 2);
     }
     if (def.esp) {
+      // cristales que brotan de la hornacina
       const ec = RESCOL[def.esp], pul = 0.75 + 0.25 * Math.sin(V.t * 3 + a.k);
-      for (let i = 0; i < 4; i++) { const x = vx - 6 + i * 4, h = 5 + (i % 2) * 4; ctx.fillStyle = rgb(sc(ec, pul)); ctx.fillRect(x, y0 + TECHO - 8 - h, 3, h); ctx.fillStyle = rgb(sc(ec, 1.4)); ctx.fillRect(x, y0 + TECHO - 8 - h, 1, h); }
-      luces.push([vx, y0 + TECHO - 10, 26, 1]);
+      for (let i = 0; i < 5; i++) {
+        const x = vx - 9 + i * 4 + (i % 2), h = 4 + ((i * 7) % 3) * 3, y = cy + 6 - (i % 2) * 14;
+        ctx.fillStyle = rgb(sc(ec, 0.45)); ctx.fillRect(x - 1, y - h - 1, 5, h + 2);
+        ctx.fillStyle = rgb(sc(ec, pul)); ctx.fillRect(x, y - h, 3, h);
+        ctx.fillStyle = rgb(sc(ec, 1.4)); ctx.fillRect(x, y - h, 1, h);
+      }
+      luces.push([vx, cy, 26, 1]);
     }
     const nueva = V.vetaNueva[n + '|' + a.k], brillo = nueva !== undefined && V.t - nueva < 5 ? 1 - (V.t - nueva) / 5 : 0;
-    luces.push([vx, y0 + TECHO - 8, (activa ? 30 : 20) + brillo * 26, activa || brillo ? 0.9 : 0.6]);
+    luces.push([vx, cy, (activa ? 30 : 20) + brillo * 26, activa || brillo ? 0.9 : 0.6]);
   }
   // destellos que se ven aun en la oscuridad (dibujados después de la sombra)
   function destellos(ctx, n, y0, a, def, vx) {
     const col = RESCOL[def.res] || [220, 220, 220], r = U.rng((V.b.mina.sem + n * 59 + a.k * 7) >>> 0), nueva = V.vetaNueva[n + '|' + a.k], extra = nueva !== undefined && V.t - nueva < 5 ? 6 : 0;
     for (let i = 0; i < 6 + extra; i++) {
-      const x = Math.round(vx - 16 + r() * 32), y = Math.round(y0 + TECHO - 16 + r() * 12), fase = r() * 6.28;
+      const x = Math.round(vx - 15 + r() * 30), y = Math.round(y0 + VY - 12 + r() * 22), fase = r() * 6.28;
       const s = Math.sin(V.t * (3 + extra) + fase);
       if (s < 0.6) continue;
       ctx.fillStyle = rgb(sc(col, 1.5), (s - 0.6) * 2.4); ctx.fillRect(x, y, 1, 1); ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3);

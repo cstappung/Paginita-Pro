@@ -716,6 +716,16 @@
     if (!t) return SIN_TALA;
     return { f: R.filo.mult[t.n.filo || 0], g: R.golpe.mult[t.n.golpe || 0], a: R.aguante.mult[t.n.aguante || 0] };
   };
+  // pk-87: niveles del Hachero para vestir al leñador (solo dibujo); el mismo objeto mientras no cambien (va en la llave
+  // del caché de figuras)
+  let lookTala = null;
+  G.talaLook = function () {
+    const t = talaSt();
+    if (!t) return null;
+    const f = t.n.filo || 0, g = t.n.golpe || 0, a = t.n.aguante || 0, k = f + '' + g + a;
+    if (!lookTala || lookTala.k !== k) lookTala = { f, g, a, k };
+    return lookTala;
+  };
   // madera por segundo del leñador (Filo × Golpe) y lo que pierde el árbol por cada unidad que junta (1 / (Golpe × Aguante))
   G.talaRate = () => { const m = G.talaMult(); return m.f * m.g; };
   G.talaDesgaste = () => { const m = G.talaMult(); return 1 / (m.g * m.a); };

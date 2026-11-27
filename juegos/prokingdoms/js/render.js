@@ -294,8 +294,9 @@
     if (mode === 'walk') frame = Math.floor(u.anim * 9) % 6;
     else if (mode === 'work') {
       const t = u.task && u.task.t, n = t === 'gather' && W.nodes[u.task.node];
+      // pk-87: con sierra, la mitad de la cuadrilla aserra y la otra hachea (así se ve también el Filo)
       tool = t === 'dig' ? 'pick' : t === 'build' ? 'hammer' : t === 'farm' ? 'sickle' : !n ? 'pick'
-        : n.kind === 'tree' ? (u.owner === 'p' && G().talaMult().g >= D.HACHERO.ramas.golpe.mult[2] ? 'saw' : 'axe') : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
+        : n.kind === 'tree' ? (u.owner === 'p' && G().talaLook() && G().talaLook().g >= 2 && u.id % 2 === 0 ? 'saw' : 'axe') : n.kind === 'berry' ? 'hand' : n.kind === 'deer' ? 'knife' : (D.NODES[n.kind] && D.NODES[n.kind].tool) || 'pick';
       // pk-83: con Filo del Hachero el leñador golpea más seguido
       const ph = (u.anim * SWING[tool] * (n && n.kind === 'tree' && u.owner === 'p' ? G().talaMult().f : 1) + u.id * 0.37) % 1;
       frame = tool === 'hand' ? Math.floor(ph * 4) : ph < 0.4 ? 0 : ph < 0.52 ? 1 : ph < 0.8 ? 2 : 3;
@@ -320,7 +321,7 @@
     // la suya muestra la de antes, nunca más de 3 cuadros seguidos (8 en el celular, donde cada figura cuesta más).
     const lejos = R.cam.z < 1.5, hair = lejos ? (u.id % 2) : u.hair, skin = lejos ? 0 : u.skin;
     const espera = vPres <= 0 && u._spr && (u._hambre || 0) < (MOBILE ? 8 : 3), n0 = Sp.vNuevas;
-    const spr = Sp.villager(col, hair, skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim, u.task && u.task.t === 'mina' && !u.carry ? 'minero' : undefined, espera); // pk-84: quien va a la mina, vestido de minero
+    const spr = Sp.villager(col, hair, skin, mode, frame, u.carry > 0 ? u.carryRes : null, u.flip, tool, u.kind === 'scout', u.back && (mode === 'walk' || mode === 'work'), aim, u.task && u.task.t === 'mina' && !u.carry ? 'minero' : undefined, espera, undefined, u.owner === 'p' && u.kind === 'v' && u.task && u.task.t === 'gather' && u.task.res === 'wood' ? G().talaLook() : null); // pk-84: quien va a la mina, vestido de minero; pk-87: el leñador, con el equipo del Hachero
     if (!spr) { u._hambre = (u._hambre || 0) + 1; return u._spr; }
     if (Sp.vNuevas !== n0) vPres--;
     u._hambre = 0; u._spr = spr;
@@ -339,7 +340,11 @@
     let snd = null;
     if (n) n.shk = n.kind === 'tree' ? 0.22 : 0.14;
     if (tool === 'axe' || tool === 'saw') {
-      bits(4, [[204, 160, 104], [232, 200, 146], [120, 84, 50]], 20, 26, 90, 0.55);
+      const lk = u.owner === 'p' ? G().talaLook() : null;
+      bits(4 + (lk ? lk.g : 0), [[204, 160, 104], [232, 200, 146], [120, 84, 50]], 20, 26, 90, 0.55);
+      // pk-87: el acero templado destella al golpear; la sierra de vapor echa humo
+      if (lk && tool === 'axe' && lk.f >= 3) P.push({ x, y: y - 1, vx: 0, vy: 0, life: 0, max: 0.18, s: 2, grav: 0, rgb: lk.f >= 5 ? [255, 250, 220] : [220, 236, 255] });
+      if (lk && tool === 'saw' && lk.g >= 4) puff(2, [150, 150, 150]);
       for (let i = 0; i < 2; i++) if (rnd() < 0.7) P.push({ x: x + (rnd() - 0.5) * 14, y: y - 10 - rnd() * 10, vx: (rnd() - 0.5) * 8, vy: 3 + rnd() * 4, life: 0, max: 1.3, s: 1, rgb: rnd() < 0.5 ? [70, 130, 50] : [118, 166, 62] });
       snd = 'chop';
     } else if (tool === 'pick' && n) {

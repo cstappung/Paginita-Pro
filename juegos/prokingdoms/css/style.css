@@ -1404,6 +1404,9 @@ html.daltonico .res.full { background: rgba(232, 144, 42, 0.28); outline-color: 
 /* pk-83 (plan Hacha y Pico, P2): ventana del Taller del Hachero */
 .hach-resumen { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 10px; padding: 6px 10px; background: rgba(0, 0, 0, 0.22); border-radius: 4px; }
 .hach-resumen b { color: #ffd76a; }
+.hach-vista { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 6px 10px; background: rgba(60, 90, 40, 0.35); border-radius: 4px; }
+.hach-lenador { image-rendering: pixelated; flex: 0 0 auto; max-width: 55%; }
+@media (max-width: 600px) { .hach-vista { flex-direction: column; align-items: flex-start; } .hach-lenador { max-width: 100%; } }
 .hach-inv { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; padding: 6px 8px; border: 1px solid rgba(255, 215, 106, 0.35); border-radius: 4px; }
 .hach-ico { width: 40px; height: 40px; image-rendering: pixelated; }
 .hach-ramas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
